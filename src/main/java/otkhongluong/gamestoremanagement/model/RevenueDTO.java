@@ -1,27 +1,32 @@
 package otkhongluong.gamestoremanagement.model;
 
-import java.math.BigDecimal;
-
 public class RevenueDTO {
-    private String thoiGian;   
-    private int tongDonHang;   
-    private BigDecimal tongDoanhThu; 
+    private String ThoiGian; 
+    private int SoDonHang;
+    private double TongDoanhThu;
 
-    public RevenueDTO() {}
-
-    public RevenueDTO(String thoiGian, int tongDonHang, BigDecimal tongDoanhThu) {
-        this.thoiGian = thoiGian;
-        this.tongDonHang = tongDonHang;
-        this.tongDoanhThu = tongDoanhThu;
+    public RevenueDTO() {
     }
 
-    // Getters and Setters
-    public String getThoiGian() { return thoiGian; }
-    public void setThoiGian(String thoiGian) { this.thoiGian = thoiGian; }
+    public RevenueDTO(String ThoiGian, int SoDonHang, double TongDoanhThu) {
+        this.ThoiGian = ThoiGian;
+        this.SoDonHang = SoDonHang;
+        this.TongDoanhThu = TongDoanhThu;
+    }
 
-    public int getTongDonHang() { return tongDonHang; }
-    public void setTongDonHang(int tongDonHang) { this.tongDonHang = tongDonHang; }
+    public String getThoiGian() {return ThoiGian;}
+    public void setThoiGian(String ThoiGian) {this.ThoiGian = ThoiGian;}
+    public int getSoDonHang() {return SoDonHang;}
+    public void setSoDonHang(int SoDonHang) {this.SoDonHang = SoDonHang;}
+    public double getTongDoanhThu() {return TongDoanhThu;}
+    public void setTongDoanhThu(double TongDoanhThu) {this.TongDoanhThu = TongDoanhThu;}
 
-    public BigDecimal getTongDoanhThu() { return tongDoanhThu; }
-    public void setTongDoanhThu(BigDecimal tongDoanhThu) { this.tongDoanhThu = tongDoanhThu; }
+    @Override
+    public String toString() {
+        return "RevenueDTO{" +
+                "ThoiGian='" + ThoiGian + '\'' +
+                ", SoDonHang=" + SoDonHang +
+                ", TongDoanhThu=" + TongDoanhThu +
+                '}';
+    }
 }
