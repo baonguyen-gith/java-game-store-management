@@ -1,20 +1,19 @@
 package otkhongluong.gamestoremanagement.model;
 
 public class Role {
-    private int maRole;
-    private String tenRole;
+    private int MaRole;
+    private String TenRole;
 
     public Role() {}
 
-    public Role(int maRole, String tenRole) {
-        this.maRole = maRole;
-        this.tenRole = tenRole;
+    public Role(int MaRole, String TenRole) {
+        this.MaRole = MaRole;
+        this.TenRole = TenRole;
     }
 
-    // Getters and Setters
-    public int getMaRole() { return maRole; }
-    public void setMaRole(int maRole) { this.maRole = maRole; }
+    public int getMaRole() { return MaRole; }
+    public void setMaRole(int MaRole) { this.MaRole = MaRole; }
 
-    public String getTenRole() { return tenRole; }
-    public void setTenRole(String tenRole) { this.tenRole = tenRole; }
+    public String getTenRole() { return TenRole; }
+    public void setTenRole(String TenRole) { this.TenRole = TenRole; }
 }
