@@ -1,13 +1,13 @@
 package otkhongluong.gamestoremanagement.model;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 public class HoaDon {
     private int MaHD;
     private int MaKH;
-    private Date NgayLap;
+    private LocalDateTime NgayLap; 
     private double TongTien;
     private List<ChiTietHoaDon> DanhSachChiTiet;
 
@@ -15,7 +15,7 @@ public class HoaDon {
         this.DanhSachChiTiet = new ArrayList<>();
     }
 
-    public HoaDon(int MaHD, int MaKH, Date NgayLap, double TongTien) {
+    public HoaDon(int MaHD, int MaKH, LocalDateTime NgayLap, double TongTien) {
         this.MaHD = MaHD;
         this.MaKH = MaKH;
         this.NgayLap = NgayLap;
@@ -25,19 +25,22 @@ public class HoaDon {
 
     public int getMaHD() { return MaHD; }
     public void setMaHD(int MaHD) { this.MaHD = MaHD; }
+
     public int getMaKH() { return MaKH; }
     public void setMaKH(int MaKH) { this.MaKH = MaKH; }
-    public Date getNgayLap() { return NgayLap; }
-    public void setNgayLap(Date NgayLap) { this.NgayLap = NgayLap; }
+
+    public LocalDateTime getNgayLap() { return NgayLap; }
+    public void setNgayLap(LocalDateTime NgayLap) { this.NgayLap = NgayLap; }
+
     public double getTongTien() { return TongTien; }
     public void setTongTien(double TongTien) { this.TongTien = TongTien; }
-    public List<ChiTietHoaDon> getDanhSachChiTiet() { return DanhSachChiTiet;} 
+
+    public List<ChiTietHoaDon> getDanhSachChiTiet() { return DanhSachChiTiet; }
     public void setDanhSachChiTiet(List<ChiTietHoaDon> DanhSachChiTiet) { this.DanhSachChiTiet = DanhSachChiTiet; }
-    public void themChiTiet(ChiTietHoaDon ct) { this.DanhSachChiTiet.add(ct); }
 
     @Override
     public String toString() {
-        return "HoaDon{" + "MaHD=" + MaHD + ", MaKH=" + MaKH + ", SoLuongCT=" + DanhSachChiTiet.size() + ", TongTien=" + TongTien + '}';
+        return "HoaDon{" + "MaHD=" + MaHD + ", NgayLap=" + NgayLap + ", TongTien=" + TongTien + '}';
     }
 
     public static class ChiTietHoaDon {
@@ -46,7 +49,6 @@ public class HoaDon {
         private double DonGia;
 
         public ChiTietHoaDon() {}
-
         public ChiTietHoaDon(int MaSP, int SoLuong, double DonGia) {
             this.MaSP = MaSP;
             this.SoLuong = SoLuong;
