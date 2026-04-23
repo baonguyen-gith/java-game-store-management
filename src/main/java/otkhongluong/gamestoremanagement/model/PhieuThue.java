@@ -48,7 +48,7 @@ public class PhieuThue {
     public void setTienCoc(double TienCoc) { this.TienCoc = TienCoc; }
     
     public double getTienPhat() { return TienPhat; }
-    public void setTienPhat(double TienPhat) { this.TienPhat = TienPhat; }\
+    public void setTienPhat(double TienPhat) { this.TienPhat = TienPhat; }
 
     public List<CTPhieuThue> getDanhSachChiTiet() { return DanhSachChiTiet; }
     public void setDanhSachChiTiet(List<CTPhieuThue> DanhSachChiTiet) { this.DanhSachChiTiet = DanhSachChiTiet; }
