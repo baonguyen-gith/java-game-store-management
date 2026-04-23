@@ -31,14 +31,27 @@ public class PhieuThue {
 
     public int getMaPT() { return MaPT; }
     public void setMaPT(int MaPT) { this.MaPT = MaPT; }
+
+    public int getMaKH() { return MaKH; }
+    public void setMaKH(int MaKH) { this.MaKH = MaKH; }
+    
     public LocalDateTime getNgayThue() { return NgayThue; }
     public void setNgayThue(LocalDateTime NgayThue) { this.NgayThue = NgayThue; }
+    
     public LocalDateTime getNgayTraDuKien() { return NgayTraDuKien; }
     public void setNgayTraDuKien(LocalDateTime NgayTraDuKien) { this.NgayTraDuKien = NgayTraDuKien; }
+    
     public LocalDateTime getNgayTraThucTe() { return NgayTraThucTe; }
     public void setNgayTraThucTe(LocalDateTime NgayTraThucTe) { this.NgayTraThucTe = NgayTraThucTe; }
+
+    public double getTienCoc() { return TienCoc; }
+    public void setTienCoc(double TienCoc) { this.TienCoc = TienCoc; }
+    
     public double getTienPhat() { return TienPhat; }
     public void setTienPhat(double TienPhat) { this.TienPhat = TienPhat; }
+
+    public List<CTPhieuThue> getDanhSachChiTiet() { return DanhSachChiTiet; }
+    public void setDanhSachChiTiet(List<CTPhieuThue> DanhSachChiTiet) { this.DanhSachChiTiet = DanhSachChiTiet; }
 
     public static class CTPhieuThue {
         private int MaSP;
