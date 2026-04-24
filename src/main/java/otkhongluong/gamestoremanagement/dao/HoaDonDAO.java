@@ -40,7 +40,7 @@ public class HoaDonDAO {
                     psCTHD.setInt(2, ct.getMaSP());
                     psCTHD.setInt(3, ct.getSoLuong());
                     psCTHD.setDouble(4, ct.getDonGia());
-                    psCTHD.addBatch(); // Đưa vào hàng chờ Batch
+                    psCTHD.addBatch();
                 }
                 psCTHD.executeBatch(); 
             }
