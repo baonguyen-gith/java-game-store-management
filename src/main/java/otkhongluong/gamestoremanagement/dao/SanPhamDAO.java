@@ -12,12 +12,13 @@ import java.util.List;
 
 public class SanPhamDAO {
     public boolean insert(SanPham sp) {
-        String sql = "INSERT INTO SANPHAM (MaSP, MaGame, GiaBan) VALUES (SEQ_SANPHAM.NEXTVAL, ?, ?)";
+        String sql = "INSERT INTO SANPHAM (MaSP, MaGame, GiaBan, TrangThai) VALUES (SEQ_SANPHAM.NEXTVAL, ?, ?, ?)";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             
             ps.setInt(1, sp.getMaGame());
             ps.setDouble(2, sp.getGiaBan());
+            ps.setString(3, sp.getTrangThai() != null ? sp.getTrangThai() : "Sẵn sàng");
             
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -28,18 +29,30 @@ public class SanPhamDAO {
     }
 
     public boolean update(SanPham sp) {
-        String sql = "UPDATE SANPHAM SET MaGame = ?, GiaBan = ? WHERE MaSP = ?";
+        String sql = "UPDATE SANPHAM SET MaGame = ?, GiaBan = ?, TrangThai = ? WHERE MaSP = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             
             ps.setInt(1, sp.getMaGame());
             ps.setDouble(2, sp.getGiaBan());
-            ps.setInt(3, sp.getMaSP());
+            ps.setString(3, sp.getTrangThai());
+            ps.setInt(4, sp.getMaSP());
             
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        return false;
+    }
+
+    public boolean updateStatus(int maSP, String status) {
+        String sql = "UPDATE SANPHAM SET TrangThai = ? WHERE MaSP = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, status);
+            ps.setInt(2, maSP);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { e.printStackTrace(); }
         return false;
     }
 
@@ -113,6 +126,7 @@ public class SanPhamDAO {
         sp.setMaSP(rs.getInt("MaSP"));
         sp.setMaGame(rs.getInt("MaGame"));
         sp.setGiaBan(rs.getDouble("GiaBan"));
+        sp.setTrangThai(rs.getString("TrangThai"));
         return sp;
     }
 }
