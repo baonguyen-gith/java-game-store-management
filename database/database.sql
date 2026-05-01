@@ -41,24 +41,23 @@ CREATE TABLE KHACHHANG (
 );
 
 -- ========================
--- 5. GAME
+-- 5. GAME (ĐÃ BỎ GIÁ)
 -- ========================
 CREATE TABLE GAME (
     MaGame NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     TenGame VARCHAR2(200) NOT NULL,
     TheLoai VARCHAR2(50),
-    NenTang VARCHAR2(50),
-    GiaBan NUMBER(15,2),
-    GiaThueNgay NUMBER(15,2)
+    NenTang VARCHAR2(50)
 );
 
 -- ========================
--- 6. SANPHAM
+-- 6. SANPHAM (THÊM GIÁ THUÊ)
 -- ========================
 CREATE TABLE SANPHAM (
     MaSP NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     MaGame NUMBER,
-    GiaBan NUMBER(15,2)
+    GiaBan NUMBER(15,2),
+    GiaThueNgay NUMBER(15,2)
 );
 
 -- ========================
@@ -80,18 +79,19 @@ CREATE TABLE ROM (
 );
 
 -- ========================
--- 9. HOADON
+-- 9. HOADON (THÊM TRẠNG THÁI)
 -- ========================
 CREATE TABLE HOADON (
     MaHD NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     MaKH NUMBER,
     MaNV NUMBER,
     NgayLap TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    TongTien NUMBER(15,2) DEFAULT 0
+    TongTien NUMBER(15,2) DEFAULT 0,
+    TrangThai VARCHAR2(20) DEFAULT 'ChuaThanhToan'
 );
 
 -- ========================
--- 10. CTHOADON
+-- 10. CTHOADON (GIÁ LỊCH SỬ)
 -- ========================
 CREATE TABLE CTHOADON (
     MaHD NUMBER,
@@ -102,7 +102,7 @@ CREATE TABLE CTHOADON (
 );
 
 -- ========================
--- 11. PHIEUTHUE
+-- 11. PHIEUTHUE (THÊM TRẠNG THÁI)
 -- ========================
 CREATE TABLE PHIEUTHUE (
     MaPT NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -111,15 +111,17 @@ CREATE TABLE PHIEUTHUE (
     NgayTraDuKien TIMESTAMP,
     NgayTraThucTe TIMESTAMP,
     TienCoc NUMBER(15,2),
-    TienPhat NUMBER(15,2) DEFAULT 0
+    TienPhat NUMBER(15,2) DEFAULT 0,
+    TrangThai VARCHAR2(20) DEFAULT 'DangThue'
 );
 
 -- ========================
--- 12. CTPHIEUTHUE
+-- 12. CTPHIEUTHUE (THÊM GIÁ THUÊ)
 -- ========================
 CREATE TABLE CTPHIEUTHUE (
     MaPT NUMBER,
     MaSP NUMBER,
+    DonGiaThue NUMBER(15,2),
     PRIMARY KEY (MaPT, MaSP)
 );
 
