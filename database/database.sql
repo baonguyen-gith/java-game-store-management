@@ -49,7 +49,8 @@ CREATE TABLE GAME (
     MaGame NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     TenGame VARCHAR2(200) NOT NULL,
     TheLoai VARCHAR2(50),
-    NenTang VARCHAR2(50)
+    NenTang VARCHAR2(50),
+    GhiChu VARCHAR2(500);
 );
 
 -- ========================
