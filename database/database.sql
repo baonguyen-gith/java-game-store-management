@@ -50,7 +50,8 @@ CREATE TABLE GAME (
     TenGame VARCHAR2(200) NOT NULL,
     TheLoai VARCHAR2(50),
     NenTang VARCHAR2(50),
-    GhiChu VARCHAR2(500);
+    GhiChu VARCHAR2(500),
+    HinhAnh VARCHAR2(255)
 );
 
 -- ========================
@@ -131,6 +132,7 @@ CREATE TABLE PHIEUTHUE (
 CREATE TABLE CTPHIEUTHUE (
     MaPT NUMBER,
     MaCD NUMBER,
+    MaNV NUMBER,
     DonGiaThue NUMBER(15,2),
     PRIMARY KEY (MaPT, MaCD)
 );
