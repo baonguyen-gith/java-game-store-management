@@ -30,16 +30,16 @@ CREATE TABLE USERS (
 );
 
 -- ========================
--- 4. KHACHHANG (HỖ TRỢ MUA & THUÊ)
+-- 4. KHACHHANG (HỖ TRỢ TÍCH ĐIỂM)
 -- ========================
 CREATE TABLE KHACHHANG (
     MaKH NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    HoTen VARCHAR2(100),              -- có thể NULL khi chỉ mua
-    SDT VARCHAR2(15) UNIQUE,          -- dùng để tích điểm
-    CCCD VARCHAR2(20),                -- cần khi thuê
+    HoTen VARCHAR2(100),
+    SDT VARCHAR2(15) UNIQUE,
+    CCCD VARCHAR2(20),
     Email VARCHAR2(100),
     DiaChi VARCHAR2(200),
-    DiemTichLuy NUMBER DEFAULT 0      -- ⭐ tích điểm
+    DiemTichLuy NUMBER DEFAULT 0
 );
 
 -- ========================
@@ -53,7 +53,7 @@ CREATE TABLE GAME (
 );
 
 -- ========================
--- 6. SANPHAM
+-- 6. SANPHAM (LOẠI SẢN PHẨM)
 -- ========================
 CREATE TABLE SANPHAM (
     MaSP NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -63,15 +63,18 @@ CREATE TABLE SANPHAM (
 );
 
 -- ========================
--- 7. CD (ĐĨA VẬT LÝ)
+-- 7. CD (TỪNG ĐĨA RIÊNG BIỆT)
 -- ========================
 CREATE TABLE CD (
-    MaSP NUMBER PRIMARY KEY,
-    TinhTrang VARCHAR2(50)
+    MaCD NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    MaSP NUMBER,
+    TinhTrang VARCHAR2(50),
+    TrangThai VARCHAR2(20) DEFAULT 'SanSang'
+    -- SanSang / DangThue / Hong
 );
 
 -- ========================
--- 8. ROM (GAME DIGITAL)
+-- 8. ROM (DIGITAL - 1 SP = 1 ROM)
 -- ========================
 CREATE TABLE ROM (
     MaSP NUMBER PRIMARY KEY,
@@ -81,7 +84,7 @@ CREATE TABLE ROM (
 );
 
 -- ========================
--- 9. HOADON (CÓ TÍCH ĐIỂM)
+-- 9. HOADON (BÁN HÀNG)
 -- ========================
 CREATE TABLE HOADON (
     MaHD NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -90,7 +93,6 @@ CREATE TABLE HOADON (
     NgayLap TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     TongTien NUMBER(15,2) DEFAULT 0,
 
-    -- ⭐ ĐIỂM
     DiemSuDung NUMBER DEFAULT 0,
     TienGiam NUMBER(15,2) DEFAULT 0,
 
@@ -123,22 +125,22 @@ CREATE TABLE PHIEUTHUE (
 );
 
 -- ========================
--- 12. CTPHIEUTHUE
+-- 12. CTPHIEUTHUE (THUÊ THEO CD)
 -- ========================
 CREATE TABLE CTPHIEUTHUE (
     MaPT NUMBER,
-    MaSP NUMBER,
+    MaCD NUMBER,
     DonGiaThue NUMBER(15,2),
-    PRIMARY KEY (MaPT, MaSP)
+    PRIMARY KEY (MaPT, MaCD)
 );
 
 -- ========================
--- 13. DIEM_LICHSU (QUAN TRỌNG)
+-- 13. DIEM_LICHSU
 -- ========================
 CREATE TABLE DIEM_LICHSU (
     MaLS NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     MaKH NUMBER,
-    Loai VARCHAR2(10),        -- 'Cong' / 'Tru'
+    Loai VARCHAR2(10), -- Cong / Tru
     SoDiem NUMBER,
     Ngay TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     GhiChu VARCHAR2(200)
@@ -193,8 +195,8 @@ ADD CONSTRAINT FK_CTPT_PT
 FOREIGN KEY (MaPT) REFERENCES PHIEUTHUE(MaPT);
 
 ALTER TABLE CTPHIEUTHUE 
-ADD CONSTRAINT FK_CTPT_SP 
-FOREIGN KEY (MaSP) REFERENCES SANPHAM(MaSP);
+ADD CONSTRAINT FK_CTPT_CD 
+FOREIGN KEY (MaCD) REFERENCES CD(MaCD);
 
 ALTER TABLE DIEM_LICHSU
 ADD CONSTRAINT FK_DIEM_KH
