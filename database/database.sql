@@ -1,3 +1,8 @@
+/* =====================================
+   DATABASE: QLGAME (ORACLE VERSION)
+   FULL SCRIPT + GAME_CHITIET
+===================================== */
+
 -- ========================
 -- 1. ROLE
 -- ========================
@@ -30,7 +35,7 @@ CREATE TABLE USERS (
 );
 
 -- ========================
--- 4. KHACHHANG (HỖ TRỢ TÍCH ĐIỂM)
+-- 4. KHACHHANG
 -- ========================
 CREATE TABLE KHACHHANG (
     MaKH NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -55,7 +60,24 @@ CREATE TABLE GAME (
 );
 
 -- ========================
--- 6. SANPHAM (LOẠI SẢN PHẨM)
+-- 5.1 GAME_CHITIET (NEW)
+-- ========================
+CREATE TABLE GAME_CHITIET (
+    MaGame NUMBER PRIMARY KEY,
+
+    MoTa CLOB,
+    Rating VARCHAR2(50),
+    Genre VARCHAR2(100),
+    DeliveryMethod VARCHAR2(50),
+    ReleaseDate DATE,
+    Region VARCHAR2(50),
+    Features VARCHAR2(200),
+    Language VARCHAR2(200),
+    Currency VARCHAR2(10)
+);
+
+-- ========================
+-- 6. SANPHAM
 -- ========================
 CREATE TABLE SANPHAM (
     MaSP NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -65,18 +87,17 @@ CREATE TABLE SANPHAM (
 );
 
 -- ========================
--- 7. CD (TỪNG ĐĨA RIÊNG BIỆT)
+-- 7. CD
 -- ========================
 CREATE TABLE CD (
     MaCD NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     MaSP NUMBER,
     TinhTrang VARCHAR2(50),
     TrangThai VARCHAR2(20) DEFAULT 'SanSang'
-    -- SanSang / DangThue / Hong
 );
 
 -- ========================
--- 8. ROM (DIGITAL - 1 SP = 1 ROM)
+-- 8. ROM
 -- ========================
 CREATE TABLE ROM (
     MaSP NUMBER PRIMARY KEY,
@@ -86,7 +107,7 @@ CREATE TABLE ROM (
 );
 
 -- ========================
--- 9. HOADON (BÁN HÀNG)
+-- 9. HOADON
 -- ========================
 CREATE TABLE HOADON (
     MaHD NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -94,10 +115,8 @@ CREATE TABLE HOADON (
     MaNV NUMBER,
     NgayLap TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     TongTien NUMBER(15,2) DEFAULT 0,
-
     DiemSuDung NUMBER DEFAULT 0,
     TienGiam NUMBER(15,2) DEFAULT 0,
-
     TrangThai VARCHAR2(20) DEFAULT 'ChuaThanhToan'
 );
 
@@ -113,7 +132,7 @@ CREATE TABLE CTHOADON (
 );
 
 -- ========================
--- 11. PHIEUTHUE (THUÊ CD)
+-- 11. PHIEUTHUE
 -- ========================
 CREATE TABLE PHIEUTHUE (
     MaPT NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -127,7 +146,7 @@ CREATE TABLE PHIEUTHUE (
 );
 
 -- ========================
--- 12. CTPHIEUTHUE (THUÊ THEO CD)
+-- 12. CTPHIEUTHUE
 -- ========================
 CREATE TABLE CTPHIEUTHUE (
     MaPT NUMBER,
@@ -143,7 +162,7 @@ CREATE TABLE CTPHIEUTHUE (
 CREATE TABLE DIEM_LICHSU (
     MaLS NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     MaKH NUMBER,
-    Loai VARCHAR2(10), -- Cong / Tru
+    Loai VARCHAR2(10),
     SoDiem NUMBER,
     Ngay TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     GhiChu VARCHAR2(200)
@@ -163,6 +182,10 @@ FOREIGN KEY (MaNV) REFERENCES NHANVIEN(MaNV);
 
 ALTER TABLE SANPHAM 
 ADD CONSTRAINT FK_SP_GAME 
+FOREIGN KEY (MaGame) REFERENCES GAME(MaGame);
+
+ALTER TABLE GAME_CHITIET
+ADD CONSTRAINT FK_GAME_CT
 FOREIGN KEY (MaGame) REFERENCES GAME(MaGame);
 
 ALTER TABLE CD 
