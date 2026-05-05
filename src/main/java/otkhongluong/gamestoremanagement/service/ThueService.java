@@ -1,58 +1,151 @@
 package otkhongluong.gamestoremanagement.service;
 
+import otkhongluong.gamestoremanagement.dao.CDDAO;
 import otkhongluong.gamestoremanagement.dao.PhieuThueDAO;
-import otkhongluong.gamestoremanagement.dao.SanPhamDAO;
+import otkhongluong.gamestoremanagement.dao.KhachHangDAO;
+import otkhongluong.gamestoremanagement.dao.NhanVienDAO;
 import otkhongluong.gamestoremanagement.model.PhieuThue;
-import java.time.LocalDateTime;
-import java.time.Duration;
+import otkhongluong.gamestoremanagement.model.CD;
+import java.time.temporal.ChronoUnit;
 import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class ThueService {
+
     private final PhieuThueDAO phieuThueDAO;
-    private final SanPhamDAO sanPhamDAO;
+    private final CDDAO cdDAO;
+    
+    private final KhachHangDAO khachHangDAO = new KhachHangDAO();
+    private final NhanVienDAO nhanVienDAO = new NhanVienDAO();
 
     public ThueService() {
-        this.phieuThueDAO = new PhieuThueDAO();
-        this.sanPhamDAO = new SanPhamDAO();
+
+        phieuThueDAO = new PhieuThueDAO();
+        cdDAO = new CDDAO();
     }
 
+    // ================= CREATE RENT =================
     public boolean createPhieuThue(PhieuThue pt) {
-        // Business logic: Khi thuê CD, đổi trạng thái CD sang "Đang thuê"
-        boolean success = phieuThueDAO.insert(pt);
-        if (success) {
-            for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
-                sanPhamDAO.updateStatus(ct.getMaSP(), "Đang thuê");
+
+        if (pt == null || pt.getDanhSachChiTiet() == null) return false;
+
+        pt.setTrangThai("DangThue");
+
+        boolean ok = phieuThueDAO.insert(pt);
+
+        if (!ok) return false;
+
+        // update CD status
+        for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+            cdDAO.updateTrangThai(ct.getMaCD(), "DangThue");
+        }
+
+        return true;
+    }
+
+    // ================= RETURN =================
+    public boolean returnCD(int maPT, LocalDateTime ngayTraThucTe){
+
+        // 1. lấy phiếu thuê
+        PhieuThue pt = phieuThueDAO.findById(maPT);
+        if(pt == null) return false;
+
+        // 2. lấy danh sách CD trước
+        List<PhieuThue.CTPhieuThue> listCD = pt.getDanhSachChiTiet();
+
+        // 3. tính tiền phạt
+        double tienPhat =
+        tinhTienPhat(pt, ngayTraThucTe, pt.getDanhSachChiTiet());
+
+        // 4. update phiếu thuê
+        boolean ok = phieuThueDAO.updateReturn(
+                maPT,
+                Timestamp.valueOf(ngayTraThucTe),
+                tienPhat
+        );
+
+        if(!ok) return false;
+
+        // 5. update CD status
+        for(PhieuThue.CTPhieuThue ct : listCD){
+            cdDAO.updateTrangThai(ct.getMaCD(), "SanSang");
+        }
+
+        // 6. update trạng thái phiếu thuê (nếu cần riêng)
+        pt.setTrangThai("DaTra");
+        phieuThueDAO.update(pt);
+
+        return true;
+    }
+    
+    // ================= PENALTY =================
+    public  double tinhTienPhat(PhieuThue pt,
+                             LocalDateTime ngayTra,
+                             List<PhieuThue.CTPhieuThue> cds){
+
+        double phat = 0;
+
+        if(pt == null || ngayTra == null) return 0;
+
+        LocalDateTime ngayDK = pt.getNgayTraDuKien();
+
+        if(ngayDK == null) return 0;
+
+        // 🔴 1. PHẠT TRỄ HẠN
+        if(ngayTra.isAfter(ngayDK)){
+
+            long days = java.time.temporal.ChronoUnit.DAYS.between(
+                    ngayDK.toLocalDate(),
+                    ngayTra.toLocalDate()
+            );
+
+            if(days <= 0) days = 1; // quá ngày nhưng lệch giờ
+
+            phat += days * 10000;
+        }
+
+        // 🔴 2. PHẠT THEO CD
+        if(cds != null){
+            for(PhieuThue.CTPhieuThue ct : cds){
+
+                if(ct != null &&
+                   ct.getTinhTrang() != null &&
+                   ct.getTinhTrang().equalsIgnoreCase("HONG")){
+
+                    phat += 50000;
+                }
             }
         }
-        return success;
+
+        return phat;
+    }
+    
+    public List<String> getAllKhachHangNames() {
+        return khachHangDAO.getAllTenKhachHang();
+    }
+    
+    public List<String> getAllNhanVienNames() {
+        return nhanVienDAO.getAllTenNhanVien();
     }
 
-    public List<PhieuThue> getAllPhieuThue() {
+    // ================= UPDATE =================
+    public boolean updatePhieuThue(PhieuThue pt){
+        return phieuThueDAO.update(pt);
+    }
+
+    // ================= DELETE =================
+    public boolean deletePhieuThue(int maPT){
+        return phieuThueDAO.delete(maPT);
+    }
+
+    // ================= READ =================
+    public List<PhieuThue> getAll(){
         return phieuThueDAO.findAll();
     }
 
-    public boolean returnCD(int maPT, LocalDateTime ngayTraThucTe) {
-        PhieuThue pt = phieuThueDAO.findById(maPT);
-        if (pt == null) return false;
-
-        // Tính tiền phạt: Giả sử 10,000 VND / ngày quá hạn
-        double tienPhat = 0;
-        if (ngayTraThucTe.isAfter(pt.getNgayTraDuKien())) {
-            long daysLate = Duration.between(pt.getNgayTraDuKien(), ngayTraThucTe).toDays();
-            if (daysLate == 0) daysLate = 1; // Tính ít nhất 1 ngày nếu quá giờ
-            tienPhat = daysLate * 10000.0;
-        }
-
-        // Cập nhật ngày trả và tiền phạt
-        boolean success = phieuThueDAO.updateNgayTra(maPT, Timestamp.valueOf(ngayTraThucTe));
-        // Giả sử có method updateTienPhat hoặc gộp chung
-        // Ở đây tôi gọi updateNgayTra trước, sau đó có thể cần update thêm tiền phạt nếu DB hỗ trợ
-        
-        // Đổi trạng thái CD về "Sẵn sàng"
-        // Cần lấy danh sách chi tiết của phiếu thuê này (PhieuThueDAO.findById nên load kèm chi tiết)
-        // Nếu DAO chưa load chi tiết, ta có thể cần bổ sung
-        
-        return success;
+    public PhieuThue getById(int id){
+        return phieuThueDAO.findById(id);
     }
 }

@@ -3,130 +3,153 @@ package otkhongluong.gamestoremanagement.dao;
 import otkhongluong.gamestoremanagement.model.SanPham;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class SanPhamDAO {
+
+    // ================= INSERT =================
     public boolean insert(SanPham sp) {
-        String sql = "INSERT INTO SANPHAM (MaSP, MaGame, GiaBan, TrangThai) VALUES (SEQ_SANPHAM.NEXTVAL, ?, ?, ?)";
+
+        String sql =
+                "INSERT INTO SANPHAM (MaGame, GiaBan, GiaThueNgay) VALUES (?, ?, ?)";
+
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            
+
             ps.setInt(1, sp.getMaGame());
             ps.setDouble(2, sp.getGiaBan());
-            ps.setString(3, sp.getTrangThai() != null ? sp.getTrangThai() : "Sẵn sàng");
-            
+            ps.setDouble(3, sp.getGiaThueNgay());
+
             return ps.executeUpdate() > 0;
+
         } catch (SQLException e) {
-            System.err.println("Lỗi Insert: Đảm bảo MaGame bạn truyền vào đã tồn tại trong bảng GAME!");
             e.printStackTrace();
         }
+
         return false;
     }
 
+    // ================= UPDATE =================
     public boolean update(SanPham sp) {
-        String sql = "UPDATE SANPHAM SET MaGame = ?, GiaBan = ?, TrangThai = ? WHERE MaSP = ?";
+
+        String sql =
+                "UPDATE SANPHAM SET MaGame = ?, GiaBan = ?, GiaThueNgay = ? WHERE MaSP = ?";
+
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            
+
             ps.setInt(1, sp.getMaGame());
             ps.setDouble(2, sp.getGiaBan());
-            ps.setString(3, sp.getTrangThai());
+            ps.setDouble(3, sp.getGiaThueNgay());
             ps.setInt(4, sp.getMaSP());
-            
+
             return ps.executeUpdate() > 0;
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
         return false;
     }
 
-    public boolean updateStatus(int maSP, String status) {
-        String sql = "UPDATE SANPHAM SET TrangThai = ? WHERE MaSP = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, status);
-            ps.setInt(2, maSP);
-            return ps.executeUpdate() > 0;
-        } catch (SQLException e) { e.printStackTrace(); }
-        return false;
-    }
-
+    // ================= DELETE =================
     public boolean delete(int maSP) {
+
         String sql = "DELETE FROM SANPHAM WHERE MaSP = ?";
+
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            
+
             ps.setInt(1, maSP);
             return ps.executeUpdate() > 0;
+
         } catch (SQLException e) {
-            System.err.println("Lỗi: Không thể xóa Sản phẩm vì có thể đang nằm trong Hóa Đơn hoặc Phiếu Thuê!");
             e.printStackTrace();
         }
+
         return false;
     }
 
+    // ================= FIND BY ID =================
     public SanPham findById(int maSP) {
+
         String sql = "SELECT * FROM SANPHAM WHERE MaSP = ?";
+
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            
+
             ps.setInt(1, maSP);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return mapResultSetToSanPham(rs);
-                }
+
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                return map(rs);
             }
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
         return null;
     }
 
+    // ================= FIND ALL =================
     public List<SanPham> findAll() {
+
         List<SanPham> list = new ArrayList<>();
         String sql = "SELECT * FROM SANPHAM ORDER BY MaSP DESC";
+
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-            
+
             while (rs.next()) {
-                list.add(mapResultSetToSanPham(rs));
+                list.add(map(rs));
             }
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
         return list;
     }
 
+    // ================= FIND BY GAME =================
     public List<SanPham> findByMaGame(int maGame) {
+
         List<SanPham> list = new ArrayList<>();
         String sql = "SELECT * FROM SANPHAM WHERE MaGame = ?";
+
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            
+
             ps.setInt(1, maGame);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    list.add(mapResultSetToSanPham(rs));
-                }
+
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()) {
+                list.add(map(rs));
             }
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
         return list;
     }
 
-    private SanPham mapResultSetToSanPham(ResultSet rs) throws SQLException {
+    // ================= MAPPER =================
+    private SanPham map(ResultSet rs) throws SQLException {
+
         SanPham sp = new SanPham();
+
         sp.setMaSP(rs.getInt("MaSP"));
         sp.setMaGame(rs.getInt("MaGame"));
         sp.setGiaBan(rs.getDouble("GiaBan"));
-        sp.setTrangThai(rs.getString("TrangThai"));
+        sp.setGiaThueNgay(rs.getDouble("GiaThueNgay"));
+
         return sp;
     }
 }

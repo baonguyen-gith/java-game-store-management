@@ -1,39 +1,94 @@
 package otkhongluong.gamestoremanagement.model;
 
 public class KhachHang {
-    private int MaKH;
-    private String HoTen;
-    private String SDT;
-    private String Email;
-    private String DiaChi;
+
+    private int maKH;
+    private String hoTen;
+    private String sdt;
+    private String cccd;
+    private String email;
+    private String diaChi;
+    private int diemTichLuy;
 
     public KhachHang() {}
 
-    public KhachHang(int MaKH, String HoTen, String SDT, String Email, String DiaChi) {
-        this.MaKH = MaKH;
-        this.HoTen = HoTen;
-        this.SDT = SDT;
-        this.Email = Email;
-        this.DiaChi = DiaChi;
+    public KhachHang(int maKH, String hoTen, String sdt,
+                     String cccd, String email,
+                     String diaChi, int diemTichLuy) {
+
+        this.maKH = maKH;
+        this.hoTen = hoTen;
+        this.sdt = sdt;
+        this.cccd = cccd;
+        this.email = email;
+        this.diaChi = diaChi;
+        this.diemTichLuy = diemTichLuy;
     }
 
-    public int getMaKH() { return MaKH; }
-    public void setMaKH(int MaKH) { this.MaKH = MaKH; }
+    // ===== GETTER / SETTER =====
 
-    public String getHoTen() { return HoTen; }
-    public void setHoTen(String HoTen) { this.HoTen = HoTen; }
+    public int getMaKH() {
+        return maKH;
+    }
 
-    public String getSDT() { return SDT; }
-    public void setSDT(String SDT) { this.SDT = SDT; }
+    public void setMaKH(int maKH) {
+        this.maKH = maKH;
+    }
 
-    public String getEmail() { return Email; }
-    public void setEmail(String Email) { this.Email = Email; }
+    public String getHoTen() {
+        return hoTen;
+    }
 
-    public String getDiaChi() { return DiaChi; }
-    public void setDiaChi(String DiaChi) { this.DiaChi = DiaChi; }
+    public void setHoTen(String hoTen) {
+        this.hoTen = hoTen;
+    }
+
+    public String getSdt() {
+        return sdt;
+    }
+
+    public void setSdt(String sdt) {
+        this.sdt = sdt;
+    }
+
+    public String getCccd() {
+        return cccd;
+    }
+
+    public void setCccd(String cccd) {
+        this.cccd = cccd;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getDiaChi() {
+        return diaChi;
+    }
+
+    public void setDiaChi(String diaChi) {
+        this.diaChi = diaChi;
+    }
+
+    public int getDiemTichLuy() {
+        return diemTichLuy;
+    }
+
+    public void setDiemTichLuy(int diemTichLuy) {
+        this.diemTichLuy = diemTichLuy;
+    }
 
     @Override
     public String toString() {
-        return "KhachHang{" + "MaKH=" + MaKH + ", HoTen='" + HoTen + '\'' + ", SDT='" + SDT + '\'' + '}';
+        return "KhachHang{" +
+                "maKH=" + maKH +
+                ", hoTen='" + hoTen + '\'' +
+                ", sdt='" + sdt + '\'' +
+                '}';
     }
 }

@@ -1,34 +1,62 @@
 package otkhongluong.gamestoremanagement.model;
 
 public class SanPham {
-    private int MaSP;
-    private int MaGame;
-    private double GiaBan;
-    private String TrangThai;
+
+    private int maSP;
+    private int maGame;
+    private double giaBan;
+    private double giaThueNgay;
 
     public SanPham() {}
 
-    public SanPham(int MaSP, int MaGame, double GiaBan, String TrangThai) {
-        this.MaSP = MaSP;
-        this.MaGame = MaGame;
-        this.GiaBan = GiaBan;
-        this.TrangThai = TrangThai;
+    public SanPham(int maSP, int maGame, double giaBan, double giaThueNgay) {
+        this.maSP = maSP;
+        this.maGame = maGame;
+        this.giaBan = giaBan;
+        this.giaThueNgay = giaThueNgay;
     }
 
-    public int getMaSP() { return MaSP; }
-    public void setMaSP(int MaSP) { this.MaSP = MaSP; }
+    // ===== GETTER / SETTER =====
 
-    public int getMaGame() { return MaGame; }
-    public void setMaGame(int MaGame) { this.MaGame = MaGame; }
+    public int getMaSP() {
+        return maSP;
+    }
 
-    public double getGiaBan() { return GiaBan; }
-    public void setGiaBan(double GiaBan) { this.GiaBan = GiaBan; }
+    public void setMaSP(int maSP) {
+        this.maSP = maSP;
+    }
 
-    public String getTrangThai() { return TrangThai; }
-    public void setTrangThai(String TrangThai) { this.TrangThai = TrangThai; }
+    public int getMaGame() {
+        return maGame;
+    }
+
+    public void setMaGame(int maGame) {
+        this.maGame = maGame;
+    }
+
+    public double getGiaBan() {
+        return giaBan;
+    }
+
+    public void setGiaBan(double giaBan) {
+        this.giaBan = giaBan;
+    }
+
+    public double getGiaThueNgay() {
+        return giaThueNgay;
+    }
+
+    public void setGiaThueNgay(double giaThueNgay) {
+        this.giaThueNgay = giaThueNgay;
+    }
 
     @Override
     public String toString() {
-        return "SanPham{" + "MaSP=" + MaSP + ", MaGame=" + MaGame + ", GiaBan=" + GiaBan + ", TrangThai=" + TrangThai + '}';
+        return "SanPham{" +
+                "maSP=" + maSP +
+                ", maGame=" + maGame +
+                ", giaBan=" + giaBan +
+                ", giaThueNgay=" + giaThueNgay +
+                '}';
     }
 }

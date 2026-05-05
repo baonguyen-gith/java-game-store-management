@@ -8,123 +8,314 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PhieuThueDAO {
-    public boolean insert(PhieuThue pt) {
-        String sqlPT = "INSERT INTO PHIEUTHUE (MaKH, NgayTraDuKien, TienCoc) VALUES (?, ?, ?)";
-        String sqlCTPT = "INSERT INTO CTPHIEUTHUE (MaPT, MaSP) VALUES (?, ?)";
-        
-        Connection conn = null;
-        try {
-            conn = DBConnection.getConnection();
-            conn.setAutoCommit(false);
 
-            PreparedStatement psPT = conn.prepareStatement(sqlPT, new String[]{"MaPT"});
-            psPT.setInt(1, pt.getMaKH());
-            psPT.setTimestamp(2, Timestamp.valueOf(pt.getNgayTraDuKien()));
-            psPT.setDouble(3, pt.getTienCoc());
-            psPT.executeUpdate();
-            
-            ResultSet rs = psPT.getGeneratedKeys();
-            int generatedMaPT = 0;
-            if (rs.next()) {
-                generatedMaPT = rs.getInt(1);
-            }
-            
-            if (generatedMaPT > 0 && pt.getDanhSachChiTiet() != null) {
-                PreparedStatement psCT = conn.prepareStatement(sqlCTPT);
-                for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
-                    psCT.setInt(1, generatedMaPT);
-                    psCT.setInt(2, ct.getMaSP());
-                    psCT.addBatch();
-                }
-                psCT.executeBatch();
-            }
-            
-            conn.commit();
+    /* ================= INSERT ================= */
+
+    public boolean insert(PhieuThue pt){
+
+        String sql =
+            "INSERT INTO PHIEUTHUE(MaKH,NgayTraDuKien,TienCoc,TrangThai) "
+          + "VALUES(?,?,?,N'DangThue')";
+
+        try(Connection con = DBConnection.getConnection()){
+
+            con.setAutoCommit(false);
+
+            PreparedStatement ps =
+                con.prepareStatement(sql,
+                        Statement.RETURN_GENERATED_KEYS);
+
+            ps.setInt(1, pt.getMaKH());
+            ps.setTimestamp(2,
+                    Timestamp.valueOf(pt.getNgayTraDuKien()));
+            ps.setDouble(3, pt.getTienCoc());
+
+            ps.executeUpdate();
+
+            ResultSet rs = ps.getGeneratedKeys();
+            if(rs.next())
+                pt.setMaPT(rs.getInt(1));
+
+            insertChiTiet(con, pt);
+
+            con.commit();
             return true;
-        } catch (SQLException e) {
-            if (conn != null) try { conn.rollback(); } catch (SQLException ex) {}
+
+        }catch(Exception e){
             e.printStackTrace();
-        } finally {
-            DBConnection.closeConnection(conn);
         }
+
         return false;
     }
 
-    public boolean updateNgayTra(int maPT, Timestamp ngayTraThucTe) {
-        String sql = "UPDATE PHIEUTHUE SET NgayTraThucTe = ? WHERE MaPT = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
-            ps.setTimestamp(1, ngayTraThucTe);
-            ps.setInt(2, maPT);
-            
-            return ps.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
+    /* ================= INSERT DETAIL ================= */
+
+    private void insertChiTiet(Connection con,
+                               PhieuThue pt) throws Exception {
+
+        String sql =
+            "INSERT INTO CTPHIEUTHUE(MaPT,MaCD,MaNV,DonGiaThue)"
+          + " VALUES(?,?,?,?)";
+
+        PreparedStatement ps = con.prepareStatement(sql);
+
+        for(PhieuThue.CTPhieuThue ct :
+                pt.getDanhSachChiTiet()){
+
+            ps.setInt(1, pt.getMaPT());
+            ps.setInt(2, ct.getMaCD());
+            ps.setInt(3, ct.getMaNV()); // ✔ đúng
+            ps.setDouble(4, ct.getDonGiaThue());
+
+            ps.addBatch();
         }
-        return false;
+
+        ps.executeBatch();
     }
 
-    public boolean delete(int maPT) {
-        String sqlCT = "DELETE FROM CTPHIEUTHUE WHERE MaPT = ?";
-        String sqlPT = "DELETE FROM PHIEUTHUE WHERE MaPT = ?";
-        
-        Connection conn = null;
-        try {
-            conn = DBConnection.getConnection();
-            conn.setAutoCommit(false);
-            
-            try (PreparedStatement psCT = conn.prepareStatement(sqlCT)) {
-                psCT.setInt(1, maPT);
-                psCT.executeUpdate();
+    /* ================= FIND ALL ================= */
+
+    public List<PhieuThue> findAll(){
+
+        List<PhieuThue> list=new ArrayList<>();
+
+        String sql =
+            "SELECT pt.MaPT, MIN(ct.MaNV) AS MaNV, pt.NgayThue, " +
+            "kh.HoTen, kh.SDT, pt.NgayTraDuKien, pt.TrangThai " +
+            "FROM PHIEUTHUE pt " +
+            "LEFT JOIN CTPHIEUTHUE ct ON pt.MaPT = ct.MaPT " +
+            "LEFT JOIN KHACHHANG kh ON pt.MaKH = kh.MaKH " +
+            "GROUP BY pt.MaPT, pt.NgayThue, kh.HoTen, kh.SDT, pt.NgayTraDuKien, pt.TrangThai " +
+            "ORDER BY pt.MaPT DESC";
+
+        try(Connection con=DBConnection.getConnection();
+            PreparedStatement ps=con.prepareStatement(sql);
+            ResultSet rs=ps.executeQuery()){
+
+            while(rs.next()){
+
+                PhieuThue pt=new PhieuThue();
+
+                pt.setMaPT(rs.getInt("MaPT"));
+                pt.setMaNV(rs.getInt("MaNV"));
+
+                pt.setTenKhachHang(rs.getString("HoTen"));
+                pt.setSoDienThoai(rs.getString("SDT"));
+
+                Timestamp ts=rs.getTimestamp("NgayThue");
+                if(ts!=null)
+                    pt.setNgayThue(ts.toLocalDateTime());
+                Timestamp t2 = rs.getTimestamp("NgayTraDuKien");
+                if (t2 != null)
+                    pt.setNgayTraDuKien(t2.toLocalDateTime());
+
+                pt.setTrangThai(rs.getString("TrangThai"));
+                list.add(pt);
             }
-            try (PreparedStatement psPT = conn.prepareStatement(sqlPT)) {
-                psPT.setInt(1, maPT);
-                psPT.executeUpdate();
-            }
-            
-            conn.commit();
-            return true;
-        } catch (SQLException e) {
-            if (conn != null) try { conn.rollback(); } catch (SQLException ex) {}
-            e.printStackTrace();
-        } finally {
-            DBConnection.closeConnection(conn);
-        }
-        return false;
-    }
 
-    public PhieuThue findById(int maPT) {
-        String sql = "SELECT * FROM PHIEUTHUE WHERE MaPT = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, maPT);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) return mapResultSet(rs);
-        } catch (SQLException e) { e.printStackTrace(); }
-        return null;
-    }
+        }catch(Exception e){e.printStackTrace();}
 
-    public List<PhieuThue> findAll() {
-        List<PhieuThue> list = new ArrayList<>();
-        String sql = "SELECT * FROM PHIEUTHUE ORDER BY MaPT DESC";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) list.add(mapResultSet(rs));
-        } catch (SQLException e) { e.printStackTrace(); }
         return list;
     }
 
-    private PhieuThue mapResultSet(ResultSet rs) throws SQLException {
-        PhieuThue pt = new PhieuThue();
-        pt.setMaPT(rs.getInt("MaPT"));
-        pt.setMaKH(rs.getInt("MaKH"));
-        if(rs.getTimestamp("NgayThue") != null) pt.setNgayThue(rs.getTimestamp("NgayThue").toLocalDateTime());
-        if(rs.getTimestamp("NgayTraDuKien") != null) pt.setNgayTraDuKien(rs.getTimestamp("NgayTraDuKien").toLocalDateTime());
-        if(rs.getTimestamp("NgayTraThucTe") != null) pt.setNgayTraThucTe(rs.getTimestamp("NgayTraThucTe").toLocalDateTime());
+    /* ================= FIND BY ID ================= */
+
+    public PhieuThue findById(int id){
+
+        String sql="SELECT pt.*, kh.HoTen AS TenKH, nv.HoTen AS TenNV\n" +
+                    "FROM PHIEUTHUE pt\n" +
+                    "LEFT JOIN KHACHHANG kh ON pt.MaKH = kh.MaKH\n" +
+                    "LEFT JOIN NHANVIEN nv ON pt.MaNV = nv.MaNV\n" +
+                    "WHERE pt.MaPT = ?";
+
+        try(Connection con=DBConnection.getConnection();
+            PreparedStatement ps=con.prepareStatement(sql)){
+
+            ps.setInt(1,id);
+            ResultSet rs=ps.executeQuery();
+
+            if(rs.next()){
+
+                PhieuThue pt = map(rs);
+
+                pt.setDanhSachChiTiet(
+                        getChiTiet(con,id));
+
+                return pt;
+            }
+
+        }catch(Exception e){e.printStackTrace();}
+
+        return null;
+    }
+
+    /* ================= LOAD DETAIL ================= */
+
+    private List<PhieuThue.CTPhieuThue> getChiTiet(Connection con, int maPT){
+
+        List<PhieuThue.CTPhieuThue> list = new ArrayList<>();
+
+        String sql =
+            "SELECT g.TenGame, ct.MaCD, ct.DonGiaThue, cd.TrangThai " +
+            "FROM CTPHIEUTHUE ct " +
+            "JOIN CD cd ON ct.MaCD = cd.MaCD " +
+            "JOIN SANPHAM sp ON cd.MaSP = sp.MaSP " +
+            "JOIN GAME g ON sp.MaGame = g.MaGame " +
+            "WHERE ct.MaPT = ?";
+
+        try(PreparedStatement ps = con.prepareStatement(sql)){
+
+            ps.setInt(1, maPT);
+
+            ResultSet rs = ps.executeQuery();
+
+            while(rs.next()){
+                PhieuThue.CTPhieuThue ct = new PhieuThue.CTPhieuThue(
+                    rs.getInt("MaCD"),
+                    rs.getString("TenGame"),
+                    rs.getDouble("DonGiaThue"),
+                    rs.getString("TrangThai")
+                );
+
+                ct.setTinhTrang(rs.getString("TrangThai")); // ⭐ THÊM
+
+                list.add(ct);
+            }
+
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+
+        return list;
+    }
+
+    /* ================= UPDATE RETURN ================= */
+
+    public boolean updateReturn(
+            int maPT,
+            Timestamp ngayTra,
+            double tienPhat){
+
+        String sql=
+            "UPDATE PHIEUTHUE "
+          + "SET NgayTraThucTe=?,TienPhat=?,TrangThai=N'DaTra' "
+          + "WHERE MaPT=?";
+
+        try(Connection con=DBConnection.getConnection();
+            PreparedStatement ps=con.prepareStatement(sql)){
+
+            ps.setTimestamp(1,ngayTra);
+            ps.setDouble(2,tienPhat);
+            ps.setInt(3,maPT);
+
+            return ps.executeUpdate()>0;
+
+        }catch(Exception e){e.printStackTrace();}
+
+        return false;
+    }
+
+    /* ================= UPDATE ================= */
+
+    public boolean update(PhieuThue pt){
+
+        String sql=
+            "UPDATE PHIEUTHUE "
+          + "SET MaKH=?,NgayTraDuKien=?,TienCoc=?,TrangThai=? "
+          + "WHERE MaPT=?";
+
+        try(Connection con=DBConnection.getConnection();
+            PreparedStatement ps=con.prepareStatement(sql)){
+
+            ps.setInt(1,pt.getMaKH());
+            ps.setTimestamp(2,
+                    Timestamp.valueOf(pt.getNgayTraDuKien()));
+            ps.setDouble(3,pt.getTienCoc());
+            ps.setString(4,pt.getTrangThai());
+            ps.setInt(5,pt.getMaPT());
+
+            return ps.executeUpdate()>0;
+
+        }catch(Exception e){e.printStackTrace();}
+
+        return false;
+    }
+
+    /* ================= DELETE ================= */
+
+    public boolean delete(int id){
+
+        String sql="DELETE FROM PHIEUTHUE WHERE MaPT=?";
+
+        try(Connection con=DBConnection.getConnection();
+            PreparedStatement ps=con.prepareStatement(sql)){
+
+            ps.setInt(1,id);
+            return ps.executeUpdate()>0;
+
+        }catch(Exception e){e.printStackTrace();}
+
+        return false;
+    }
+
+    /* ================= MAPPER ================= */
+
+    private PhieuThue map(ResultSet rs)
+            throws SQLException{
+
+        PhieuThue pt=new PhieuThue();
+
+        pt.setTenKhachHang(rs.getString("TenKH"));
+        pt.setTenNhanVien(rs.getString("TenNV"));
+        
+        Timestamp t1=rs.getTimestamp("NgayThue");
+        if(t1!=null) pt.setNgayThue(t1.toLocalDateTime());
+
+        Timestamp t2=rs.getTimestamp("NgayTraDuKien");
+        if(t2!=null) pt.setNgayTraDuKien(t2.toLocalDateTime());
+
+        Timestamp t3=rs.getTimestamp("NgayTraThucTe");
+        if(t3!=null) pt.setNgayTraThucTe(t3.toLocalDateTime());
+
         pt.setTienCoc(rs.getDouble("TienCoc"));
         pt.setTienPhat(rs.getDouble("TienPhat"));
+        pt.setTrangThai(rs.getString("TrangThai"));
+
         return pt;
     }
+    
+    public boolean returnCD(int maPT, Timestamp ngayTraThucTe, double tienPhat){
+
+        String sql =
+            "UPDATE PHIEUTHUE " +
+            "SET NgayTraThucTe=?, TienPhat=?, TrangThai=N'DaTra' " +
+            "WHERE MaPT=?";
+
+        try(Connection con = DBConnection.getConnection();
+            PreparedStatement ps = con.prepareStatement(sql)){
+
+            ps.setTimestamp(1, ngayTraThucTe);
+            ps.setDouble(2, tienPhat);
+            ps.setInt(3, maPT);
+
+            return ps.executeUpdate() > 0;
+
+        } catch(Exception e){
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+    
+       public void updateCDStatusAfterReturn(Connection con, int maPT) throws Exception {
+
+            String sql =
+                "UPDATE CD SET TrangThai=N'SanSang' " +
+                "WHERE MaCD IN (SELECT MaCD FROM CTPHIEUTHUE WHERE MaPT=?)";
+
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                ps.setInt(1, maPT);
+                ps.executeUpdate();
+            }
+        }
 }

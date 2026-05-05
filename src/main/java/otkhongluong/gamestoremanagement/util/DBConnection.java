@@ -6,42 +6,39 @@ import java.sql.SQLException;
 
 public class DBConnection {
 
-    private static final String HOST = "localhost";
-    private static final String PORT = "1521";
-    private static final String SID = "xe";
-    private static final String USER = "system"; 
-    private static final String PASS = "your_password";
-    
-    private static final String URL = "jdbc:oracle:thin:@" + HOST + ":" + PORT + ":" + SID;
+    private static final String URL = "jdbc:sqlserver://localhost:1433;databaseName=qlgamee;encrypt=false;trustServerCertificate=true";
 
-    public static Connection getConnection() throws SQLException {
+    private static final String USER = "bao";
+    private static final String PASSWORD = "301006";
+
+    public static Connection getConnection() {
+
         Connection conn = null;
-        try {
 
-            Class.forName("oracle.jdbc.driver.OracleDriver");
-            
-            conn = DriverManager.getConnection(URL, USER, PASS);
-            
-            if (conn != null) {
-                System.out.println("Kết nối Database thành công!");
-            }
-        } catch (ClassNotFoundException e) {
-            System.err.println("Lỗi: Không tìm thấy thư viện Driver Oracle JDBC!");
+        try {
+            // Load Driver (optional với JDBC mới nhưng cứ giữ)
+            Class.forName("com.microsoft.sqlserver.jdbc.SQLServerDriver");
+
+            // ✅ PHẢI truyền USER + PASSWORD
+            conn = DriverManager.getConnection(URL, USER, PASSWORD);
+
+            System.out.println("✅ Connected SQL Server successfully!");
+
+        } catch (Exception e) {
+            System.out.println("❌ Database connection failed!");
             e.printStackTrace();
-        } catch (SQLException e) {
-            System.err.println("Lỗi: Không thể kết nối tới Database. Kiểm tra URL, User hoặc Pass!");
-            throw e;
         }
+
         return conn;
     }
 
     public static void closeConnection(Connection conn) {
-        if (conn != null) {
-            try {
+        try {
+            if (conn != null && !conn.isClosed()) {
                 conn.close();
-            } catch (SQLException e) {
-                e.printStackTrace();
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
     }
 }

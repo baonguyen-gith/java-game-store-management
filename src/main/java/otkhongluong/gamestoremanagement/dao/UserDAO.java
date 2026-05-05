@@ -7,9 +7,11 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.swing.JOptionPane; // nếu bạn có bắt lỗi hiển thị
 public class UserDAO {
     public boolean insert(User user) {
         String sql = "INSERT INTO USERS (Username, Password, MaRole) VALUES (?, ?, ?)";
@@ -22,6 +24,7 @@ public class UserDAO {
             
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Lỗi kết nối database!");
             e.printStackTrace();
         }
         return false;
@@ -39,6 +42,7 @@ public class UserDAO {
             
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Lỗi kết nối database!");
             e.printStackTrace();
         }
         return false;
@@ -52,6 +56,7 @@ public class UserDAO {
             ps.setInt(1, maUser);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Lỗi kết nối database!");
             e.printStackTrace();
         }
         return false;
@@ -69,6 +74,7 @@ public class UserDAO {
                 }
             }
         } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Lỗi kết nối database!");
             e.printStackTrace();
         }
         return null;
@@ -85,6 +91,7 @@ public class UserDAO {
                 list.add(mapResultSetToUser(rs));
             }
         } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Lỗi kết nối database!");
             e.printStackTrace();
         }
         return list;
@@ -102,6 +109,7 @@ public class UserDAO {
                 }
             }
         } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Lỗi kết nối database!");
             e.printStackTrace();
         }
         return null;

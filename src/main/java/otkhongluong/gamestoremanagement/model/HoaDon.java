@@ -5,61 +5,131 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class HoaDon {
-    private int MaHD;
-    private int MaKH;
-    private LocalDateTime NgayLap; 
-    private double TongTien;
-    private List<ChiTietHoaDon> DanhSachChiTiet;
 
-    public HoaDon() {
-        this.DanhSachChiTiet = new ArrayList<>();
+    private int maHD;
+    private int maKH;
+    private int maNV;
+    private LocalDateTime ngayLap;
+    private double tongTien;
+    private String trangThai;
+
+    // ⭐ thêm để HIỂN THỊ TABLE
+    private String tenKhachHang;
+    private String soDienThoai;
+
+    private List<ChiTietHoaDon> danhSachChiTiet =
+            new ArrayList<>();
+
+    // ================= GET SET =================
+
+    public int getMaHD() { return maHD; }
+    public void setMaHD(int maHD) { this.maHD = maHD; }
+    
+    public String getMaHDFormatted() {
+        return "HD" + maHD;
+    }
+    public String getMaNVFormatted() {
+        return "NV" + maNV;
     }
 
-    public HoaDon(int MaHD, int MaKH, LocalDateTime NgayLap, double TongTien) {
-        this.MaHD = MaHD;
-        this.MaKH = MaKH;
-        this.NgayLap = NgayLap;
-        this.TongTien = TongTien;
-        this.DanhSachChiTiet = new ArrayList<>();
+    public int getMaKH() { return maKH; }
+    public void setMaKH(int maKH) { this.maKH = maKH; }
+
+    public int getMaNV() { return maNV; }
+    public void setMaNV(int maNV) { this.maNV = maNV; }
+
+    public LocalDateTime getNgayLap() { return ngayLap; }
+    public void setNgayLap(LocalDateTime ngayLap) {
+        this.ngayLap = ngayLap;
     }
 
-    public int getMaHD() { return MaHD; }
-    public void setMaHD(int MaHD) { this.MaHD = MaHD; }
-
-    public int getMaKH() { return MaKH; }
-    public void setMaKH(int MaKH) { this.MaKH = MaKH; }
-
-    public LocalDateTime getNgayLap() { return NgayLap; }
-    public void setNgayLap(LocalDateTime NgayLap) { this.NgayLap = NgayLap; }
-
-    public double getTongTien() { return TongTien; }
-    public void setTongTien(double TongTien) { this.TongTien = TongTien; }
-
-    public List<ChiTietHoaDon> getDanhSachChiTiet() { return DanhSachChiTiet; }
-    public void setDanhSachChiTiet(List<ChiTietHoaDon> DanhSachChiTiet) { this.DanhSachChiTiet = DanhSachChiTiet; }
-
-    @Override
-    public String toString() {
-        return "HoaDon{" + "MaHD=" + MaHD + ", NgayLap=" + NgayLap + ", TongTien=" + TongTien + '}';
+    public double getTongTien() { return tongTien; }
+    public void setTongTien(double tongTien) {
+        this.tongTien = tongTien;
     }
+
+    public String getTrangThai() { return trangThai; }
+    public void setTrangThai(String trangThai) {
+        this.trangThai = trangThai;
+    }
+
+    // ⭐ VIEW DATA
+    public String getTenKhachHang() {
+        return tenKhachHang;
+    }
+
+    public void setTenKhachHang(String tenKhachHang) {
+        this.tenKhachHang = tenKhachHang;
+    }
+
+    public String getSoDienThoai() {
+        return soDienThoai;
+    }
+
+    public void setSoDienThoai(String soDienThoai) {
+        this.soDienThoai = soDienThoai;
+    }
+
+    public List<ChiTietHoaDon> getDanhSachChiTiet() {
+        return danhSachChiTiet;
+    }
+
+    public void setDanhSachChiTiet(List<ChiTietHoaDon> list) {
+        this.danhSachChiTiet = list;
+    }
+
+    // =====================================================
+    // ================= CHI TIẾT HÓA ĐƠN ==================
+    // =====================================================
 
     public static class ChiTietHoaDon {
-        private int MaSP;
-        private int SoLuong;
-        private double DonGia;
 
-        public ChiTietHoaDon() {}
-        public ChiTietHoaDon(int MaSP, int SoLuong, double DonGia) {
-            this.MaSP = MaSP;
-            this.SoLuong = SoLuong;
-            this.DonGia = DonGia;
+        private int maSP;
+        private int soLuong;
+        private double donGia;
+
+        // ⭐ ADD FIELD HIỂN THỊ (KHÔNG ẢNH HƯỞNG DB)
+        private String tenGame;
+        private String loaiSanPham; // CD / ROM
+        
+        public ChiTietHoaDon(String tenGame, String loaiSanPham, int soLuong, double donGia) {
+        this.tenGame = tenGame;
+        this.loaiSanPham = loaiSanPham;
+        this.soLuong = soLuong;
+        this.donGia = donGia;
+    }
+        
+
+        public int getMaSP() { return maSP; }
+        public void setMaSP(int maSP) {
+            this.maSP = maSP;
         }
 
-        public int getMaSP() { return MaSP; }
-        public void setMaSP(int MaSP) { this.MaSP = MaSP; }
-        public int getSoLuong() { return SoLuong; }
-        public void setSoLuong(int SoLuong) { this.SoLuong = SoLuong; }
-        public double getDonGia() { return DonGia; }
-        public void setDonGia(double DonGia) { this.DonGia = DonGia; }
+        public int getSoLuong() { return soLuong; }
+        public void setSoLuong(int soLuong) {
+            this.soLuong = soLuong;
+        }
+
+        public double getDonGia() { return donGia; }
+        public void setDonGia(double donGia) {
+            this.donGia = donGia;
+        }
+
+        // ⭐ VIEW ONLY
+        public String getTenGame() {
+            return tenGame;
+        }
+
+        public void setTenGame(String tenGame) {
+            this.tenGame = tenGame;
+        }
+
+        public String getLoaiSanPham() {
+            return loaiSanPham;
+        }
+
+        public void setLoaiSanPham(String loaiSanPham) {
+            this.loaiSanPham = loaiSanPham;
+        }
     }
 }

@@ -1,183 +1,286 @@
 package otkhongluong.gamestoremanagement.dao;
 
 import otkhongluong.gamestoremanagement.model.HoaDon;
+import otkhongluong.gamestoremanagement.model.HoaDon.ChiTietHoaDon;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 
 import java.sql.*;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 public class HoaDonDAO {
+
+    /* =====================================================
+        INSERT
+     ===================================================== */
     public boolean insert(HoaDon hd) {
-        String sqlHD = "INSERT INTO HOADON (MaKH, TongTien) VALUES (?, ?)";
-        String sqlCTHD = "INSERT INTO CTHOADON (MaHD, MaSP, SoLuong, DonGia) VALUES (?, ?, ?, ?)";
-        
-        Connection conn = null;
-        PreparedStatement psHD = null;
-        PreparedStatement psCTHD = null;
-        ResultSet rs = null;
-        
-        try {
-            conn = DBConnection.getConnection();
-            conn.setAutoCommit(false); 
-            
-            psHD = conn.prepareStatement(sqlHD, new String[]{"MaHD"});
-            psHD.setInt(1, hd.getMaKH());
-            psHD.setDouble(2, hd.getTongTien());
-            psHD.executeUpdate();
-            
-            int generatedMaHD = 0;
-            rs = psHD.getGeneratedKeys();
-            if (rs.next()) {
-                generatedMaHD = rs.getInt(1);
-            }
-            
-            if (generatedMaHD > 0 && hd.getDanhSachChiTiet() != null) {
-                psCTHD = conn.prepareStatement(sqlCTHD);
-                for (HoaDon.ChiTietHoaDon ct : hd.getDanhSachChiTiet()) {
-                    psCTHD.setInt(1, generatedMaHD);
-                    psCTHD.setInt(2, ct.getMaSP());
-                    psCTHD.setInt(3, ct.getSoLuong());
-                    psCTHD.setDouble(4, ct.getDonGia());
-                    psCTHD.addBatch();
-                }
-                psCTHD.executeBatch(); 
-            }
-            
-            conn.commit(); 
-            return true;
-            
-        } catch (SQLException e) {
-            if (conn != null) {
-                try {
-                    conn.rollback(); 
-                    System.err.println("Lỗi Insert Hóa Đơn. Đã Rollback dữ liệu!");
-                } catch (SQLException ex) {
-                    ex.printStackTrace();
-                }
-            }
-            e.printStackTrace();
-        } finally {
-            try { if (rs != null) rs.close(); } catch (SQLException e) {}
-            try { if (psCTHD != null) psCTHD.close(); } catch (SQLException e) {}
-            try { if (psHD != null) psHD.close(); } catch (SQLException e) {}
-            DBConnection.closeConnection(conn);
-        }
-        return false;
-    }
 
-    public boolean update(HoaDon hd) {
-        String sql = "UPDATE HOADON SET MaKH = ?, TongTien = ? WHERE MaHD = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
+        String sql =
+        "INSERT INTO HOADON(MaKH,MaNV,NgayLap,TongTien,TrangThai) "
+      + "VALUES(?,?,?,?,?)";
+
+        try(Connection conn = DBConnection.getConnection();
+            PreparedStatement ps =
+                    conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
             ps.setInt(1, hd.getMaKH());
-            ps.setDouble(2, hd.getTongTien());
-            ps.setInt(3, hd.getMaHD());
-            
-            return ps.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return false;
-    }
+            ps.setInt(2, hd.getMaNV());
+            ps.setTimestamp(3,
+                    Timestamp.valueOf(hd.getNgayLap()));
+            ps.setDouble(4, hd.getTongTien());
+            ps.setString(5, hd.getTrangThai());
 
-    public boolean delete(int maHD) {
-        String sqlCTHD = "DELETE FROM CTHOADON WHERE MaHD = ?";
-        String sqlHD = "DELETE FROM HOADON WHERE MaHD = ?";
-        
-        Connection conn = null;
-        try {
-            conn = DBConnection.getConnection();
-            conn.setAutoCommit(false);
-            
-            try (PreparedStatement psCT = conn.prepareStatement(sqlCTHD)) {
-                psCT.setInt(1, maHD);
-                psCT.executeUpdate();
-            }
-            
-            try (PreparedStatement psHD = conn.prepareStatement(sqlHD)) {
-                psHD.setInt(1, maHD);
-                psHD.executeUpdate();
-            }
-            
-            conn.commit();
+            ps.executeUpdate();
+
+            ResultSet rs = ps.getGeneratedKeys();
+            if(rs.next())
+                hd.setMaHD(rs.getInt(1));
+
+            insertChiTiet(conn, hd);
+
             return true;
-        } catch (SQLException e) {
-            if (conn != null) try { conn.rollback(); } catch (SQLException ex) {}
+
+        }catch(Exception e){
             e.printStackTrace();
-        } finally {
-            DBConnection.closeConnection(conn);
         }
+
         return false;
     }
 
-    public HoaDon findById(int maHD) {
-        String sql = "SELECT * FROM HOADON WHERE MaHD = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
-            ps.setInt(1, maHD);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return mapResultSetToHoaDon(rs);
-                }
+    /* =====================================================
+        INSERT DETAIL
+     ===================================================== */
+    private void insertChiTiet(Connection conn, HoaDon hd)
+            throws SQLException {
+
+        String sql =
+        "INSERT INTO CHITIETHOADON(MaHD,MaSP,SoLuong,DonGia) "
+      + "VALUES(?,?,?,?)";
+
+        PreparedStatement ps = conn.prepareStatement(sql);
+
+        for(ChiTietHoaDon ct : hd.getDanhSachChiTiet()){
+
+            ps.setInt(1, hd.getMaHD());
+            ps.setInt(2, ct.getMaSP());
+            ps.setInt(3, ct.getSoLuong());
+            ps.setDouble(4, ct.getDonGia());
+
+            ps.addBatch();
+        }
+
+        ps.executeBatch();
+    }
+
+    /* =====================================================
+        FIND ALL
+     ===================================================== */
+    public List<HoaDon> findAll(){
+
+        List<HoaDon> list = new ArrayList<>();
+
+        String sql =
+            "SELECT hd.MaHD,hd.MaNV,hd.NgayLap,hd.TongTien,"
+          + "kh.HoTen,kh.SDT "
+          + "FROM HOADON hd "
+          + "JOIN KHACHHANG kh ON hd.MaKH=kh.MaKH "
+          + "ORDER BY hd.MaHD DESC";
+
+        try(Connection con = DBConnection.getConnection();
+            PreparedStatement ps = con.prepareStatement(sql);
+            ResultSet rs = ps.executeQuery()){
+
+            while(rs.next()){
+
+                HoaDon hd = new HoaDon();
+
+                hd.setMaHD(rs.getInt("MaHD"));
+                hd.setMaNV(rs.getInt("MaNV"));
+                hd.setTongTien(rs.getDouble("TongTien"));
+
+                hd.setTenKhachHang(rs.getString("HoTen"));
+                hd.setSoDienThoai(rs.getString("SDT"));
+
+                Timestamp ts = rs.getTimestamp("NgayLap");
+                if(ts != null)
+                    hd.setNgayLap(ts.toLocalDateTime());
+
+                list.add(hd);
             }
-        } catch (SQLException e) {
+
+        }catch(Exception e){e.printStackTrace();}
+
+        return list;
+    }
+
+    /* =====================================================
+        FIND BY ID + DETAIL ⭐
+     ===================================================== */
+    public HoaDon findById(int maHD){
+
+        String sql = "SELECT * FROM HOADON WHERE MaHD=?";
+
+        try(Connection conn = DBConnection.getConnection();
+            PreparedStatement ps = conn.prepareStatement(sql)){
+
+            ps.setInt(1,maHD);
+
+            ResultSet rs = ps.executeQuery();
+
+            if(rs.next()){
+
+                HoaDon hd = mapHoaDon(rs);
+
+                hd.setDanhSachChiTiet(
+                        getChiTiet(conn, maHD)
+                );
+
+                return hd;
+            }
+
+        }catch(Exception e){
             e.printStackTrace();
         }
+
         return null;
     }
 
-    public List<HoaDon> findAll() {
-        List<HoaDon> list = new ArrayList<>();
-        String sql = "SELECT * FROM HOADON ORDER BY MaHD DESC";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            
-            while (rs.next()) {
-                list.add(mapResultSetToHoaDon(rs));
+    /* =====================================================
+        LOAD DETAIL
+     ===================================================== */
+    private List<ChiTietHoaDon> getChiTiet(Connection conn, int maHD){
+
+        List<ChiTietHoaDon> list = new ArrayList<>();
+
+        String sql =
+            "SELECT " +
+            "    g.TenGame, " +
+            "    CASE " +
+            "        WHEN EXISTS (SELECT 1 FROM CD WHERE CD.MaSP = sp.MaSP) THEN N'CD' " +
+            "        WHEN EXISTS (SELECT 1 FROM ROM WHERE ROM.MaSP = sp.MaSP) THEN N'ROM' " +
+            "        ELSE N'Không rõ' " +
+            "    END AS LoaiSanPham, " +
+            "    ct.SoLuong, " +
+            "    ct.DonGia " +
+            "FROM CTHOADON ct " +
+            "JOIN SANPHAM sp ON ct.MaSP = sp.MaSP " +
+            "JOIN GAME g ON sp.MaGame = g.MaGame " +
+            "WHERE ct.MaHD = ?";
+
+        try(PreparedStatement ps = conn.prepareStatement(sql)){
+
+            ps.setInt(1, maHD);
+
+            ResultSet rs = ps.executeQuery();
+
+            while(rs.next()){
+                list.add(new ChiTietHoaDon(
+                        rs.getString("TenGame"),
+                        rs.getString("LoaiSanPham"),
+                        rs.getInt("SoLuong"),
+                        rs.getDouble("DonGia")
+                ));
             }
-        } catch (SQLException e) {
+
+        }catch(Exception e){
             e.printStackTrace();
         }
+
         return list;
     }
 
-    public List<HoaDon> filterByDate(String fromDate, String toDate) {
-        List<HoaDon> list = new ArrayList<>();
-        String sql = "SELECT * FROM HOADON WHERE NgayLap >= TO_DATE(?, 'YYYY-MM-DD') " +
-                     "AND NgayLap < TO_DATE(?, 'YYYY-MM-DD') + 1 ORDER BY NgayLap DESC";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
-            ps.setString(1, fromDate);
-            ps.setString(2, toDate);
-            
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    list.add(mapResultSetToHoaDon(rs));
-                }
-            }
-        } catch (SQLException e) {
+    /* =====================================================
+        UPDATE STATUS
+     ===================================================== */
+    public boolean updateTrangThai(HoaDon hd){
+
+        String sql =
+                "UPDATE HOADON SET TrangThai=? WHERE MaHD=?";
+
+        try(Connection conn = DBConnection.getConnection();
+            PreparedStatement ps = conn.prepareStatement(sql)){
+
+            ps.setString(1, hd.getTrangThai());
+            ps.setInt(2, hd.getMaHD());
+
+            return ps.executeUpdate()>0;
+
+        }catch(Exception e){
             e.printStackTrace();
         }
-        return list;
+
+        return false;
     }
 
-    private HoaDon mapResultSetToHoaDon(ResultSet rs) throws SQLException {
+    /* =====================================================
+        UPDATE
+     ===================================================== */
+    public boolean update(HoaDon hd){
+
+        String sql =
+                "UPDATE HOADON SET TongTien=? WHERE MaHD=?";
+
+        try(Connection conn = DBConnection.getConnection();
+            PreparedStatement ps = conn.prepareStatement(sql)){
+
+            ps.setDouble(1, hd.getTongTien());
+            ps.setInt(2, hd.getMaHD());
+
+            return ps.executeUpdate()>0;
+
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
+    /* =====================================================
+        DELETE
+     ===================================================== */
+    public boolean delete(int maHD){
+
+        try(Connection conn = DBConnection.getConnection()){
+
+            PreparedStatement ct =
+                    conn.prepareStatement(
+                            "DELETE FROM CHITIETHOADON WHERE MaHD=?");
+            ct.setInt(1,maHD);
+            ct.executeUpdate();
+
+            PreparedStatement hd =
+                    conn.prepareStatement(
+                            "DELETE FROM HOADON WHERE MaHD=?");
+            hd.setInt(1,maHD);
+
+            return hd.executeUpdate()>0;
+
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
+    /* =====================================================
+        MAP OBJECT ⭐ FIX NULL TIMESTAMP
+     ===================================================== */
+    private HoaDon mapHoaDon(ResultSet rs)
+            throws SQLException {
+
         HoaDon hd = new HoaDon();
+
         hd.setMaHD(rs.getInt("MaHD"));
         hd.setMaKH(rs.getInt("MaKH"));
-        
+        hd.setMaNV(rs.getInt("MaNV"));
+
         Timestamp ts = rs.getTimestamp("NgayLap");
-        if (ts != null) {
+        if(ts!=null)
             hd.setNgayLap(ts.toLocalDateTime());
-        }
-        
+
         hd.setTongTien(rs.getDouble("TongTien"));
+        hd.setTrangThai(rs.getString("TrangThai"));
+
         return hd;
     }
 }
