@@ -3,6 +3,7 @@ import otkhongluong.gamestoremanagement.view.dialog.RentDetailDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentEditDialog; 
 import otkhongluong.gamestoremanagement.view.dialog.RentReturnDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentAddDialog;
+import otkhongluong.gamestoremanagement.view.dialog.RentExtendDialog;
 import otkhongluong.gamestoremanagement.dao.PhieuThueDAO;
 import otkhongluong.gamestoremanagement.model.PhieuThue;
 import java.awt.Graphics;
@@ -67,6 +68,7 @@ public class RentPanel extends JPanel {
     private JPanel paginationPanel;
     private int currentPage = 1;
     private static final int PAGE_SIZE = 8;
+    private PhieuThueDAO dao = new PhieuThueDAO();
 
     private java.util.List<PhieuThue> allData;
     private java.util.List<PhieuThue> currentPageData;
@@ -309,38 +311,68 @@ public class RentPanel extends JPanel {
 
         btnReturn.addActionListener(e -> {
             int row = table.getSelectedRow();
-            if (row < 0) {
-                JOptionPane.showMessageDialog(this, "Chọn phiếu thuê để trả!");
-                return;
-            }
-
-            int id = Integer.parseInt(
-                tableModel.getValueAt(row, 0).toString().replaceAll("\\D", "")
-            );
-
-            Window parent = SwingUtilities.getWindowAncestor(this);
-            RentReturnDialog dialog = new RentReturnDialog((Frame) parent, id);
+            // Nếu có chọn hàng thì pre-fill SĐT, không thì mở dialog trắng
+            int id = (row >= 0)
+                ? Integer.parseInt(tableModel.getValueAt(row, 0).toString().replaceAll("\\D", ""))
+                : -1;
+            RentReturnDialog dialog =
+                new RentReturnDialog((Frame) SwingUtilities.getWindowAncestor(this), id);
             dialog.setVisible(true);
-
-            loadData(); // refresh
+            loadData();
+        });
+        
+        RoundButton btnExtend = new RoundButton("📅  Gia hạn", new Color(104, 175, 255), BG_DARK);
+        btnExtend.setPreferredSize(new Dimension(130, 40));
+        btnExtend.addActionListener(e -> {
+            int row = table.getSelectedRow();
+            int id = (row >= 0)
+                ? Integer.parseInt(tableModel.getValueAt(row, 0).toString().replaceAll("\\D", ""))
+                : -1;
+            RentExtendDialog dialog =
+                new RentExtendDialog((Frame) SwingUtilities.getWindowAncestor(this), id);
+            dialog.setVisible(true);
+            loadData();
         });
 
         RoundButton btnDelete = new RoundButton("🗑  Xóa", BTN_DELETE, BG_DARK);
         btnDelete.setPreferredSize(new Dimension(110, 40));
         btnDelete.addActionListener(e -> {
             int row = table.getSelectedRow();
-            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn phiếu thuê để xóa!"); return; }
+            if (row < 0) {
+                JOptionPane.showMessageDialog(this, "Chọn phiếu thuê để xóa!");
+                return;
+            }
+
+            PhieuThue pt = currentPageData.get(row);
+
+            // Chặn xóa nếu đang thuê
+            if ("DangThue".equalsIgnoreCase(pt.getTrangThai())) {
+                JOptionPane.showMessageDialog(this,
+                    "Không thể xóa phiếu thuê đang hoạt động!\n"
+                  + "Vui lòng trả CD trước khi xóa.",
+                    "Không cho phép", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
             int confirm = JOptionPane.showConfirmDialog(this,
-                "Xác nhận xóa phiếu thuê " + tableModel.getValueAt(row, 0) + "?",
-                "Xác nhận", JOptionPane.YES_NO_OPTION);
+                "Xác nhận xóa phiếu thuê PT" + pt.getMaPT() + "?\n"
+              + "Khách hàng: " + pt.getTenKhachHang(),
+                "Xác nhận xóa", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+
             if (confirm == JOptionPane.YES_OPTION) {
-                tableModel.removeRow(row);
-                JOptionPane.showMessageDialog(this, "Đã xóa!");
+                boolean ok = dao.delete(pt.getMaPT());
+                if (ok) {
+                    JOptionPane.showMessageDialog(this, "Đã xóa phiếu thuê PT" + pt.getMaPT());
+                    loadData();
+                } else {
+                    JOptionPane.showMessageDialog(this, "Xóa thất bại!", "Lỗi", JOptionPane.ERROR_MESSAGE);
+                }
             }
         });
 
         btnPanel.add(btnEdit);
         btnPanel.add(btnReturn);
+        btnPanel.add(btnExtend);
         btnPanel.add(btnDelete);
         bar.add(btnPanel, BorderLayout.EAST);
 
@@ -375,7 +407,7 @@ public class RentPanel extends JPanel {
     }
 
     private void loadData() {
-        PhieuThueDAO dao = new PhieuThueDAO();
+        // ✅ bỏ khai báo local, dùng field dao
         allData = dao.findAll();
         renderPage();
     }
