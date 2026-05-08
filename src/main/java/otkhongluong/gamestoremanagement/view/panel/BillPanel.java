@@ -3,7 +3,7 @@ package otkhongluong.gamestoremanagement.view.panel;
 import otkhongluong.gamestoremanagement.model.HoaDon;
 import otkhongluong.gamestoremanagement.service.HoaDonService;
 import otkhongluong.gamestoremanagement.view.dialog.BillDetailDialog;
-
+import otkhongluong.gamestoremanagement.view.dialog.BillAddDialog;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -114,9 +114,10 @@ public class BillPanel extends JPanel {
 
         RoundButton btnAdd = new RoundButton("+  Thêm", BTN_ADD, new Color(30, 30, 30));
         btnAdd.setPreferredSize(new Dimension(105, 38));
-        btnAdd.addActionListener(e ->
-            JOptionPane.showMessageDialog(this, "Chức năng thêm hóa đơn đang phát triển.")
-        );
+        btnAdd.addActionListener(e -> {
+            new BillAddDialog((Frame) SwingUtilities.getWindowAncestor(this)).setVisible(true);
+            loadData();
+        });
 
         right.add(btnAdd);
         bar.add(left,  BorderLayout.WEST);
