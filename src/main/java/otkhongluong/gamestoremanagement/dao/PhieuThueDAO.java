@@ -1,5 +1,6 @@
 package otkhongluong.gamestoremanagement.dao;
-
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import otkhongluong.gamestoremanagement.model.PhieuThue;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 
@@ -207,25 +208,213 @@ public class PhieuThueDAO {
     /* ================= DELETE ================= */
 
     public boolean delete(int id) {
-        String sqlChiTiet = "DELETE FROM CTPHIEUTHUE WHERE MaPT = ?";
-        String sqlPhieu   = "DELETE FROM PHIEUTHUE WHERE MaPT = ?";
+        String sqlDiem    = "DELETE FROM DIEM_LICHSU  WHERE MaPT = ?";
+        String sqlChiTiet = "DELETE FROM CTPHIEUTHUE  WHERE MaPT = ?";
+        String sqlPhieu   = "DELETE FROM PHIEUTHUE    WHERE MaPT = ?";
 
         try (Connection con = DBConnection.getConnection()) {
             con.setAutoCommit(false);
+
+            try (PreparedStatement ps0 = con.prepareStatement(sqlDiem)) {
+                ps0.setInt(1, id);
+                int rows = ps0.executeUpdate();
+                System.out.println("[DELETE] DIEM_LICHSU rows deleted: " + rows);
+            }
+
             try (PreparedStatement ps1 = con.prepareStatement(sqlChiTiet)) {
                 ps1.setInt(1, id);
-                ps1.executeUpdate();
+                int rows = ps1.executeUpdate();
+                System.out.println("[DELETE] CTPHIEUTHUE rows deleted: " + rows);
             }
+
             try (PreparedStatement ps2 = con.prepareStatement(sqlPhieu)) {
                 ps2.setInt(1, id);
+                int rows = ps2.executeUpdate();
+                System.out.println("[DELETE] PHIEUTHUE rows deleted: " + rows);
+
+                if (rows == 0) {
+                    con.rollback();
+                    System.out.println("[DELETE] Rollback — MaPT " + id + " không tồn tại!");
+                    return false;
+                }
+            }
+
+            con.commit();
+            System.out.println("[DELETE] Commit thành công MaPT = " + id);
+            return true;
+
+        } catch (Exception e) {
+            System.out.println("[DELETE] Exception: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+    // ================= UPDATE KH + NV (dùng cho RentEditDialog) =================
+    public boolean updateKhachHangVaNhanVien(int maPT, int maKH, int maNV) {
+        String sqlPT = "UPDATE PHIEUTHUE SET MaKH = ? WHERE MaPT = ?";
+        String sqlCT = "UPDATE CTPHIEUTHUE SET MaNV = ? WHERE MaPT = ?";
+
+        try (Connection con = DBConnection.getConnection()) {
+            con.setAutoCommit(false);
+            try (PreparedStatement ps1 = con.prepareStatement(sqlPT)) {
+                ps1.setInt(1, maKH);
+                ps1.setInt(2, maPT);
+                ps1.executeUpdate();
+            }
+            try (PreparedStatement ps2 = con.prepareStatement(sqlCT)) {
+                ps2.setInt(1, maNV);
+                ps2.setInt(2, maPT);
                 ps2.executeUpdate();
             }
             con.commit();
             return true;
         } catch (Exception e) {
             e.printStackTrace();
+            return false;
         }
-        return false;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+// Thêm vào class PhieuThueDAO
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Cập nhật NgayTraDuKien của phiếu thuê và tính lại DonGiaThue
+ * cho từng dòng ChiTietPhieuThue thuộc phiếu đó.
+ *
+ * Công thức (mỗi CTPT):
+ *   soNgayMoi  = ngayTraMoi − NgayThue  (số ngày)
+ *   donGiaMoi  = soNgayMoi × GiaThueNgay
+ *   tienGiaHan = MAX(0, donGiaMoi − DonGiaThue_cũ)
+ *   DonGiaThue_mới = donGiaMoi − tienGiaHan − TienGiamDiem
+ *
+ * @param maPT      Mã phiếu thuê cần cập nhật
+ * @param ngayTraMoi Ngày trả dự kiến mới (đã validate > NgayThue)
+ * @return true nếu cập nhật thành công toàn bộ, false nếu có lỗi (đã rollback)
+ */
+    // ── Trong PhieuThueDAO ──────────────────────────────────────────────────────
+
+    public boolean updateNgayTraVaDonGia(int maPT, LocalDateTime ngayTraMoi) {
+
+        final String SQL_SELECT_CTPT =
+            "SELECT ct.MaCD, ct.DonGiaThue, sp.GiaThueNgay, pt.NgayThue, pt.NgayTraDuKien " +
+            "FROM   CTPHIEUTHUE ct " +
+            "JOIN   PHIEUTHUE   pt ON pt.MaPT = ct.MaPT " +
+            "JOIN   CD          cd ON cd.MaCD = ct.MaCD " +
+            "JOIN   SANPHAM     sp ON sp.MaSP = cd.MaSP " +
+            "WHERE  ct.MaPT = ?";
+
+        final String SQL_UPDATE_PT =
+            "UPDATE PHIEUTHUE SET NgayTraDuKien = ? WHERE MaPT = ?";
+
+        final String SQL_UPDATE_CTPT =
+            "UPDATE CTPHIEUTHUE SET DonGiaThue = ? WHERE MaPT = ? AND MaCD = ?";
+
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false);
+
+            // Bước 1: đọc CTPT trước khi cập nhật NgayTraDuKien
+            // (để lấy NgayTraDuKien HIỆN TẠI còn đúng trong DB)
+            List<int[]>    maCDList       = new ArrayList<>();
+            List<double[]> donGiaFinalList = new ArrayList<>();
+
+            try (PreparedStatement ps = conn.prepareStatement(SQL_SELECT_CTPT)) {
+                ps.setInt(1, maPT);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        int    maCD        = rs.getInt("MaCD");
+                        double donGiaCu    = rs.getDouble("DonGiaThue");
+                        double giaThueNgay = rs.getDouble("GiaThueNgay");
+
+                        java.sql.Timestamp tsNgayThue  = rs.getTimestamp("NgayThue");
+                        java.sql.Timestamp tsNgayTraCu = rs.getTimestamp("NgayTraDuKien");
+                        LocalDateTime ngayThue  = tsNgayThue  != null ? tsNgayThue.toLocalDateTime()  : LocalDateTime.now();
+                        LocalDateTime ngayTraCu = tsNgayTraCu != null ? tsNgayTraCu.toLocalDateTime() : LocalDateTime.now();
+
+
+                        // Bước 1: tính tiền gia hạn đã thu trước đó (nếu có)
+                        long soNgayCu  = ChronoUnit.DAYS.between(
+                            ngayThue.toLocalDate().atStartOfDay(),
+                            ngayTraCu.toLocalDate().atStartOfDay()
+                        );
+                        double tienGiaHan = Math.max(0, soNgayCu * giaThueNgay - donGiaCu);
+
+                        // Bước 2: tính đơn giá mới
+
+                        long soNgayMoi = ChronoUnit.DAYS.between(
+                            ngayThue.toLocalDate().atStartOfDay(),
+                            ngayTraMoi.toLocalDate().atStartOfDay()
+                        );
+                        double donGiaFinal = soNgayMoi * giaThueNgay - tienGiaHan;
+
+                        System.out.printf(
+                            "[CD%d] ngayTraCu=%s soNgayCu=%d tienGiaHan=%.0f " +
+                            "soNgayMoi=%d donGiaFinal=%.0f%n",
+                            maCD, ngayTraCu, soNgayCu, tienGiaHan, soNgayMoi, donGiaFinal
+                        );
+
+                        maCDList.add(new int[]{maCD});
+                        donGiaFinalList.add(new double[]{donGiaFinal});
+                    }
+                }
+            }
+
+            // Bước 2: cập nhật NgayTraDuKien trên PHIEUTHUE
+            try (PreparedStatement ps = conn.prepareStatement(SQL_UPDATE_PT)) {
+                ps.setTimestamp(1, Timestamp.valueOf(ngayTraMoi));
+                ps.setInt(2, maPT);
+                ps.executeUpdate();
+            }
+
+            // Bước 3: batch update DonGiaThue trên CTPHIEUTHUE
+            try (PreparedStatement ps = conn.prepareStatement(SQL_UPDATE_CTPT)) {
+                for (int i = 0; i < maCDList.size(); i++) {
+                    ps.setDouble(1, donGiaFinalList.get(i)[0]);
+                    ps.setInt(2, maPT);
+                    ps.setInt(3, maCDList.get(i)[0]);
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+            }
+
+            conn.commit();
+            return true;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            if (conn != null) {
+                try { conn.rollback(); } catch (Exception ex) { ex.printStackTrace(); }
+            }
+            return false;
+
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+    
+    public int tinhDiemPhieu(int maPT) {
+        String sql = "SELECT SUM(DonGiaThue) AS TongTien FROM CTPHIEUTHUE WHERE MaPT = ?";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, maPT);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                double tongTien = rs.getDouble("TongTien");
+                return (int) (tongTien / 100000); // 100K = 1 điểm
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
     }
 
     /* ================= EXTEND RENTAL ================= */
@@ -268,6 +457,7 @@ public class PhieuThueDAO {
     private PhieuThue map(ResultSet rs) throws SQLException {
         PhieuThue pt = new PhieuThue();
         pt.setMaPT(rs.getInt("MaPT"));
+        pt.setMaKH(rs.getInt("MaKH")); 
         pt.setTenKhachHang(rs.getString("TenKH"));
         pt.setTenNhanVien(rs.getString("TenNV"));
 
