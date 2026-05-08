@@ -259,6 +259,8 @@ public class RentPanel extends JPanel {
                 int id = Integer.parseInt(maPT.replaceAll("\\D", ""));
                 Window parent = SwingUtilities.getWindowAncestor(table);
                 RentDetailDialog dialog = new RentDetailDialog((Frame) parent, id);
+                dialog.pack();
+                dialog.setLocationRelativeTo(parent);
                 dialog.setVisible(true);
             }
         }
@@ -506,6 +508,8 @@ public class RentPanel extends JPanel {
 
                 Window parent = SwingUtilities.getWindowAncestor(table);
                 RentDetailDialog dialog = new RentDetailDialog((Frame) parent, id);
+                dialog.pack();
+                dialog.setLocationRelativeTo(parent);
                 dialog.setVisible(true);
             };
 
