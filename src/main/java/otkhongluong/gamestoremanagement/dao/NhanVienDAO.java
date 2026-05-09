@@ -53,6 +53,26 @@ public class NhanVienDAO {
 
         return -1; // không tìm thấy
     }
+    
+    // ================= FIND BY ID =================
+    public otkhongluong.gamestoremanagement.model.NhanVien findById(int maNV) {
+        String sql = "SELECT MaNV, HoTen FROM NHANVIEN WHERE MaNV = ?";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, maNV);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                otkhongluong.gamestoremanagement.model.NhanVien nv =
+                    new otkhongluong.gamestoremanagement.model.NhanVien();
+                nv.setMaNV(rs.getInt("MaNV"));
+                nv.setHoTen(rs.getString("HoTen"));
+                return nv;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     // ================= OPTIONAL: SEARCH LIKE (nâng cấp autocomplete) =================
     public List<String> searchByName(String keyword) {
