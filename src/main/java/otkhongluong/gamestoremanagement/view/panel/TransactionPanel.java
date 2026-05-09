@@ -108,6 +108,24 @@ public class TransactionPanel extends JPanel {
         left.add(buildLoaiFilter());
 
         bar.add(left, BorderLayout.WEST);
+
+        // ── Nút Refresh (góc phải) ──
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 4));
+        right.setBackground(BG_DARK);
+
+        RoundButton btnRefresh = new RoundButton("⟳  Làm mới", ACCENT, TEXT_WHITE);
+        btnRefresh.setPreferredSize(new Dimension(120, 38));
+        btnRefresh.setToolTipText("Tải lại dữ liệu từ cơ sở dữ liệu");
+        btnRefresh.addActionListener(e -> {
+            txtFrom.setText("");
+            txtTo.setText("");
+            txtSearch.setText("");
+            if (cmbLoai != null) cmbLoai.setSelectedIndex(0);
+            loadData();
+        });
+        right.add(btnRefresh);
+
+        bar.add(right, BorderLayout.EAST);
         return bar;
     }
 

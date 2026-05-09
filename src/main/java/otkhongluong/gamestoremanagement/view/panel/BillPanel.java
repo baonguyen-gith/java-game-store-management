@@ -4,6 +4,7 @@ import otkhongluong.gamestoremanagement.model.HoaDon;
 import otkhongluong.gamestoremanagement.service.HoaDonService;
 import otkhongluong.gamestoremanagement.view.dialog.BillDetailDialog;
 import otkhongluong.gamestoremanagement.view.dialog.BillAddDialog;
+import otkhongluong.gamestoremanagement.view.dialog.BillEditDialog;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -338,24 +339,52 @@ public class BillPanel extends JPanel {
         btnEdit.addActionListener(e -> {
             int row = table.getSelectedRow();
             if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn hóa đơn để sửa!"); return; }
-            JOptionPane.showMessageDialog(this, "Chức năng sửa hóa đơn đang phát triển.");
+            int maHD = parseMa(tableModel.getValueAt(row, 0).toString());
+            new BillEditDialog((Frame) SwingUtilities.getWindowAncestor(this), maHD).setVisible(true);
+            loadData();
         });
 
         RoundButton btnDelete = new RoundButton("Xóa", BTN_DELETE, Color.WHITE);
         btnDelete.setPreferredSize(new Dimension(105, 38));
+        // ✅ MỚI
         btnDelete.addActionListener(e -> {
             int row = table.getSelectedRow();
-            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn hóa đơn để xóa!"); return; }
+            if (row < 0) {
+                JOptionPane.showMessageDialog(this, "Chọn hóa đơn để xóa!"); return;
+            }
 
             String maHDStr = tableModel.getValueAt(row, 0).toString();
             HoaDon hd = currentPageData.get(row);
 
+            // Hiển thị cảnh báo rõ ràng
             int confirm = JOptionPane.showConfirmDialog(this,
-                "Xác nhận xóa " + maHDStr + "?\nKhách hàng: " + hd.getTenKhachHang(),
-                "Xác nhận xóa", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+                "⚠ Xác nhận xóa " + maHDStr + "?\n\n" +
+                "  Khách hàng : " + hd.getTenKhachHang() + "\n" +
+                "  Tổng tiền  : " + String.format("%,.0f đ", hd.getTongTien()) + "\n\n" +
+                "Hệ thống sẽ tự động:\n" +
+                "  • Hoàn lại trạng thái CD về Sẵn sàng\n" +
+                "  • Trừ lượt bán ROM\n" +
+                "  • Hoàn/rút lại điểm tích lũy của khách\n\n" +
+                "Thao tác này KHÔNG THỂ hoàn tác!",
+                "Xác nhận xóa hóa đơn",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
             if (confirm != JOptionPane.YES_OPTION) return;
 
-            JOptionPane.showMessageDialog(this, "Chức năng xóa hóa đơn đang phát triển.");
+            int maHD = Integer.parseInt(maHDStr.replaceAll("\\D", ""));
+            boolean ok = service.deleteHoaDon(maHD);
+
+            if (ok) {
+                JOptionPane.showMessageDialog(this,
+                    "✅ Đã xóa " + maHDStr + " và rollback toàn bộ dữ liệu liên quan.",
+                    "Xóa thành công", JOptionPane.INFORMATION_MESSAGE);
+                loadData();
+            } else {
+                JOptionPane.showMessageDialog(this,
+                    "❌ Xóa thất bại!\nVui lòng thử lại hoặc kiểm tra log.",
+                    "Lỗi", JOptionPane.ERROR_MESSAGE);
+            }
         });
 
         btnPanel.add(btnEdit);

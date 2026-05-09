@@ -1,6 +1,6 @@
 /* =====================================
-   DATABASE: QLGAME (SQL SERVER VERSION)
-   FULL SCRIPT + GAME_CHITIET
+    DATABASE: QLGAME (SQL SERVER VERSION)
+    FULL SCRIPT + GAME_CHITIET
 ===================================== */
 
 -- ========================
@@ -230,7 +230,7 @@ ADD CONSTRAINT FK_DIEM_KH
 FOREIGN KEY (MaKH) REFERENCES KHACHHANG(MaKH);
 
 /* =====================================
-   FULL FOREIGN KEY (SQL SERVER)
+    FULL FOREIGN KEY (SQL SERVER)
 ===================================== */
 
 -- USERS
@@ -322,3 +322,8 @@ ALTER TABLE DIEM_LICHSU
 ADD CONSTRAINT FK_DIEM_PT
 FOREIGN KEY (MaPT)
 REFERENCES PHIEUTHUE(MaPT);
+
+-- KHACHHANG
+CREATE UNIQUE INDEX UQ_KHACHHANG_SDT
+ON KHACHHANG (SDT)
+WHERE SDT IS NOT NULL;

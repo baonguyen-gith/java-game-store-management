@@ -5,8 +5,12 @@ import otkhongluong.gamestoremanagement.dao.PhieuThueDAO;
 import otkhongluong.gamestoremanagement.dao.KhachHangDAO;
 import otkhongluong.gamestoremanagement.dao.NhanVienDAO;
 import otkhongluong.gamestoremanagement.model.PhieuThue;
-import otkhongluong.gamestoremanagement.model.CD;
+import otkhongluong.gamestoremanagement.util.DBConnection;  // ✅ THÊM
 
+import java.sql.Connection;        // ✅ THÊM
+import java.sql.PreparedStatement; // ✅ THÊM
+import java.sql.ResultSet;         // ✅ THÊM
+import java.sql.SQLException;      // ✅ THÊM
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -29,12 +33,54 @@ public class ThueService {
     public boolean createPhieuThue(PhieuThue pt) {
         if (pt == null || pt.getDanhSachChiTiet() == null) return false;
         pt.setTrangThai("DangThue");
-        boolean ok = phieuThueDAO.insert(pt);
-        if (!ok) return false;
-        for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
-            cdDAO.updateTrangThai(ct.getMaCD(), "DangThue");
+
+        // Dùng 1 connection duy nhất để transaction an toàn
+        try (Connection con = DBConnection.getConnection()) {
+            con.setAutoCommit(false);
+            try {
+                // ✅ CHECK RACE CONDITION trước khi insert
+                for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+                    String chk = "SELECT TrangThai FROM CD WHERE MaCD = ?";
+                    try (PreparedStatement ps = con.prepareStatement(chk)) {
+                        ps.setInt(1, ct.getMaCD());
+                        ResultSet rs = ps.executeQuery();
+                        if (!rs.next()) {
+                            con.rollback();
+                            return false; // CD không tồn tại
+                        }
+                        String trangThai = rs.getString("TrangThai");
+                        if (!"SanSang".equals(trangThai)) {
+                            con.rollback();
+                            return false; // CD đã bị thuê/bán bởi giao dịch khác
+                        }
+                    }
+                }
+
+                // Insert phiếu thuê
+                boolean ok = phieuThueDAO.insertWithConnection(pt, con); // ⚠ xem vấn đề 2
+                if (!ok) { con.rollback(); return false; }
+
+                // Cập nhật TrangThai CD
+                for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+                    String upd = "UPDATE CD SET TrangThai = N'DangThue' WHERE MaCD = ?";
+                    try (PreparedStatement ps = con.prepareStatement(upd)) {
+                        ps.setInt(1, ct.getMaCD());
+                        ps.executeUpdate();
+                    }
+                }
+
+                con.commit();
+                return true;
+
+            } catch (Exception ex) {
+                con.rollback();
+                ex.printStackTrace();
+                return false;
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            return false;
         }
-        return true;
     }
 
     /* ================= RETURN ================= */
@@ -45,37 +91,46 @@ public class ThueService {
         return returnCD(maPT, ngayTraThucTe, 0);
     }
 
-    /**
-     * Xử lý trả CD:
-     *   TienPhat = phatTreHan + chiPhiHuHong  (ghi DB, chốt)
-     *   TienCoc giữ nguyên — dialog tự tính delta = TienCoc - TienPhat để hoàn/thu thêm
-     *
-     * @param chiPhiHuHong phí sửa chữa/hư hỏng do nhân viên nhập tay
-     */
     public boolean returnCD(int maPT, LocalDateTime ngayTraThucTe, double chiPhiHuHong) {
         PhieuThue pt = phieuThueDAO.findById(maPT);
         if (pt == null) return false;
 
-        List<PhieuThue.CTPhieuThue> listCD = pt.getDanhSachChiTiet();
+        double phatTreHan   = tinhPhatTreHanOnly(pt, ngayTraThucTe);
+        double tienPhatChot = pt.getTienPhat() + phatTreHan + chiPhiHuHong;
 
-        // Phạt trễ hạn tính từ NgayTraDuKien → ngayTraThucTe
-        double phatTreHan = tinhPhatTreHanOnly(pt, ngayTraThucTe);
+        try (Connection con = DBConnection.getConnection()) {
+            con.setAutoCommit(false);
+            try {
+                // Update phiếu thuê
+                String sqlPT = "UPDATE PHIEUTHUE SET NgayTraThucTe = ?, TienPhat = ?, TrangThai = N'DaTra' WHERE MaPT = ?";
+                try (PreparedStatement ps = con.prepareStatement(sqlPT)) {
+                    ps.setTimestamp(1, Timestamp.valueOf(ngayTraThucTe));
+                    ps.setDouble(2, tienPhatChot);
+                    ps.setInt(3, maPT);
+                    if (ps.executeUpdate() == 0) { con.rollback(); return false; }
+                }
 
-        // Tổng TienPhat khi trả = phí đã ghi từ gia hạn (TienPhat DB) + trễ hạn mới + hư hỏng
-        double tienPhatCu   = pt.getTienPhat();  // đã tích lũy từ các lần gia hạn
-        double tienPhatChot = tienPhatCu + phatTreHan + chiPhiHuHong;
+                // Update TrangThai tất cả CD về SanSang
+                String sqlCD = "UPDATE CD SET TrangThai = N'SanSang' WHERE MaCD = ?";
+                for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+                    try (PreparedStatement ps = con.prepareStatement(sqlCD)) {
+                        ps.setInt(1, ct.getMaCD());
+                        ps.executeUpdate();
+                    }
+                }
 
-        boolean ok = phieuThueDAO.updateReturn(
-            maPT,
-            Timestamp.valueOf(ngayTraThucTe),
-            tienPhatChot
-        );
-        if (!ok) return false;
+                con.commit();
+                return true;
 
-        for (PhieuThue.CTPhieuThue ct : listCD) {
-            cdDAO.updateTrangThai(ct.getMaCD(), "SanSang");
+            } catch (Exception ex) {
+                con.rollback();
+                ex.printStackTrace();
+                return false;
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            return false;
         }
-        return true;
     }
 
     /** Tính riêng phạt trễ hạn (không cộng phạt hư hỏng) */

@@ -249,6 +249,41 @@ public class PhieuThueDAO {
             return false;
         }
     }
+    
+    // Thêm vào PhieuThueDAO.java
+    public boolean insertWithConnection(PhieuThue pt, Connection con) throws SQLException {
+        // Copy logic của insert() hiện tại nhưng dùng con thay vì tự mở connection
+        // KHÔNG gọi con.commit() / con.close() ở đây
+        String sql = "INSERT INTO PHIEUTHUE (MaKH, MaNV, NgayThue, NgayTraDuKien, TienCoc, TienPhat, TrangThai) " +
+                     "VALUES (?, ?, GETDATE(), ?, ?, 0, N'DangThue')";
+        try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setInt(1, pt.getMaKH());
+            if (pt.getMaNV() > 0) ps.setInt(2, pt.getMaNV());
+            else ps.setNull(2, Types.INTEGER);
+            ps.setTimestamp(3, Timestamp.valueOf(pt.getNgayTraDuKien()));
+            ps.setDouble(4, pt.getTienCoc());
+            ps.executeUpdate();
+
+            ResultSet gk = ps.getGeneratedKeys();
+            if (!gk.next()) return false;
+            pt.setMaPT(gk.getInt(1)); // lưu lại MaPT để dùng sau
+
+            // Insert CTPHIEUTHUE
+            for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+                String sqlCT = "INSERT INTO CTPHIEUTHUE (MaPT, MaCD, MaNV, DonGiaThue) VALUES (?, ?, ?, ?)";
+                try (PreparedStatement psCT = con.prepareStatement(sqlCT)) {
+                    psCT.setInt(1, pt.getMaPT());
+                    psCT.setInt(2, ct.getMaCD());
+                    if (ct.getMaNV() > 0) psCT.setInt(3, ct.getMaNV());
+                    else psCT.setNull(3, Types.INTEGER);
+                    psCT.setDouble(4, ct.getDonGiaThue());
+                    psCT.executeUpdate();
+                }
+            }
+            return true;
+        }
+    }
+
     // ================= UPDATE KH + NV (dùng cho RentEditDialog) =================
     public boolean updateKhachHangVaNhanVien(int maPT, int maKH, int maNV) {
         String sqlPT = "UPDATE PHIEUTHUE SET MaKH = ? WHERE MaPT = ?";

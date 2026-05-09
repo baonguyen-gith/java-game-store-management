@@ -19,37 +19,59 @@ public class GameService {
     }
 
     // =================================================
-    // GET ALL GAME + PRICE CD + ROM
+    // GET ALL GAME + PRICE CD + ROM + THUÊ
     // =================================================
     public List<Game> getAllGames() {
 
         List<Game> list = new ArrayList<>();
 
+        /*
+         * Tách rõ 3 cột giá:
+         *   GiaCD        — GiaBan của SanPham có bản ghi trong bảng CD
+         *   GiaROM       — GiaBan của SanPham có bản ghi trong bảng ROM
+         *   GiaThueNgay  — GiaThueNgay của SanPham thuộc bảng CD
+         *
+         * Dùng MAX(...) để gộp nhiều sản phẩm cùng loại về 1 dòng/game.
+         * NULL được giữ nguyên → wasNull() phía Java xử lý đúng.
+         */
         String sql =
             "SELECT " +
-            " g.MaGame, g.TenGame, g.TheLoai, g.NenTang, g.GhiChu, g.HinhAnh, " +
+            "  g.MaGame, g.TenGame, g.TheLoai, g.NenTang, g.GhiChu, g.HinhAnh, " +
 
-            " MAX(CASE WHEN cd.MaCD IS NOT NULL THEN sp.GiaThueNgay END) AS GiaCD, " +
-            " MAX(CASE WHEN r.MaSP IS NOT NULL THEN sp.GiaBan END) AS GiaROM " +
+            // GiaBan CD — chỉ tính khi còn ít nhất 1 CD SanSang
+            "  CASE WHEN COUNT(CASE WHEN cd.TrangThai = N'SanSang' THEN 1 END) > 0 " +
+            "       THEN MAX(CASE WHEN cd.MaSP IS NOT NULL THEN spCD.GiaBan ELSE NULL END) " +
+            "       ELSE NULL END AS GiaCD, " +
+
+            // GiaBan ROM — ROM không có TrangThai, luôn lấy nếu có
+            "  MAX(CASE WHEN r.MaSP IS NOT NULL THEN spROM.GiaBan ELSE NULL END) AS GiaROM, " +
+
+            // GiaThueNgay — chỉ tính khi còn ít nhất 1 CD SanSang
+            "  CASE WHEN COUNT(CASE WHEN cd.TrangThai = N'SanSang' THEN 1 END) > 0 " +
+            "       THEN MAX(CASE WHEN cd.MaSP IS NOT NULL THEN spCD.GiaThueNgay ELSE NULL END) " +
+            "       ELSE NULL END AS GiaThueNgay " +
 
             "FROM GAME g " +
-            "LEFT JOIN SANPHAM sp ON g.MaGame = sp.MaGame " +
-            "LEFT JOIN CD cd ON sp.MaSP = cd.MaSP " +
-            "LEFT JOIN ROM r ON sp.MaSP = r.MaSP " +
+
+            // JOIN riêng cho CD
+            "LEFT JOIN SANPHAM spCD ON spCD.MaGame = g.MaGame " +
+            "LEFT JOIN CD cd        ON cd.MaSP     = spCD.MaSP " +
+
+            // JOIN riêng cho ROM
+            "LEFT JOIN SANPHAM spROM ON spROM.MaGame = g.MaGame " +
+            "LEFT JOIN ROM r         ON r.MaSP        = spROM.MaSP " +
 
             "GROUP BY g.MaGame, g.TenGame, g.TheLoai, g.NenTang, g.GhiChu, g.HinhAnh " +
             "ORDER BY g.TenGame";
 
         try (
-                Connection con = DBConnection.getConnection();
-                PreparedStatement ps = con.prepareStatement(sql);
-                ResultSet rs = ps.executeQuery()
+            Connection con = DBConnection.getConnection();
+            PreparedStatement ps = con.prepareStatement(sql);
+            ResultSet rs = ps.executeQuery()
         ) {
-
             while (rs.next()) {
 
                 Game g = new Game();
-
                 g.setMaGame(rs.getInt("MaGame"));
                 g.setTenGame(rs.getString("TenGame"));
                 g.setTheLoai(rs.getString("TheLoai"));
@@ -57,17 +79,14 @@ public class GameService {
                 g.setGhiChu(rs.getString("GhiChu"));
                 g.setHinhAnh(rs.getString("HinhAnh"));
 
-                // ===== PRICE CD =====
                 double giaCD = rs.getDouble("GiaCD");
-                if (!rs.wasNull()) {
-                    g.setGiaCD(giaCD);
-                }
+                if (!rs.wasNull()) g.setGiaCD(giaCD);
 
-                // ===== PRICE ROM =====
                 double giaROM = rs.getDouble("GiaROM");
-                if (!rs.wasNull()) {
-                    g.setGiaROM(giaROM);
-                }
+                if (!rs.wasNull()) g.setGiaROM(giaROM);
+
+                double giaThueNgay = rs.getDouble("GiaThueNgay");
+                if (!rs.wasNull()) g.setGiaThueNgay(giaThueNgay);
 
                 list.add(g);
             }
@@ -83,57 +102,32 @@ public class GameService {
     // GET BY ID
     // =================================================
     public Game getGameById(int id) {
-
-        if (id <= 0) {
-            throw new IllegalArgumentException("ID game không hợp lệ");
-        }
-
+        if (id <= 0) throw new IllegalArgumentException("ID game không hợp lệ");
         return gameDAO.findById(id);
     }
 
     // =================================================
-    // ADD GAME
+    // ADD / UPDATE / DELETE / SEARCH
     // =================================================
     public boolean addGame(Game game) {
-
         validateGame(game);
         return gameDAO.insert(game);
     }
 
-    // =================================================
-    // UPDATE GAME
-    // =================================================
     public boolean updateGame(Game game) {
-
-        if (game == null || game.getMaGame() <= 0) {
+        if (game == null || game.getMaGame() <= 0)
             throw new IllegalArgumentException("Game không hợp lệ để update");
-        }
-
         validateGame(game);
         return gameDAO.update(game);
     }
 
-    // =================================================
-    // DELETE GAME
-    // =================================================
     public boolean deleteGame(int id) {
-
-        if (id <= 0) {
-            throw new IllegalArgumentException("ID không hợp lệ");
-        }
-
+        if (id <= 0) throw new IllegalArgumentException("ID không hợp lệ");
         return gameDAO.delete(id);
     }
 
-    // =================================================
-    // SEARCH
-    // =================================================
     public List<Game> searchGames(String keyword) {
-
-        if (keyword == null) {
-            keyword = "";
-        }
-
+        if (keyword == null) keyword = "";
         return gameDAO.search(keyword.trim());
     }
 
@@ -141,21 +135,11 @@ public class GameService {
     // VALIDATION
     // =================================================
     private void validateGame(Game game) {
-
-        if (game == null) {
-            throw new IllegalArgumentException("Game không được null");
-        }
-
+        if (game == null) throw new IllegalArgumentException("Game không được null");
         ValidationService.validateNotEmpty(game.getTenGame(), "Tên game");
         ValidationService.validateNotEmpty(game.getTheLoai(), "Thể loại");
         ValidationService.validateNotEmpty(game.getNenTang(), "Nền tảng");
-
-        if (game.getHinhAnh() == null) {
-            game.setHinhAnh("");
-        }
-
-        if (game.getGhiChu() == null) {
-            game.setGhiChu("");
-        }
+        if (game.getHinhAnh() == null) game.setHinhAnh("");
+        if (game.getGhiChu()  == null) game.setGhiChu("");
     }
 }

@@ -85,9 +85,9 @@ public class RentAddDialog extends JDialog {
     private int currentStep = 1;
 
     // Bước 1
-    private JTable            tblCD;
+    JTable            tblCD;
     private DefaultTableModel tblCDModel;
-    private List<Object[]>    cdList;
+    List<Object[]>    cdList;
 
     private int    selectedMaCD    = -1;
     private String selectedTenGame = "";
@@ -888,7 +888,7 @@ public class RentAddDialog extends JDialog {
 
                 KhachHang kh = new KhachHang();
                 kh.setHoTen("Khách vãng lai");
-                kh.setSdt("VL_" + System.currentTimeMillis());
+                kh.setSdt(null);
                 kh.setDiemTichLuy(0);
                 if (!khDAO.insert(kh)) { showMsg("Không thể tạo khách vãng lai!"); return; }
                 KhachHang newKH = khDAO.findBySDT(kh.getSdt());
@@ -1083,5 +1083,50 @@ public class RentAddDialog extends JDialog {
             super.paintComponent(g2);
             g2.dispose();
         }
+    }
+    
+    public static void openAndPreselectCD(Frame parent, int maCD) {
+        RentAddDialog dlg = new RentAddDialog(parent);
+ 
+        SwingUtilities.invokeLater(() -> {
+            if (dlg.cdList != null) {
+                for (int i = 0; i < dlg.cdList.size(); i++) {
+                    if ((int) dlg.cdList.get(i)[0] == maCD) {
+                        dlg.tblCD.setRowSelectionInterval(i, i);
+                        dlg.tblCD.scrollRectToVisible(dlg.tblCD.getCellRect(i, 0, true));
+                        break;
+                    }
+                }
+            }
+        });
+ 
+        dlg.setVisible(true);
+    }
+ 
+    /**
+     * Mở RentAddDialog và tự động chọn sẵn CD đầu tiên khớp tên game.
+     * Dùng khi chỉ biết tên game, không biết maCD cụ thể.
+     *
+     * @param parent  Frame cha
+     * @param tenGame Tên game (so khớp một phần, không phân biệt hoa thường)
+     */
+    public static void openAndPreselectByGameName(Frame parent, String tenGame) {
+        RentAddDialog dlg = new RentAddDialog(parent);
+ 
+        SwingUtilities.invokeLater(() -> {
+            if (dlg.cdList != null && tenGame != null) {
+                String keyword = tenGame.trim().toLowerCase();
+                for (int i = 0; i < dlg.cdList.size(); i++) {
+                    String rowName = ((String) dlg.cdList.get(i)[1]).trim().toLowerCase();
+                    if (rowName.contains(keyword) || keyword.contains(rowName)) {
+                        dlg.tblCD.setRowSelectionInterval(i, i);
+                        dlg.tblCD.scrollRectToVisible(dlg.tblCD.getCellRect(i, 0, true));
+                        break;
+                    }
+                }
+            }
+        });
+ 
+        dlg.setVisible(true);
     }
 }

@@ -5,6 +5,8 @@ import otkhongluong.gamestoremanagement.model.KhachHang;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 import otkhongluong.gamestoremanagement.util.Session;
 
+import java.util.LinkedHashMap; // ✅ THÊM
+import java.util.Map;           // ✅ THÊM
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -93,12 +95,12 @@ public class BillAddDialog extends JDialog {
     // Bảng game bên trái
     private JTable          tblGame;
     private DefaultTableModel tblGameModel;
-    private List<Object[]>  gameList; // {MaGame, TenGame, TheLoai, NenTang}
+    List<Object[]>  gameList; // {MaGame, TenGame, TheLoai, NenTang}
 
     // Bảng sản phẩm bên phải (CD/ROM của game đang chọn)
     private JTable          tblSP;
     private DefaultTableModel tblSPModel;
-    private List<Object[]>  spList;  // {MaSP, LoaiSP, GiaBan, TonKho_or_SoLuotBan, ThongTin}
+    List<Object[]>  spList;  // {MaSP, LoaiSP, GiaBan, TonKho_or_SoLuotBan, ThongTin}
 
     // Bảng giỏ hàng bên dưới
     private JTable          tblCart;
@@ -531,12 +533,17 @@ public class BillAddDialog extends JDialog {
         String tenGame = (String) gameList.get(gameRow)[1];
 
         // Kiểm tra trùng: CD thì trùng theo MaSP+MaCD, ROM trùng theo MaSP
+        String newKey = "CD".equals(loai)
+            ? "CD_" + maCD          // CD: unique theo MaCD
+            : "ROM_" + maSP;        // ROM: unique theo MaSP
+
         for (CartItem item : cart) {
-            if ("CD".equals(loai) && item.maSP == maSP && item.maCD == maCD) {
-                showMsg("CD này đã có trong giỏ hàng!"); return;
-            }
-            if ("ROM".equals(loai) && item.maSP == maSP) {
-                showMsg("ROM game này đã có trong giỏ!\nBạn có thể điều chỉnh số lượng trong giỏ."); return;
+            if (item.cartKey.equals(newKey)) {
+                if ("CD".equals(loai))
+                    showMsg("CD" + maCD + " này đã có trong giỏ hàng!");
+                else
+                    showMsg("ROM game này đã có trong giỏ!\nBạn có thể điều chỉnh số lượng trong cột SL.");
+                return;
             }
         }
 
@@ -548,6 +555,7 @@ public class BillAddDialog extends JDialog {
         item.loaiSP  = loai;
         item.donGia  = giaBan;
         item.soLuong = 1;
+        item.cartKey = "CD".equals(loai) ? "CD_" + maCD : "ROM_" + maSP;  // ← gán key
         cart.add(item);
         refreshCartTable();
     }
@@ -1051,9 +1059,8 @@ public class BillAddDialog extends JDialog {
                         "Khách vãng lai?", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
                     if (yn != JOptionPane.YES_OPTION) { con.rollback(); showStep(2); return; }
 
-                    String insKH = "INSERT INTO KHACHHANG (HoTen, SDT, DiemTichLuy) VALUES (N'Khách vãng lai', ?, 0)";
+                    String insKH = "INSERT INTO KHACHHANG (HoTen, SDT, DiemTichLuy) VALUES (N'Khách vãng lai', NULL, 0)";
                     try (PreparedStatement ps = con.prepareStatement(insKH, Statement.RETURN_GENERATED_KEYS)) {
-                        ps.setString(1, "VL_" + System.currentTimeMillis());
                         ps.executeUpdate();
                         ResultSet gk = ps.getGeneratedKeys();
                         if (gk.next()) maKH = gk.getInt(1);
@@ -1063,39 +1070,57 @@ public class BillAddDialog extends JDialog {
 
                 // 3. Tạo HOADON
                 String insHD = "INSERT INTO HOADON (MaKH, MaNV, NgayLap, TongTien, DiemSuDung, TienGiam, TrangThai) " +
-                               "VALUES (?, ?, GETDATE(), ?, ?, ?, N'DaThanhToan')";
-                int maHD;
+               "VALUES (?, ?, GETDATE(), ?, ?, ?, N'DaThanhToan')";
+                int maHD = -1;   // ← khởi tạo mặc định
                 try (PreparedStatement ps = con.prepareStatement(insHD, Statement.RETURN_GENERATED_KEYS)) {
                     ps.setInt(1, maKH);
-                    ps.setInt(2, Session.getMaNV());
+                    int maNV = Session.getMaNV();
+                    if (maNV > 0) ps.setInt(2, maNV);
+                    else          ps.setNull(2, java.sql.Types.INTEGER);
                     ps.setDouble(3, tongPhaiTra);
                     ps.setInt(4, diemThucDung);
                     ps.setDouble(5, giamTienDiem);
                     ps.executeUpdate();
                     ResultSet gk = ps.getGeneratedKeys();
                     if (!gk.next()) throw new SQLException("Không tạo được hóa đơn!");
-                    maHD = gk.getInt(1);
+                    maHD = gk.getInt(1);   // gán vào biến đã khai báo ngoài
+                }
+                if (maHD == -1) throw new SQLException("Không lấy được mã hóa đơn!");
+
+                // ✅ FIX — gộp SoLuong của các CartItem cùng MaSP
+                // Bước 1: gộp cart theo MaSP
+                Map<Integer, double[]> spMap = new LinkedHashMap<>();
+                // key = MaSP, value = [tongSoLuong, donGia]
+                for (CartItem item : cart) {
+                    if (spMap.containsKey(item.maSP)) {
+                        spMap.get(item.maSP)[0] += item.soLuong;
+                    } else {
+                        spMap.put(item.maSP, new double[]{item.soLuong, item.donGia});
+                    }
                 }
 
-                // 4. Tạo CTHOADON + cập nhật CD/ROM
-                String insCT  = "INSERT INTO CTHOADON (MaHD, MaSP, SoLuong, DonGia) VALUES (?, ?, ?, ?)";
-                String updCD  = "UPDATE CD SET TrangThai = N'DaBan' WHERE MaCD = ?";
-                String updROM = "UPDATE ROM SET SoLuotBan = SoLuotBan + ? WHERE MaSP = ?";
-
-                for (CartItem item : cart) {
+                // Bước 2: insert CTHOADON từ map (đã gộp, không còn duplicate)
+                String insCT = "INSERT INTO CTHOADON (MaHD, MaSP, SoLuong, DonGia) VALUES (?, ?, ?, ?)";
+                for (Map.Entry<Integer, double[]> entry : spMap.entrySet()) {
                     try (PreparedStatement ps = con.prepareStatement(insCT)) {
                         ps.setInt(1, maHD);
-                        ps.setInt(2, item.maSP);
-                        ps.setInt(3, item.soLuong);
-                        ps.setDouble(4, item.donGia);
+                        ps.setInt(2, entry.getKey());               // MaSP
+                        ps.setInt(3, (int) entry.getValue()[0]);    // tổng SoLuong
+                        ps.setDouble(4, entry.getValue()[1]);        // DonGia
                         ps.executeUpdate();
                     }
+                }
+
+                // Bước 3: update CD/ROM vẫn dùng cart gốc (từng item riêng)
+                String updCD  = "UPDATE CD SET TrangThai = N'DaBan' WHERE MaCD = ?";
+                String updROM = "UPDATE ROM SET SoLuotBan = SoLuotBan + ? WHERE MaSP = ?";
+                for (CartItem item : cart) {
                     if ("CD".equals(item.loaiSP)) {
                         try (PreparedStatement ps = con.prepareStatement(updCD)) {
                             ps.setInt(1, item.maCD);
                             ps.executeUpdate();
                         }
-                    } else { // ROM
+                    } else {
                         try (PreparedStatement ps = con.prepareStatement(updROM)) {
                             ps.setInt(1, item.soLuong);
                             ps.setInt(2, item.maSP);
@@ -1185,7 +1210,7 @@ public class BillAddDialog extends JDialog {
     // =========================================================
     private static class CartItem {
         int    maSP, maCD, maGame, soLuong;
-        String tenGame, loaiSP;
+        String tenGame, loaiSP, cartKey;   // ← thêm cartKey
         double donGia;
     }
 
@@ -1305,5 +1330,47 @@ public class BillAddDialog extends JDialog {
             super.paintComponent(g2);
             g2.dispose();
         }
+    }
+    
+    public static void openAndPreselectGame(Frame parent, int maGame, String loaiSP) {
+        BillAddDialog dlg = new BillAddDialog(parent);
+ 
+        SwingUtilities.invokeLater(() -> {
+            // Bước 1: tìm & chọn dòng game
+            int gameRow = -1;
+            if (dlg.gameList != null) {
+                for (int i = 0; i < dlg.gameList.size(); i++) {
+                    if ((int) dlg.gameList.get(i)[0] == maGame) {
+                        gameRow = i;
+                        break;
+                    }
+                }
+            }
+ 
+            if (gameRow >= 0) {
+                final int row = gameRow;
+                dlg.tblGame.setRowSelectionInterval(row, row);
+                dlg.tblGame.scrollRectToVisible(dlg.tblGame.getCellRect(row, 0, true));
+                // ListSelectionListener sẽ gọi loadSPTable() tự động
+ 
+                // Bước 2: chờ loadSPTable() xong rồi chọn SP
+                SwingUtilities.invokeLater(() -> {
+                    if (dlg.spList != null) {
+                        for (int j = 0; j < dlg.spList.size(); j++) {
+                            Object[] sp = dlg.spList.get(j);
+                            boolean typeMatch     = loaiSP.equals(sp[2]);
+                            boolean available     = (boolean) sp[5];
+                            if (typeMatch && available) {
+                                dlg.tblSP.setRowSelectionInterval(j, j);
+                                dlg.tblSP.scrollRectToVisible(dlg.tblSP.getCellRect(j, 0, true));
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+        });
+ 
+        dlg.setVisible(true);   // modal — luồng dừng ở đây cho đến khi đóng dialog
     }
 }
