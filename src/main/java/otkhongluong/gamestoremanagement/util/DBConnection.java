@@ -8,7 +8,7 @@ public class DBConnection {
 
     private static final String URL = "jdbc:sqlserver://localhost\\ANSQL;databaseName=qlgamee;encrypt=false;trustServerCertificate=true";
     private static final String USER = "sa";
-    private static final String PASSWORD = "Tha2k6.*#2303";
+    private static final String PASSWORD = "123456";
 
     public static Connection getConnection() {
 
