@@ -1,67 +1,360 @@
 package otkhongluong.gamestoremanagement.view.panel;
 
+import otkhongluong.gamestoremanagement.model.Game;
+import otkhongluong.gamestoremanagement.service.GameService;
+import otkhongluong.gamestoremanagement.util.IconUtils;
+
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
+import javax.swing.border.*;
+import javax.swing.table.*;
 import java.awt.*;
+import java.awt.event.*;
+import java.awt.geom.RoundRectangle2D;
+import java.util.List;
 
 public class GameManagePanel extends JPanel {
 
+    /* ============ COLORS ============ */
+    private static final Color BG_DARK       = new Color(35, 20, 85);
+    private static final Color BG_CARD       = Color.WHITE;
+
+    private static final Color PURPLE_HEADER = new Color(155, 135, 245);
+    private static final Color PURPLE_ROW    = new Color(245, 242, 255);
+    private static final Color PURPLE_ALT    = Color.WHITE;
+
+    private static final Color ACCENT        = new Color(130, 90, 230);
+
+    private static final Color TEXT_WHITE    = Color.WHITE;
+    private static final Color TEXT_MUTED    = new Color(120, 120, 140);
+
+    private static final Color INPUT_BG      = Color.WHITE;
+    private static final Color BTN_EDIT      = new Color(99, 179, 237);
+    private static final Color BTN_DELETE    = new Color(252, 129, 129);
+    private static final Color BTN_ADD       = new Color(104, 211, 145);
+
+    /* ============ FONTS ============ */
+    private static final Font FONT_HEADER = new Font("Segoe UI", Font.BOLD, 13);
+    private static final Font FONT_CELL   = new Font("Segoe UI", Font.PLAIN, 13);
+    private static final Font FONT_LABEL  = new Font("Segoe UI", Font.BOLD, 12);
+
+    /* ============ COMPONENTS ============ */
     private JTable table;
-    private DefaultTableModel model;
+    private DefaultTableModel tableModel;
+    private JTextField txtSearch;
+    private JPanel paginationPanel;
+    private int currentPage = 1;
+    private static final int PAGE_SIZE = 8;
+
+    private GameService service = new GameService();
+    private List<Game> allData;
+    private List<Game> currentPageData;
 
     public GameManagePanel() {
+        setLayout(new BorderLayout(0, 0));
+        setBackground(BG_DARK);
+        setBorder(new EmptyBorder(20, 20, 20, 20));
 
-        setLayout(new BorderLayout());
-        setBackground(new Color(20,20,50));
+        add(buildTopBar(),    BorderLayout.NORTH);
+        add(buildTable(),     BorderLayout.CENTER);
+        add(buildBottomBar(), BorderLayout.SOUTH);
 
-        add(createToolbar(), BorderLayout.NORTH);
-        add(createTable(), BorderLayout.CENTER);
+        loadData();
     }
 
-    // ================= TOOLBAR =================
-    private JPanel createToolbar(){
+    /* ======================================================
+        TOP BAR
+    ====================================================== */
+    private JPanel buildTopBar() {
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.setBackground(BG_DARK);
+        bar.setBorder(new EmptyBorder(0, 0, 12, 0));
 
-        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT,10,10));
-        bar.setBackground(new Color(20,20,50));
+        JLabel title = new JLabel("QUẢN LÝ GAME");
+        title.setForeground(Color.WHITE);
+        title.setFont(new Font("Arial", Font.BOLD, 22));
+        title.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 20));
+        bar.add(title, BorderLayout.WEST);
 
-        JButton btnAdd = new JButton("➕ Thêm");
-        JButton btnEdit = new JButton("✏ Sửa");
-        JButton btnDelete = new JButton("🗑 Xóa");
-        JButton btnRefresh = new JButton("🔄 Refresh");
-
-        bar.add(btnAdd);
-        bar.add(btnEdit);
-        bar.add(btnDelete);
-        bar.add(btnRefresh);
+        bar.add(labeledSearch(), BorderLayout.EAST);
 
         return bar;
     }
 
-    // ================= TABLE =================
-    private JScrollPane createTable(){
+    private JPanel labeledSearch() {
+        JPanel p = new JPanel(new BorderLayout(0, 6));
+        p.setBackground(BG_DARK);
+        JLabel lbl = new JLabel("Tìm kiếm từ khóa");
+        lbl.setFont(FONT_LABEL);
+        lbl.setForeground(TEXT_WHITE);
+        p.add(lbl, BorderLayout.NORTH);
 
-        String[] column = {
-                "Mã Game",
-                "Tên Game",
-                "Thể Loại",
-                "Nền Tảng",
-                "Giá Bán",
-                "Giá Thuê"
+        JPanel row = new JPanel(new BorderLayout(8, 0));
+        row.setBackground(BG_DARK);
+
+        txtSearch = new JTextField(22) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(INPUT_BG);
+                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
+                super.paintComponent(g);
+                if (getText().isEmpty()) {
+                    Icon searchIcon = IconUtils.getSearchIcon(14, TEXT_MUTED);
+                    searchIcon.paintIcon(this, g2, 8, getHeight() / 2 - 7);
+                }
+                g2.dispose();
+            }
+        };
+        styleTextField(txtSearch);
+        txtSearch.addKeyListener(new KeyAdapter() {
+            public void keyReleased(KeyEvent e) { currentPage = 1; renderPage(); }
+        });
+
+        RoundButton btnAdd = new RoundButton("", BTN_ADD, Color.WHITE);
+        btnAdd.setIcon(IconUtils.getAddIcon(18, Color.WHITE));
+        btnAdd.setPreferredSize(new Dimension(40, 40));
+        btnAdd.setToolTipText("Thêm Game");
+        btnAdd.addActionListener(e -> {
+            JOptionPane.showMessageDialog(this, "Chức năng thêm Game đang cập nhật!");
+        });
+
+        RoundButton btnRefresh = new RoundButton("", INPUT_BG, BG_DARK);
+        btnRefresh.setIcon(IconUtils.getRefreshIcon(18, BG_DARK));
+        btnRefresh.setPreferredSize(new Dimension(40, 40));
+        btnRefresh.setToolTipText("Làm mới");
+        btnRefresh.addActionListener(e -> loadData());
+
+        JPanel btnGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        btnGroup.setBackground(BG_DARK);
+        btnGroup.add(btnAdd);
+        btnGroup.add(btnRefresh);
+
+        row.add(txtSearch, BorderLayout.CENTER);
+        row.add(btnGroup,  BorderLayout.EAST);
+        p.add(row, BorderLayout.CENTER);
+        return p;
+    }
+
+    private void styleTextField(JTextField tf) {
+        tf.setBackground(INPUT_BG);
+        tf.setForeground(TEXT_MUTED);
+        tf.setCaretColor(TEXT_WHITE);
+        tf.setFont(FONT_CELL);
+        tf.setBorder(new CompoundBorder(
+            new LineBorder(ACCENT, 1, true),
+            new EmptyBorder(6, 10, 6, 32)
+        ));
+        tf.setOpaque(false);
+        tf.setPreferredSize(new Dimension(0, 40));
+    }
+
+    /* ======================================================
+        TABLE
+    ====================================================== */
+    private JScrollPane buildTable() {
+        String[] cols = {"Mã Game", "Tên Game", "Thể Loại", "Nền Tảng", "Giá Thuê (CD)", "Giá Bán (ROM)"};
+        tableModel = new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
         };
 
-        model = new DefaultTableModel(column,0);
+        table = new JTable(tableModel) {
+            @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
+                Component c = super.prepareRenderer(r, row, col);
+                if (c instanceof JLabel) {
+                    ((JLabel) c).setHorizontalAlignment(SwingConstants.CENTER);
+                }
+                if (isRowSelected(row)) {
+                    c.setBackground(ACCENT);
+                    c.setForeground(Color.WHITE);
+                } else {
+                    c.setBackground(row % 2 == 0 ? PURPLE_ROW : PURPLE_ALT);
+                    c.setForeground(new Color(40, 40, 40));
+                }
+                return c;
+            }
+        };
 
-        // demo data
-        model.addRow(new Object[]{"G01","GTA V","Action","PC",500000,30000});
-        model.addRow(new Object[]{"G02","Minecraft","Sandbox","PC",300000,20000});
-        model.addRow(new Object[]{"G03","FIFA 24","Sport","PS5",900000,50000});
+        table.setFont(FONT_CELL);
+        table.setRowHeight(38);
+        table.setShowGrid(false);
+        table.setIntercellSpacing(new Dimension(0, 0));
+        table.setSelectionBackground(ACCENT);
+        table.setSelectionForeground(Color.WHITE);
+        table.setBackground(PURPLE_ALT);
+        table.setForeground(TEXT_WHITE);
 
-        table = new JTable(model);
-        table.setRowHeight(28);
-        table.setFont(new Font("Segoe UI",Font.PLAIN,14));
+        JTableHeader header = table.getTableHeader();
+        header.setDefaultRenderer(new DefaultTableCellRenderer() {
+            @Override public Component getTableCellRendererComponent(
+                    JTable t, Object v, boolean sel, boolean foc, int r, int c) {
+                JLabel lbl = new JLabel(v == null ? "" : v.toString());
+                lbl.setFont(FONT_HEADER);
+                lbl.setForeground(Color.WHITE);
+                lbl.setBackground(PURPLE_HEADER);
+                lbl.setHorizontalAlignment(SwingConstants.CENTER);
+                lbl.setOpaque(true);
+                lbl.setBorder(new EmptyBorder(10, 12, 10, 12));
+                return lbl;
+            }
+        });
+        header.setBackground(PURPLE_HEADER);
+        header.setPreferredSize(new Dimension(0, 42));
+        header.setBorder(BorderFactory.createEmptyBorder());
 
-        JScrollPane scroll = new JScrollPane(table);
+        int[] widths = {80, 200, 100, 100, 120, 120};
+        for (int i = 0; i < widths.length; i++)
+            table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
 
-        return scroll;
+        JScrollPane sp = new JScrollPane(table);
+        sp.setBorder(new LineBorder(PURPLE_HEADER, 1, true));
+        sp.setBackground(BG_CARD);
+        sp.getViewport().setBackground(PURPLE_ALT);
+        return sp;
+    }
+
+    /* ======================================================
+        BOTTOM BAR
+    ====================================================== */
+    private JPanel buildBottomBar() {
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.setBackground(BG_DARK);
+        bar.setBorder(new EmptyBorder(14, 0, 0, 0));
+
+        paginationPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        paginationPanel.setBackground(BG_DARK);
+        rebuildPagination(paginationPanel);
+        bar.add(paginationPanel, BorderLayout.WEST);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        btnPanel.setBackground(BG_DARK);
+
+        RoundButton btnEdit = new RoundButton(" Sửa", BTN_EDIT, BG_DARK);
+        btnEdit.setIcon(IconUtils.getEditIcon(16, BG_DARK));
+        btnEdit.setPreferredSize(new Dimension(110, 40));
+        btnEdit.addActionListener(e -> {
+            int row = table.getSelectedRow();
+            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn game để sửa!"); return; }
+            JOptionPane.showMessageDialog(this, "Chức năng sửa Game đang cập nhật!");
+        });
+
+        RoundButton btnDelete = new RoundButton(" Xóa", BTN_DELETE, BG_DARK);
+        btnDelete.setIcon(IconUtils.getDeleteIcon(16, BG_DARK));
+        btnDelete.setPreferredSize(new Dimension(110, 40));
+        btnDelete.addActionListener(e -> {
+            int row = table.getSelectedRow();
+            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn game để xóa!"); return; }
+            Game g = currentPageData.get(row);
+            int confirm = JOptionPane.showConfirmDialog(this, "Xác nhận xóa game " + g.getTenGame() + "?", "Xác nhận", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                if (service.deleteGame(g.getMaGame())) {
+                    JOptionPane.showMessageDialog(this, "Xóa thành công!");
+                    loadData();
+                } else {
+                    JOptionPane.showMessageDialog(this, "Lỗi khi xóa!");
+                }
+            }
+        });
+
+        btnPanel.add(btnEdit);
+        btnPanel.add(btnDelete);
+        bar.add(btnPanel, BorderLayout.EAST);
+
+        return bar;
+    }
+
+    private void rebuildPagination(JPanel panel) {
+        panel.removeAll();
+        List<Game> filtered = getFilteredData();
+        final int total = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
+
+        for (int i = 1; i <= Math.min(total, 4); i++) {
+            final int pg = i;
+            RoundButton btn = new RoundButton(String.valueOf(i),
+                pg == currentPage ? ACCENT : INPUT_BG, TEXT_WHITE);
+            btn.setPreferredSize(new Dimension(36, 36));
+            btn.addActionListener(e -> { currentPage = pg; renderPage(); });
+            panel.add(btn);
+        }
+        if (total > 4) {
+            RoundButton btnNext = new RoundButton("Tiếp", INPUT_BG, TEXT_WHITE);
+            btnNext.setPreferredSize(new Dimension(60, 36));
+            btnNext.addActionListener(e -> {
+                if (currentPage < total) { currentPage++; renderPage(); }
+            });
+            panel.add(btnNext);
+        }
+        panel.revalidate();
+        panel.repaint();
+    }
+
+    /* ======================================================
+        DATA
+    ====================================================== */
+    private void loadData() {
+        allData = service.getAllGames();
+        renderPage();
+    }
+    
+    private List<Game> getFilteredData() {
+        String keyword = txtSearch == null ? "" : txtSearch.getText().trim().toLowerCase();
+
+        return allData == null ? java.util.Collections.emptyList() :
+            allData.stream()
+                .filter(g -> keyword.isEmpty()
+                    || g.getTenGame().toLowerCase().contains(keyword)
+                    || (g.getTheLoai() != null && g.getTheLoai().toLowerCase().contains(keyword))
+                    || (g.getNenTang() != null && g.getNenTang().toLowerCase().contains(keyword)))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    private void renderPage() {
+        tableModel.setRowCount(0);
+        List<Game> filtered = getFilteredData();
+
+        int totalPage = (int) Math.ceil((double) filtered.size() / PAGE_SIZE);
+        if (currentPage > totalPage) currentPage = totalPage == 0 ? 1 : totalPage;
+
+        int from = (currentPage - 1) * PAGE_SIZE;
+        int to   = Math.min(from + PAGE_SIZE, filtered.size());
+
+        currentPageData = filtered.subList(from, to);
+
+        for (Game g : currentPageData) {
+            tableModel.addRow(new Object[]{
+                "G" + String.format("%03d", g.getMaGame()),
+                g.getTenGame(),
+                g.getTheLoai() != null ? g.getTheLoai() : "",
+                g.getNenTang() != null ? g.getNenTang() : "",
+                g.getGiaCDText(),
+                g.getGiaROMText()
+            });
+        }
+
+        rebuildPagination(paginationPanel);
+    }
+
+    /* ======================================================
+        INNER: RoundButton
+    ====================================================== */
+    static class RoundButton extends JButton {
+        private final Color bg, fg;
+        RoundButton(String text, Color bg, Color fg) {
+            super(text);
+            this.bg = bg; this.fg = fg;
+            setFocusPainted(false);
+            setContentAreaFilled(false);
+            setBorderPainted(false);
+            setForeground(fg);
+            setFont(new Font("Segoe UI", Font.BOLD, 13));
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        }
+        @Override protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(getModel().isRollover() ? bg.brighter() : bg);
+            g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 12, 12));
+            super.paintComponent(g2);
+            g2.dispose();
+        }
     }
 }
