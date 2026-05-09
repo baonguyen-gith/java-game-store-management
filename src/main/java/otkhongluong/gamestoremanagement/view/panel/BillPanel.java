@@ -3,8 +3,8 @@ package otkhongluong.gamestoremanagement.view.panel;
 import otkhongluong.gamestoremanagement.model.HoaDon;
 import otkhongluong.gamestoremanagement.service.HoaDonService;
 import otkhongluong.gamestoremanagement.view.dialog.BillDetailDialog;
-import otkhongluong.gamestoremanagement.util.IconUtils;
-
+import otkhongluong.gamestoremanagement.view.dialog.BillAddDialog;
+import otkhongluong.gamestoremanagement.view.dialog.BillEditDialog;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -145,8 +145,14 @@ public class BillPanel extends JPanel {
                 g2.setColor(getBackground());
                 g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
                 super.paintComponent(g);
-                Icon calIcon = IconUtils.getCalendarIcon(14, TEXT_MUTED);
-                calIcon.paintIcon(this, g2, getWidth() - 28, getHeight() / 2 - 7);
+                if (getText().trim().isEmpty()) {
+                    g2.setColor(TEXT_MUTED);
+                    g2.setFont(FONT_CELL);
+                    g2.drawString("dd/MM/yyyy", 10, getHeight() / 2 + 5);
+                }
+                g2.setColor(TEXT_MUTED);
+                g2.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 13));
+                g2.drawString("📅", getWidth() - 26, getHeight() / 2 + 5);
                 g2.dispose();
             }
         };
@@ -179,8 +185,9 @@ public class BillPanel extends JPanel {
                 g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
                 super.paintComponent(g);
                 if (getText().isEmpty()) {
-                    Icon searchIcon = IconUtils.getSearchIcon(14, TEXT_MUTED);
-                    searchIcon.paintIcon(this, g2, 8, getHeight() / 2 - 7);
+                    g2.setColor(TEXT_MUTED);
+                    g2.setFont(FONT_CELL);
+                    g2.drawString("Tìm kiếm theo từ khóa", 10, getHeight() / 2 + 5);
                 }
                 g2.dispose();
             }
@@ -199,14 +206,7 @@ public class BillPanel extends JPanel {
             public void keyReleased(KeyEvent e) { currentPage = 1; renderPage(); }
         });
 
-        RoundButton btnAdd = new RoundButton("", BTN_ADD, Color.WHITE);
-        btnAdd.setIcon(IconUtils.getAddIcon(18, Color.WHITE));
-        btnAdd.setPreferredSize(new Dimension(40, 40));
-        btnAdd.addActionListener(e -> JOptionPane.showMessageDialog(this, "Thêm hóa đơn mới"));
-
-        row.add(txtSearch, BorderLayout.CENTER);
-        row.add(btnAdd,    BorderLayout.EAST);
-        p.add(row, BorderLayout.CENTER);
+        p.add(txtSearch, BorderLayout.CENTER);
         return p;
     }
 
@@ -221,9 +221,6 @@ public class BillPanel extends JPanel {
         table = new JTable(tableModel) {
             @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
-                if (c instanceof JLabel) {
-                    ((JLabel) c).setHorizontalAlignment(SwingConstants.CENTER);
-                }
                 if (isRowSelected(row)) {
                     c.setBackground(ACCENT);
                     c.setForeground(Color.WHITE);
@@ -258,7 +255,6 @@ public class BillPanel extends JPanel {
                 lbl.setFont(FONT_HEADER);
                 lbl.setForeground(Color.WHITE);
                 lbl.setBackground(PURPLE_HEADER);
-                lbl.setHorizontalAlignment(SwingConstants.CENTER);
                 lbl.setOpaque(true);
                 lbl.setBorder(new EmptyBorder(10, 12, 10, 12));
                 lbl.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -338,9 +334,8 @@ public class BillPanel extends JPanel {
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         btnPanel.setBackground(BG_DARK);
 
-        RoundButton btnEdit = new RoundButton(" Sửa", BTN_EDIT, BG_DARK);
-        btnEdit.setIcon(IconUtils.getEditIcon(16, BG_DARK));
-        btnEdit.setPreferredSize(new Dimension(110, 40));
+        RoundButton btnEdit = new RoundButton("Sửa", BTN_EDIT, Color.WHITE);
+        btnEdit.setPreferredSize(new Dimension(105, 38));
         btnEdit.addActionListener(e -> {
             int row = table.getSelectedRow();
             if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn hóa đơn để sửa!"); return; }
@@ -349,9 +344,9 @@ public class BillPanel extends JPanel {
             loadData();
         });
 
-        RoundButton btnDelete = new RoundButton(" Xóa", BTN_DELETE, BG_DARK);
-        btnDelete.setIcon(IconUtils.getDeleteIcon(16, BG_DARK));
-        btnDelete.setPreferredSize(new Dimension(110, 40));
+        RoundButton btnDelete = new RoundButton("Xóa", BTN_DELETE, Color.WHITE);
+        btnDelete.setPreferredSize(new Dimension(105, 38));
+        // ✅ MỚI
         btnDelete.addActionListener(e -> {
             int row = table.getSelectedRow();
             if (row < 0) {
@@ -398,31 +393,28 @@ public class BillPanel extends JPanel {
         return bar;
     }
 
-    private void rebuildPagination(JPanel panel) {
-        panel.removeAll();
-        List<HoaDon> filtered = getFilteredData();
-        final int total = Math.max(1,
-            (int) Math.ceil((double) filtered.size() / PAGE_SIZE)
-        );
+    // ══════════════════════════════════════════════════════════
+    // PAGINATION
+    // ══════════════════════════════════════════════════════════
+    private void rebuildPagination(int totalPages) {
+        paginationPanel.removeAll();
 
-        for (int i = 1; i <= Math.min(total, 4); i++) {
-            final int pg = i;
-            RoundButton btn = new RoundButton(String.valueOf(i),
-                pg == currentPage ? ACCENT : INPUT_BG, TEXT_WHITE);
-            btn.setPreferredSize(new Dimension(36, 36));
-            btn.addActionListener(e -> { currentPage = pg; renderPage(); });
-            panel.add(btn);
-        }
-        if (total > 4) {
-            RoundButton btnNext = new RoundButton("Tiếp", INPUT_BG, TEXT_WHITE);
-            btnNext.setPreferredSize(new Dimension(60, 36));
-            btnNext.addActionListener(e -> {
-                if (currentPage < total) { currentPage++; renderPage(); }
-            });
-            panel.add(btnNext);
-        }
-        panel.revalidate();
-        panel.repaint();
+        RoundButton btnPrev = new RoundButton("<", INPUT_BG, new Color(80, 80, 80));
+        btnPrev.setPreferredSize(new Dimension(34, 34));
+        btnPrev.setEnabled(currentPage > 1);
+        btnPrev.addActionListener(e -> { if (currentPage > 1) { currentPage--; renderPage(); } });
+        paginationPanel.add(btnPrev);
+
+        RoundButton btnNext = new RoundButton(">", INPUT_BG, new Color(80, 80, 80));
+        btnNext.setPreferredSize(new Dimension(34, 34));
+        btnNext.setEnabled(currentPage < totalPages);
+        btnNext.addActionListener(e -> { if (currentPage < totalPages) { currentPage++; renderPage(); } });
+        paginationPanel.add(btnNext);
+
+        lblPageInfo.setText("Trang " + currentPage + " / " + Math.max(1, totalPages));
+
+        paginationPanel.revalidate();
+        paginationPanel.repaint();
     }
 
     // ══════════════════════════════════════════════════════════
