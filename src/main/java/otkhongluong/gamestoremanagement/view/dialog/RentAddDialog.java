@@ -18,17 +18,16 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * RentAddDialog — Wizard 3 buoc thue CD/Game
+ * RentAddDialog — Wizard 3 bước thuê CD/Game
  *
- * Buoc 1 : Chon game (danh sach CD san sang)
- * Buoc 2 : Thong tin khach hang + thoi gian + diem + coc
- * Buoc 3 : Xac nhan & tao phieu thue
+ * Bước 1 : Chọn game (danh sách CD sẵn sàng)
+ * Bước 2 : Thông tin khách hàng + thời gian + điểm + cọc
+ * Bước 3 : Xác nhận & tạo phiếu thuê
  *
- * LOGIC MOI:
- *   CTPHIEUTHUE.DonGiaThue = tong thue goc = GiaThueNgay x SoNgay
- *   (chua tru diem, thu khi tra CD)
- *   => Khi gia han, chi can cong them vao DonGiaThue, khong bi tinh lai.
- *   Diem dung giam luu vao TinhTrang = "OK|diem=N"
+ * LOGIC:
+ *   CTPHIEUTHUE.DonGiaThue = tổng thuê gốc = GiaThueNgay x SoNgay
+ *   Điểm dùng giảm lưu vào TinhTrang = "OK|diem=N"
+ *   1 điểm = 5.000 VNĐ, không được giảm quá số tiền thuê
  */
 public class RentAddDialog extends JDialog {
 
@@ -71,7 +70,7 @@ public class RentAddDialog extends JDialog {
     // =========================================================
     private static final double COC_MIN      = 250_000;
     private static final double COC_MULTIPLY = 2.0;
-    private static final int    DIEM_TO_VND  = 1_000;
+    private static final int    DIEM_TO_VND  = 5_000; // 1 điểm = 5.000 VNĐ
 
     // =========================================================
     // DAO / SERVICE
@@ -85,29 +84,29 @@ public class RentAddDialog extends JDialog {
     // =========================================================
     private int currentStep = 1;
 
-    // Buoc 1
-    private JTable            tblCD;
+    // Bước 1
+    JTable            tblCD;
     private DefaultTableModel tblCDModel;
-    private List<Object[]>    cdList;
+    List<Object[]>    cdList;
 
     private int    selectedMaCD    = -1;
     private String selectedTenGame = "";
-    private double selectedGia     = 0;   // GiaThueNgay (don gia/ngay)
+    private double selectedGia     = 0;   // GiaThueNgay (đơn giá/ngày)
 
-    // Buoc 2
+    // Bước 2
     private JTextField txtSDT;
     private JLabel     lblTenKH, lblDiemHienCo;
     private JTextField txtSoNgay, txtDiemSuDung;
-    private JLabel     lblInfoTongThueGoc, lblInfoGiamDiem, lblInfoTongSauGiam, lblInfoTienCoc;
+    private JLabel     lblInfoTongThueGoc, lblInfoGiamDiem, lblInfoTongPhaiTra, lblInfoTienCoc;
 
     private KhachHang currentKH  = null;
     private int       maKH       = -1;
     private int       diemHienCo = 0;
 
-    // Buoc 3 — info cards
+    // Bước 3 — info cards
     private JLabel cardMaCD, cardGame, cardGiaNgay;
 
-    // Buoc 3 — summary labels
+    // Bước 3 — summary labels
     private JLabel lblS3CD, lblS3Game, lblS3KH;
     private JLabel lblS3NgayThue, lblS3NgayTra, lblS3SoNgay;
     private JLabel lblS3TongGoc, lblS3DiemTru, lblS3TongSauGiam, lblS3Coc;
@@ -123,7 +122,7 @@ public class RentAddDialog extends JDialog {
     // CONSTRUCTOR
     // =========================================================
     public RentAddDialog(Frame parent) {
-        super(parent, "Thue CD / Game", true);
+        super(parent, "Thuê CD / Game", true);
         setSize(740, 580);
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout());
@@ -151,7 +150,7 @@ public class RentAddDialog extends JDialog {
         p.setBackground(BG);
         p.setBorder(new EmptyBorder(16, 20, 0, 20));
 
-        JLabel title = new JLabel("THUE CD / GAME");
+        JLabel title = new JLabel("THUÊ CD / GAME");
         title.setFont(F_DIALOG_TITLE);
         title.setForeground(WHITE);
 
@@ -178,7 +177,7 @@ public class RentAddDialog extends JDialog {
     private JPanel buildStepIndicator() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
         p.setBackground(BG);
-        String[] labels = {"1. Chon game", "2. Chi tiet", "3. Xac nhan"};
+        String[] labels = {"1. Chọn game", "2. Chi tiết", "3. Xác nhận"};
         for (int i = 0; i < labels.length; i++) {
             JLabel lbl = new JLabel(labels[i]);
             lbl.setName("step_" + (i + 1));
@@ -198,15 +197,10 @@ public class RentAddDialog extends JDialog {
 
     private void updateStepIndicator(int active) {
         for (Component c : stepIndicator.getComponents()) {
-
             if (c instanceof JLabel) {
-
                 JLabel lbl = (JLabel) c;
-
                 if (lbl.getName() != null && lbl.getName().startsWith("step_")) {
-
                     int s = Integer.parseInt(lbl.getName().split("_")[1]);
-
                     lbl.setForeground(
                         s == active ? ACCENT_LIGHT :
                         (s < active ? SUCCESS : TEXT_MUTED)
@@ -218,22 +212,21 @@ public class RentAddDialog extends JDialog {
     }
 
     // =========================================================
-    // STEP 1 — Danh sach CD san sang
+    // BƯỚC 1 — Danh sách CD sẵn sàng
     // =========================================================
     private JPanel buildStep1() {
         JPanel p = new JPanel(new BorderLayout(0, 10));
         p.setBackground(BG);
         p.setBorder(new EmptyBorder(14, 20, 0, 20));
 
-        // Thanh tren: tieu de + nut lam moi
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.setBackground(BG);
 
-        JLabel lbl = new JLabel("Danh sach CD san sang cho thue:");
+        JLabel lbl = new JLabel("Danh sách CD sẵn sàng cho thuê:");
         lbl.setFont(F_SECTION);
         lbl.setForeground(TEXT_MAIN);
 
-        PillButton btnRefresh = new PillButton("Lam moi", ACCENT, WHITE);
+        PillButton btnRefresh = new PillButton("Làm mới", ACCENT, WHITE);
         btnRefresh.setPreferredSize(new Dimension(100, 32));
         btnRefresh.addActionListener(e -> loadCDTable());
 
@@ -241,8 +234,7 @@ public class RentAddDialog extends JDialog {
         topBar.add(btnRefresh, BorderLayout.EAST);
         p.add(topBar, BorderLayout.NORTH);
 
-        // Bang CD
-        String[] cols = {"Ma CD", "Ten Game", "Gia thue / ngay"};
+        String[] cols = {"Mã CD", "Tên Game", "Giá thuê / ngày"};
         tblCDModel = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -259,7 +251,7 @@ public class RentAddDialog extends JDialog {
         loadCDTable();
         p.add(wrapScroll(tblCD), BorderLayout.CENTER);
 
-        JLabel hint = new JLabel("Chon game roi nhan \"Tiep theo\", hoac double-click de sang buoc tiep.");
+        JLabel hint = new JLabel("Chọn game rồi nhấn \"Tiếp theo\", hoặc double-click để sang bước tiếp.");
         hint.setFont(F_HINT);
         hint.setForeground(TEXT_MUTED);
         p.add(hint, BorderLayout.SOUTH);
@@ -277,30 +269,30 @@ public class RentAddDialog extends JDialog {
             tblCDModel.addRow(new Object[]{
                 "CD" + maCD,
                 ten,
-                String.format("%,.0f VND / ngay", gia)
+                String.format("%,.0f VNĐ / ngày", gia)
             });
         }
     }
 
     // =========================================================
-    // STEP 2 — Thong tin thue
+    // BƯỚC 2 — Thông tin thuê
     // =========================================================
     private JPanel buildStep2() {
         JPanel p = new JPanel(new BorderLayout(0, 10));
         p.setBackground(BG);
         p.setBorder(new EmptyBorder(14, 20, 0, 20));
 
-        // --- Info cards game da chon ---
-        cardMaCD  = new JLabel("-");
-        cardGame  = new JLabel("-");
+        // --- Info cards game đã chọn ---
+        cardMaCD    = new JLabel("-");
+        cardGame    = new JLabel("-");
         cardGiaNgay = new JLabel("-");
 
         JPanel cards = new JPanel(new GridLayout(1, 3, 10, 0));
         cards.setBackground(BG);
         cards.setPreferredSize(new Dimension(0, 68));
-        cards.add(infoCard("Ma CD",          cardMaCD));
-        cards.add(infoCard("Ten game",       cardGame));
-        cards.add(infoCard("Gia thue / ngay", cardGiaNgay));
+        cards.add(infoCard("Mã CD",            cardMaCD));
+        cards.add(infoCard("Tên game",         cardGame));
+        cards.add(infoCard("Giá thuê / ngày",  cardGiaNgay));
         p.add(cards, BorderLayout.NORTH);
 
         // --- Form ---
@@ -312,13 +304,13 @@ public class RentAddDialog extends JDialog {
 
         int row = 0;
 
-        // SĐT + nut tim + nut tao
+        // SĐT + nút tìm + nút tạo
         txtSDT = makeInput();
-        PillButton btnTim = new PillButton("Tim", ACCENT, WHITE);
+        PillButton btnTim = new PillButton("Tìm", ACCENT, WHITE);
         btnTim.setPreferredSize(new Dimension(80, 34));
         btnTim.addActionListener(e -> doFindKH());
 
-        PillButton btnTao = new PillButton("Tao moi", SUCCESS, TEXT_DARK);
+        PillButton btnTao = new PillButton("Tạo mới", SUCCESS, TEXT_DARK);
         btnTao.setPreferredSize(new Dimension(100, 34));
         btnTao.addActionListener(e -> doCreateKH());
 
@@ -327,7 +319,7 @@ public class RentAddDialog extends JDialog {
             public void keyPressed(KeyEvent e)  { if (e.getKeyCode() == KeyEvent.VK_ENTER) doFindKH(); }
         });
 
-        addLabel(form, gc, "So dien thoai KH:", row, 0, 120);
+        addLabel(form, gc, "Số điện thoại KH:", row, 0, 130);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 1;
         form.add(txtSDT, gc);
         gc.gridx = 2; gc.weightx = 0;
@@ -336,83 +328,83 @@ public class RentAddDialog extends JDialog {
         form.add(btnTao, gc);
         gc.gridwidth = 1;
 
-        // Ten KH
+        // Tên KH
         row++;
         lblTenKH = new JLabel("---");
         lblTenKH.setFont(F_VALUE);
         lblTenKH.setForeground(TEXT_MAIN);
-        addLabel(form, gc, "Ten khach hang:", row, 0, 120);
+        addLabel(form, gc, "Tên khách hàng:", row, 0, 130);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 3;
         form.add(lblTenKH, gc);
         gc.gridwidth = 1; gc.weightx = 0;
 
-        // Diem hien co
+        // Điểm hiện có
         row++;
         lblDiemHienCo = new JLabel("---");
         lblDiemHienCo.setFont(F_VALUE);
         lblDiemHienCo.setForeground(GOLD);
-        addLabel(form, gc, "Diem tich luy:", row, 0, 120);
+        addLabel(form, gc, "Điểm tích lũy:", row, 0, 130);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 3;
         form.add(lblDiemHienCo, gc);
         gc.gridwidth = 1; gc.weightx = 0;
 
-        // Duong ke
+        // Đường kẻ
         row++;
         addDivider(form, gc, row, 4);
 
-        // So ngay thue
+        // Số ngày thuê
         row++;
         txtSoNgay = makeInput();
         txtSoNgay.setText("1");
         txtSoNgay.addKeyListener(new KeyAdapter() {
             public void keyReleased(KeyEvent e) { recalc(); }
         });
-        addLabel(form, gc, "So ngay thue:", row, 0, 120);
+        addLabel(form, gc, "Số ngày thuê:", row, 0, 130);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 3;
         form.add(txtSoNgay, gc);
         gc.gridwidth = 1; gc.weightx = 0;
 
-        // Diem su dung
+        // Điểm sử dụng
         row++;
         txtDiemSuDung = makeInput();
         txtDiemSuDung.setText("0");
         txtDiemSuDung.addKeyListener(new KeyAdapter() {
             public void keyReleased(KeyEvent e) { recalc(); }
         });
-        addLabel(form, gc, "Diem muon dung:", row, 0, 120);
+        addLabel(form, gc, "Điểm muốn dùng:", row, 0, 130);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 3;
         form.add(txtDiemSuDung, gc);
         gc.gridwidth = 1; gc.weightx = 0;
 
-        // Duong ke
+        // Đường kẻ
         row++;
         addDivider(form, gc, row, 4);
 
-        // --- Ket qua tinh (4 dong, 2 cot moi dong) ---
+        // --- Kết quả tính (4 dòng) ---
         row++;
         lblInfoTongThueGoc = resultLabel("---", TEXT_MAIN);
-        addLabel(form, gc, "Tong thue goc:", row, 0, 120);
+        addLabel(form, gc, "Tổng thuê gốc:", row, 0, 130);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 3;
         form.add(lblInfoTongThueGoc, gc);
         gc.gridwidth = 1; gc.weightx = 0;
 
         row++;
         lblInfoGiamDiem = resultLabel("---", SUCCESS);
-        addLabel(form, gc, "Giam tu diem:", row, 0, 120);
+        addLabel(form, gc, "Giảm từ điểm:", row, 0, 130);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 3;
         form.add(lblInfoGiamDiem, gc);
         gc.gridwidth = 1; gc.weightx = 0;
 
         row++;
-        lblInfoTongSauGiam = resultLabel("---", ACCENT_LIGHT);
-        addLabel(form, gc, "Du kien thu khi tra:", row, 0, 120);
+        lblInfoTongPhaiTra = resultLabel("---", ACCENT_LIGHT);
+        addLabel(form, gc, "Tổng tiền thuê phải trả:", row, 0, 130);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 3;
-        form.add(lblInfoTongSauGiam, gc);
+        form.add(lblInfoTongPhaiTra, gc);
         gc.gridwidth = 1; gc.weightx = 0;
 
         row++;
         lblInfoTienCoc = resultLabel("---", GOLD);
-        addLabel(form, gc, "Tien coc thu ngay:", row, 0, 120);
+        addLabel(form, gc, "Tiền cọc thu ngay:", row, 0, 130);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 3;
         form.add(lblInfoTienCoc, gc);
         gc.gridwidth = 1; gc.weightx = 0;
@@ -453,16 +445,16 @@ public class RentAddDialog extends JDialog {
         gc.gridwidth = 1;
     }
 
-    /** Load du lieu game da chon vao step 2 */
+    /** Load dữ liệu game đã chọn vào step 2 */
     private void loadStep2Data() {
         cardMaCD.setText("CD" + selectedMaCD);
         cardGame.setText(selectedTenGame);
-        cardGiaNgay.setText(String.format("%,.0f VND", selectedGia));
+        cardGiaNgay.setText(String.format("%,.0f VNĐ", selectedGia));
 
         txtSDT.setText("");
         txtSoNgay.setText("1");
         txtDiemSuDung.setText("0");
-        lblTenKH.setText("Chua tim kiem");
+        lblTenKH.setText("Chưa tìm kiếm");
         lblTenKH.setForeground(TEXT_MUTED);
         lblDiemHienCo.setText("---");
         currentKH = null; maKH = -1; diemHienCo = 0;
@@ -473,7 +465,7 @@ public class RentAddDialog extends JDialog {
         String sdt = txtSDT.getText().trim();
         if (sdt.isEmpty()) {
             currentKH = null; maKH = -1; diemHienCo = 0;
-            lblTenKH.setText("Chua nhap so dien thoai");
+            lblTenKH.setText("Chưa nhập số điện thoại");
             lblTenKH.setForeground(TEXT_MUTED);
             lblDiemHienCo.setText("---");
             recalc(); return;
@@ -482,66 +474,123 @@ public class RentAddDialog extends JDialog {
         if (kh != null) {
             currentKH = kh; maKH = kh.getMaKH(); diemHienCo = kh.getDiemTichLuy();
             lblTenKH.setText(kh.getHoTen());
-            lblTenKH.setForeground(SUCCESS);
-            lblDiemHienCo.setText(diemHienCo + " diem  ~  "
-                + String.format("%,.0f VND", (double) diemHienCo * DIEM_TO_VND));
+            // Kiểm tra CCCD
+            if (kh.getCccd() == null || kh.getCccd().trim().isEmpty()) {
+                lblTenKH.setForeground(GOLD);
+                lblTenKH.setText(kh.getHoTen() + "  ⚠ Chưa có CCCD");
+            } else {
+                lblTenKH.setForeground(SUCCESS);
+            }
+            lblDiemHienCo.setText(diemHienCo + " điểm  ~  "
+                + String.format("%,.0f VNĐ", (double) diemHienCo * DIEM_TO_VND));
         } else {
             currentKH = null; maKH = -1; diemHienCo = 0;
-            lblTenKH.setText("Khong tim thay  —  Nhan \"Tao moi\"");
+            lblTenKH.setText("Không tìm thấy  —  Nhấn \"Tạo mới\"");
             lblTenKH.setForeground(DANGER);
-            lblDiemHienCo.setText("0 diem");
+            lblDiemHienCo.setText("0 điểm");
         }
         recalc();
     }
 
+    /**
+     * Xử lý tạo mới hoặc cập nhật CCCD cho khách hàng đã tồn tại nhưng chưa có CCCD.
+     * Nếu KH chưa tồn tại: tạo mới hoàn toàn.
+     * Nếu KH tồn tại nhưng chưa có CCCD: yêu cầu nhập CCCD.
+     */
     private void doCreateKH() {
         String sdt = txtSDT.getText().trim();
-        if (sdt.isEmpty()) { showMsg("Vui long nhap so dien thoai truoc khi tao!"); return; }
+        if (sdt.isEmpty()) { showMsg("Vui lòng nhập số điện thoại trước!"); return; }
 
         KhachHang existing = khDAO.findBySDT(sdt);
+
+        // Trường hợp KH đã tồn tại nhưng chưa có CCCD → yêu cầu cập nhật CCCD
+        if (existing != null && (existing.getCccd() == null || existing.getCccd().trim().isEmpty())) {
+            JTextField fldTen  = new JTextField(existing.getHoTen(), 20);
+            JTextField fldCCCD = new JTextField(20);
+
+            JPanel panel = new JPanel(new GridLayout(4, 2, 8, 8));
+            panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+            panel.add(new JLabel("Số điện thoại:")); panel.add(new JLabel(sdt));
+            panel.add(new JLabel("Họ và tên (*):"));  panel.add(fldTen);
+            panel.add(new JLabel("CCCD (*):"));       panel.add(fldCCCD);
+            panel.add(new JLabel(""));
+            panel.add(new JLabel("<html><i style='color:gray'>9 hoặc 12 chữ số</i></html>"));
+
+            int result = JOptionPane.showConfirmDialog(this, panel,
+                "Cập nhật thông tin khách hàng", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+            if (result != JOptionPane.OK_OPTION) return;
+
+            String hoTen = fldTen.getText().trim();
+            String cccd  = fldCCCD.getText().trim();
+            if (hoTen.isEmpty()) { showMsg("Họ và tên không được để trống!"); return; }
+            if (!cccd.matches("\\d{9}|\\d{12}")) {
+                showMsg("CCCD phải có 9 hoặc 12 chữ số!"); return;
+            }
+
+            existing.setHoTen(hoTen);
+            existing.setCccd(cccd);
+            if (khDAO.update(existing)) {
+                currentKH = khDAO.findBySDT(sdt);
+                maKH = currentKH.getMaKH();
+                diemHienCo = currentKH.getDiemTichLuy();
+                lblTenKH.setText(currentKH.getHoTen());
+                lblTenKH.setForeground(SUCCESS);
+                lblDiemHienCo.setText(diemHienCo + " điểm  ~  "
+                    + String.format("%,.0f VNĐ", (double) diemHienCo * DIEM_TO_VND));
+                showMsg("Cập nhật tên và CCCD thành công!");
+            } else {
+                showMsg("Cập nhật CCCD thất bại!");
+            }
+            recalc();
+            return;
+        }
+
+        // Trường hợp KH đã tồn tại và đã có CCCD
         if (existing != null) {
-            showMsg("Khach hang voi SDT " + sdt + " da ton tai!");
+            showMsg("Khách hàng với SĐT " + sdt + " đã tồn tại!");
             currentKH = existing; maKH = existing.getMaKH(); diemHienCo = existing.getDiemTichLuy();
             lblTenKH.setText(existing.getHoTen()); lblTenKH.setForeground(SUCCESS);
-            lblDiemHienCo.setText(diemHienCo + " diem");
+            lblDiemHienCo.setText(diemHienCo + " điểm  ~  "
+                + String.format("%,.0f VNĐ", (double) diemHienCo * DIEM_TO_VND));
             recalc(); return;
         }
 
+        // Trường hợp KH chưa tồn tại → tạo mới
         JTextField fldTen  = new JTextField(20);
         JTextField fldCCCD = new JTextField(20);
 
         JPanel panel = new JPanel(new GridLayout(4, 2, 8, 8));
         panel.setBorder(new EmptyBorder(8, 8, 8, 8));
-        panel.add(new JLabel("So dien thoai:"));  panel.add(new JLabel(sdt));
-        panel.add(new JLabel("Ho va ten (*):"));  panel.add(fldTen);
+        panel.add(new JLabel("Số điện thoại:"));  panel.add(new JLabel(sdt));
+        panel.add(new JLabel("Họ và tên (*):"));  panel.add(fldTen);
         panel.add(new JLabel("CCCD (*):"));       panel.add(fldCCCD);
         panel.add(new JLabel(""));
-        panel.add(new JLabel("<html><i style='color:gray'>9 hoac 12 chu so</i></html>"));
+        panel.add(new JLabel("<html><i style='color:gray'>9 hoặc 12 chữ số</i></html>"));
 
-        int result = JOptionPane.showConfirmDialog(this, panel, "Tao khach hang moi",
+        int result = JOptionPane.showConfirmDialog(this, panel, "Tạo khách hàng mới",
             JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (result != JOptionPane.OK_OPTION) return;
 
         String hoTen = fldTen.getText().trim();
         String cccd  = fldCCCD.getText().trim();
-        if (hoTen.isEmpty()) { showMsg("Ho va ten khong duoc de trong!"); return; }
-        if (!cccd.matches("\\d{9}|\\d{12}")) { showMsg("CCCD phai co 9 hoac 12 chu so!"); return; }
+        if (hoTen.isEmpty()) { showMsg("Họ và tên không được để trống!"); return; }
+        if (!cccd.matches("\\d{9}|\\d{12}")) { showMsg("CCCD phải có 9 hoặc 12 chữ số!"); return; }
 
         KhachHang kh = new KhachHang();
         kh.setHoTen(hoTen); kh.setSdt(sdt); kh.setCccd(cccd); kh.setDiemTichLuy(0);
         if (khDAO.insert(kh)) {
             currentKH = khDAO.findBySDT(sdt); maKH = currentKH.getMaKH(); diemHienCo = 0;
-            lblTenKH.setText(currentKH.getHoTen() + "  (moi tao)");
+            lblTenKH.setText(currentKH.getHoTen() + "  (mới tạo)");
             lblTenKH.setForeground(SUCCESS);
-            lblDiemHienCo.setText("0 diem");
-            showMsg("Tao khach hang thanh cong!");
+            lblDiemHienCo.setText("0 điểm");
+            showMsg("Tạo khách hàng thành công!");
         } else {
-            showMsg("Tao khach hang that bai!");
+            showMsg("Tạo khách hàng thất bại!");
         }
         recalc();
     }
 
-    /** Tinh lai cac gia tri hien thi (moi khi thay doi so ngay / diem) */
+    /** Tính lại các giá trị hiển thị (mỗi khi thay đổi số ngày / điểm) */
     private void recalc() {
         try {
             int soNgay = Math.max(1, Integer.parseInt(txtSoNgay.getText().trim()));
@@ -554,54 +603,65 @@ public class RentAddDialog extends JDialog {
                 txtDiemSuDung.setText(String.valueOf(diemDung));
             }
 
-            // Tong thue goc = GiaThueNgay x SoNgay (day la gia tri se luu vao DonGiaThue)
+            // Tổng thuê gốc = GiaThueNgay x SoNgay
             double tongThueGoc = selectedGia * soNgay;
-            double giamDiem    = diemDung * DIEM_TO_VND;
-            double tongSauGiam = Math.max(0, tongThueGoc - giamDiem);
-            // Coc tinh tren gia goc (chua tru diem)
+
+            // Giảm điểm không được vượt quá tiền thuê gốc
+            double giamDiem = Math.min((double) diemDung * DIEM_TO_VND, tongThueGoc);
+
+            // Nếu điểm nhập vượt quá, tính lại số điểm thực sự dùng
+            int diemThucDung = (int) Math.floor(giamDiem / DIEM_TO_VND);
+            giamDiem = diemThucDung * DIEM_TO_VND;
+
+            double tongPhaiTra = Math.max(0, tongThueGoc - giamDiem);
             double tienCoc = Math.max(COC_MIN, tongThueGoc * COC_MULTIPLY);
 
-            lblInfoTongThueGoc.setText(String.format("%,.0f VND  (%,.0f x %d ngay)", tongThueGoc, selectedGia, soNgay));
+            lblInfoTongThueGoc.setText(String.format("%,.0f VNĐ  (%,.0f x %d ngày)", tongThueGoc, selectedGia, soNgay));
             lblInfoTongThueGoc.setForeground(TEXT_MAIN);
 
-            lblInfoGiamDiem.setText(diemDung > 0
-                ? String.format("-%,.0f VND  (%d diem)", giamDiem, diemDung)
-                : "Khong su dung diem");
-            lblInfoGiamDiem.setForeground(diemDung > 0 ? SUCCESS : TEXT_MUTED);
+            if (diemThucDung > 0) {
+                lblInfoGiamDiem.setText(String.format("-%,.0f VNĐ  (%d điểm)", giamDiem, diemThucDung));
+                lblInfoGiamDiem.setForeground(SUCCESS);
+            } else {
+                lblInfoGiamDiem.setText("Không sử dụng điểm");
+                lblInfoGiamDiem.setForeground(TEXT_MUTED);
+            }
 
-            lblInfoTongSauGiam.setText(String.format("%,.0f VND  (thu khi tra CD)", tongSauGiam));
-            lblInfoTongSauGiam.setForeground(ACCENT_LIGHT);
+            lblInfoTongPhaiTra.setText(String.format("%,.0f VNĐ", tongPhaiTra));
+            lblInfoTongPhaiTra.setForeground(ACCENT_LIGHT);
 
-            lblInfoTienCoc.setText(String.format("%,.0f VND  (thu ngay bay gio)", tienCoc));
+            lblInfoTienCoc.setText(String.format("%,.0f VNĐ  (thu ngay bây giờ)", tienCoc));
             lblInfoTienCoc.setForeground(GOLD);
 
         } catch (NumberFormatException ex) {
-            lblInfoTongThueGoc.setText("Nhap so hop le");
+            lblInfoTongThueGoc.setText("Nhập số hợp lệ");
             lblInfoTienCoc.setText("---");
         }
     }
 
     // =========================================================
-    // STEP 3 — Xac nhan
+    // BƯỚC 3 — Xác nhận
     // =========================================================
     private JPanel buildStep3() {
         JPanel p = new JPanel(new BorderLayout(0, 14));
         p.setBackground(BG);
         p.setBorder(new EmptyBorder(16, 20, 10, 20));
 
-        lblS3CD         = sumValue();
-        lblS3Game       = sumValue();
-        lblS3KH         = sumValue();
-        lblS3NgayThue   = sumValue();
-        lblS3NgayTra    = sumValue();
-        lblS3SoNgay     = sumValue();
-        lblS3TongGoc    = sumValue();
-        lblS3DiemTru    = sumValue();
-        lblS3TongSauGiam= sumValue();
-        lblS3Coc        = sumValue();
+        lblS3CD      = sumValue();
+        lblS3Game    = sumValue();
+        lblS3KH      = sumValue();
+        lblS3NgayThue= sumValue();
+        lblS3NgayTra = sumValue();
+        lblS3SoNgay  = sumValue();
+        lblS3TongGoc = sumValue();
+        lblS3DiemTru = sumValue();
+        lblS3TongSauGiam = sumValue();
+        lblS3TongSauGiam.setForeground(ACCENT_LIGHT);
+        lblS3Coc     = sumValue();
         lblS3Coc.setFont(F_MONEY);
         lblS3Coc.setForeground(GOLD);
 
+        // 10 dòng
         JPanel card = new JPanel(new GridLayout(10, 2, 8, 10));
         card.setBackground(BG_CARD);
         card.setBorder(new CompoundBorder(
@@ -609,20 +669,20 @@ public class RentAddDialog extends JDialog {
             new EmptyBorder(16, 20, 16, 20)
         ));
 
-        card.add(sumKey("Ma CD:"            )); card.add(lblS3CD);
-        card.add(sumKey("Ten game:"         )); card.add(lblS3Game);
-        card.add(sumKey("Khach hang:"       )); card.add(lblS3KH);
-        card.add(sumKey("Ngay thue:"        )); card.add(lblS3NgayThue);
-        card.add(sumKey("Ngay tra du kien:" )); card.add(lblS3NgayTra);
-        card.add(sumKey("So ngay / Gia:"    )); card.add(lblS3SoNgay);
-        card.add(sumKey("Tong thue goc:"    )); card.add(lblS3TongGoc);
-        card.add(sumKey("Giam tu diem:"     )); card.add(lblS3DiemTru);
-        card.add(sumKey("Du kien thu khi tra:")); card.add(lblS3TongSauGiam);
-        card.add(sumKey("Tien coc thu ngay:")); card.add(lblS3Coc);
+        card.add(sumKey("Mã CD:"));              card.add(lblS3CD);
+        card.add(sumKey("Tên game:"));           card.add(lblS3Game);
+        card.add(sumKey("Khách hàng:"));         card.add(lblS3KH);
+        card.add(sumKey("Ngày thuê:"));          card.add(lblS3NgayThue);
+        card.add(sumKey("Ngày trả dự kiến:"));   card.add(lblS3NgayTra);
+        card.add(sumKey("Số ngày / Giá:"));      card.add(lblS3SoNgay);
+        card.add(sumKey("Tổng thuê gốc:"));      card.add(lblS3TongGoc);
+        card.add(sumKey("Giảm từ điểm:"));       card.add(lblS3DiemTru);
+        card.add(sumKey("Tiền thuê sau giảm:"));  card.add(lblS3TongSauGiam);
+        card.add(sumKey("Tiền cọc thu ngay:"));  card.add(lblS3Coc);
 
         JLabel notice = new JLabel(
-            "<html><center>Sau khi xac nhan:<br>"
-          + "Phieu thue moi &rarr; Dang thue  |  CD &rarr; Dang thue  |  Tru diem (neu co)</center></html>"
+            "<html><center>Sau khi xác nhận:<br>"
+          + "Phiếu thuê mới → Đang thuê  |  CD → Đang thuê  |  Trừ điểm (nếu có)</center></html>"
         );
         notice.setFont(F_HINT);
         notice.setForeground(TEXT_MUTED);
@@ -661,25 +721,33 @@ public class RentAddDialog extends JDialog {
         catch (NumberFormatException ignored) {}
         if (diemDung > diemHienCo) diemDung = diemHienCo;
 
-        double tongThueGoc = selectedGia * soNgay;   // GiaThueNgay x SoNgay => se luu vao DonGiaThue
-        double giamDiem    = diemDung * DIEM_TO_VND;
-        double tongSauGiam = Math.max(0, tongThueGoc - giamDiem);
+        double tongThueGoc = selectedGia * soNgay;
+        double giamDiem    = Math.min((double) diemDung * DIEM_TO_VND, tongThueGoc);
+        int    diemThucDung = (int) Math.floor(giamDiem / DIEM_TO_VND);
+        giamDiem = diemThucDung * DIEM_TO_VND;
         double tienCoc     = Math.max(COC_MIN, tongThueGoc * COC_MULTIPLY);
 
         lblS3CD.setText("CD" + selectedMaCD);
         lblS3Game.setText(selectedTenGame);
-        lblS3KH.setText(currentKH != null ? currentKH.getHoTen() + "  (KH" + maKH + ")" : "Khach vang lai");
+        lblS3KH.setText(currentKH != null ? currentKH.getHoTen() + "  (KH" + maKH + ")" : "Khách vãng lai");
         lblS3NgayThue.setText(now.format(fmt));
         lblS3NgayTra.setText(now.plusDays(soNgay).format(fmt));
-        lblS3SoNgay.setText(soNgay + " ngay  x  " + String.format("%,.0f VND", selectedGia) + " / ngay");
-        lblS3TongGoc.setText(String.format("%,.0f VND  (se luu vao phieu thue)", tongThueGoc));
-        lblS3DiemTru.setText(diemDung > 0
-            ? String.format("-%,.0f VND  (%d diem)", giamDiem, diemDung)
-            : "Khong su dung diem");
-        lblS3DiemTru.setForeground(diemDung > 0 ? SUCCESS : TEXT_MUTED);
-        lblS3TongSauGiam.setText(String.format("%,.0f VND", tongSauGiam));
+        lblS3SoNgay.setText(soNgay + " ngày  x  " + String.format("%,.0f VNĐ", selectedGia) + " / ngày");
+        lblS3TongGoc.setText(String.format("%,.0f VNĐ  (lưu vào phiếu thuê)", tongThueGoc));
+
+        if (diemThucDung > 0) {
+            lblS3DiemTru.setText(String.format("-%,.0f VNĐ  (%d điểm)", giamDiem, diemThucDung));
+            lblS3DiemTru.setForeground(SUCCESS);
+        } else {
+            lblS3DiemTru.setText("Không sử dụng điểm");
+            lblS3DiemTru.setForeground(TEXT_MUTED);
+        }
+
+        double tongSauGiam = Math.max(0, tongThueGoc - giamDiem);
+        lblS3TongSauGiam.setText(String.format("%,.0f VNĐ", tongSauGiam));
         lblS3TongSauGiam.setForeground(ACCENT_LIGHT);
-        lblS3Coc.setText(String.format("%,.0f VND  (thu ngay bay gio)", tienCoc));
+
+        lblS3Coc.setText(String.format("%,.0f VNĐ  (thu ngay bây giờ)", tienCoc));
     }
 
     // =========================================================
@@ -696,24 +764,24 @@ public class RentAddDialog extends JDialog {
         JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
         btnRow.setBackground(BG);
 
-        btnBack = new PillButton("Quay lai", INPUT_BG, TEXT_DARK);
+        btnBack = new PillButton("Quay lại", INPUT_BG, TEXT_DARK);
         btnBack.setPreferredSize(new Dimension(110, 36));
         btnBack.setVisible(false);
         btnBack.addActionListener(e -> { if (currentStep > 1) showStep(currentStep - 1); });
 
-        btnNext = new PillButton("Tiep theo", ACCENT, WHITE);
+        btnNext = new PillButton("Tiếp theo", ACCENT, WHITE);
         btnNext.setPreferredSize(new Dimension(120, 36));
         btnNext.addActionListener(e -> {
             if (currentStep == 1) goToStep2();
             else if (currentStep == 2) goToStep3();
         });
 
-        btnConfirm = new PillButton("Xac nhan thue", BTN_GREEN, TEXT_DARK);
+        btnConfirm = new PillButton("Xác nhận thuê", BTN_GREEN, TEXT_DARK);
         btnConfirm.setPreferredSize(new Dimension(150, 36));
         btnConfirm.setVisible(false);
         btnConfirm.addActionListener(e -> doConfirmRent());
 
-        PillButton btnCancel = new PillButton("Huy", BTN_RED, WHITE);
+        PillButton btnCancel = new PillButton("Hủy", BTN_RED, WHITE);
         btnCancel.setPreferredSize(new Dimension(80, 36));
         btnCancel.addActionListener(e -> dispose());
 
@@ -742,14 +810,14 @@ public class RentAddDialog extends JDialog {
     private void goToStep2() {
         int row = tblCD.getSelectedRow();
         if (row < 0 || cdList == null || row >= cdList.size()) {
-            showMsg("Vui long chon mot game!"); return;
+            showMsg("Vui lòng chọn một game!"); return;
         }
         Object[] cd = cdList.get(row);
         selectedMaCD    = (int)    cd[0];
         selectedTenGame = (String) cd[1];
         selectedGia     = (double) cd[2];
         if (selectedGia <= 0) {
-            showMsg("CD nay khong co thong tin gia thue, vui long chon CD khac!"); return;
+            showMsg("CD này không có thông tin giá thuê, vui lòng chọn CD khác!"); return;
         }
         loadStep2Data();
         showStep(2);
@@ -759,23 +827,30 @@ public class RentAddDialog extends JDialog {
         int soNgay;
         try {
             soNgay = Integer.parseInt(txtSoNgay.getText().trim());
-            if (soNgay <= 0) { showMsg("So ngay thue phai lon hon 0!"); return; }
+            if (soNgay <= 0) { showMsg("Số ngày thuê phải lớn hơn 0!"); return; }
         } catch (NumberFormatException e) {
-            showMsg("So ngay thue phai la so nguyen!"); return;
+            showMsg("Số ngày thuê phải là số nguyên!"); return;
         }
 
         int diemDung;
         try {
             diemDung = Integer.parseInt(txtDiemSuDung.getText().trim());
-            if (diemDung < 0) { showMsg("Diem su dung khong duoc am!"); return; }
+            if (diemDung < 0) { showMsg("Điểm sử dụng không được âm!"); return; }
         } catch (NumberFormatException e) {
-            showMsg("Diem su dung phai la so nguyen!"); return;
+            showMsg("Điểm sử dụng phải là số nguyên!"); return;
         }
 
         if (diemDung > diemHienCo) {
-            showMsg("Khong du diem! Hien co: " + diemHienCo + ", muon dung: " + diemDung);
+            showMsg("Không đủ điểm! Hiện có: " + diemHienCo + ", muốn dùng: " + diemDung);
             txtDiemSuDung.setText(String.valueOf(diemHienCo));
             recalc(); return;
+        }
+
+        // ✅ Kiểm tra CCCD trước khi sang bước 3
+        if (currentKH != null && (currentKH.getCccd() == null || currentKH.getCccd().trim().isEmpty())) {
+            showMsg("Khách hàng \"" + currentKH.getHoTen() + "\" chưa có CCCD!\n"
+                  + "Vui lòng nhấn \"Tạo mới\" để cập nhật CCCD trước khi tiếp tục.");
+            return;
         }
 
         updateStep3Summary();
@@ -783,8 +858,7 @@ public class RentAddDialog extends JDialog {
     }
 
     // =========================================================
-    // CONFIRM — Tao phieu thue
-    // LOGIC MOI: DonGiaThue = tongThueGoc = GiaThueNgay x SoNgay
+    // XÁC NHẬN — Tạo phiếu thuê
     // =========================================================
     private void doConfirmRent() {
         try {
@@ -794,50 +868,55 @@ public class RentAddDialog extends JDialog {
             catch (NumberFormatException ignored) {}
             if (diemDung > diemHienCo) diemDung = diemHienCo;
 
-            // Tong thue goc — day la gia tri luu vao CTPHIEUTHUE.DonGiaThue
             double tongThueGoc = selectedGia * soNgay;
-            double tienCoc     = Math.max(COC_MIN, tongThueGoc * COC_MULTIPLY);
 
-            // Xu ly khach vang lai
+            // Giảm điểm không vượt quá tiền thuê gốc
+            double giamDiem    = Math.min((double) diemDung * DIEM_TO_VND, tongThueGoc);
+            int    diemThucDung = (int) Math.floor(giamDiem / DIEM_TO_VND);
+            giamDiem = diemThucDung * DIEM_TO_VND;
+
+            double tienCoc = Math.max(COC_MIN, tongThueGoc * COC_MULTIPLY);
+
+            // Xử lý khách vãng lai
             if (maKH == -1) {
                 int yn = JOptionPane.showConfirmDialog(this,
-                    "Khach hang chua xac dinh.\n\n"
-                  + "[Co]    Tao tu dong Khach vang lai (khong tich diem)\n"
-                  + "[Khong] Quay lai nhap SDT / tao KH",
-                    "Khach vang lai?", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+                    "Khách hàng chưa xác định.\n\n"
+                  + "[Có]    Tạo tự động Khách vãng lai (không tích điểm)\n"
+                  + "[Không] Quay lại nhập SĐT / tạo KH",
+                    "Khách vãng lai?", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
                 if (yn != JOptionPane.YES_OPTION) { showStep(2); return; }
 
                 KhachHang kh = new KhachHang();
-                kh.setHoTen("Khach vang lai");
-                kh.setSdt("VL_" + System.currentTimeMillis());
+                kh.setHoTen("Khách vãng lai");
+                kh.setSdt(null);
                 kh.setDiemTichLuy(0);
-                if (!khDAO.insert(kh)) { showMsg("Khong the tao khach vang lai!"); return; }
+                if (!khDAO.insert(kh)) { showMsg("Không thể tạo khách vãng lai!"); return; }
                 KhachHang newKH = khDAO.findBySDT(kh.getSdt());
-                if (newKH == null) { showMsg("Loi tao khach!"); return; }
+                if (newKH == null) { showMsg("Lỗi tạo khách!"); return; }
                 maKH = newKH.getMaKH();
-                diemDung = 0;
+                diemThucDung = 0;
+                giamDiem     = 0;
             }
 
-            // Popup xac nhan
-            double giamDiem    = diemDung * DIEM_TO_VND;
-            double tongSauGiam = Math.max(0, tongThueGoc - giamDiem);
+            // Popup xác nhận
+            double tongPhaiTra = Math.max(0, tongThueGoc - giamDiem);
             String msg = String.format(
-                "Xac nhan thu coc va tao phieu thue?\n\n"
+                "Xác nhận thu cọc và tạo phiếu thuê?\n\n"
               + "  CD            : CD%d  -  %s\n"
-              + "  Khach hang    : %s\n"
-              + "  Thoi gian     : %d ngay\n"
-              + "  Tong thue goc : %,.0f VND  (luu vao phieu thue)\n"
-              + "  Giam diem     : %,.0f VND  (%d diem, ap dung khi tra)\n"
-              + "  Du kien thu khi tra: %,.0f VND\n\n"
-              + ">>> Thu coc ngay: %,.0f VND <<<",
+              + "  Khách hàng    : %s\n"
+              + "  Thời gian     : %d ngày\n"
+              + "  Tổng thuê gốc : %,.0f VNĐ  (lưu vào phiếu thuê)\n"
+              + "  Giảm điểm     : %,.0f VNĐ  (%d điểm)\n"
+              + "  Tổng tiền thuê phải trả: %,.0f VNĐ\n\n"
+              + ">>> Thu cọc ngay: %,.0f VNĐ <<<",
                 selectedMaCD, selectedTenGame,
-                currentKH != null ? currentKH.getHoTen() : "Khach vang lai",
+                currentKH != null ? currentKH.getHoTen() : "Khách vãng lai",
                 soNgay,
-                tongThueGoc, giamDiem, diemDung, tongSauGiam,
+                tongThueGoc, giamDiem, diemThucDung, tongPhaiTra,
                 tienCoc);
 
             int confirm = JOptionPane.showConfirmDialog(this, msg,
-                "Xac nhan thu coc", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+                "Xác nhận thu cọc", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
             if (confirm != JOptionPane.YES_OPTION) return;
 
             LocalDateTime now = LocalDateTime.now();
@@ -850,12 +929,9 @@ public class RentAddDialog extends JDialog {
             pt.setTienCoc(tienCoc);
             pt.setTrangThai("DangThue");
 
-            // TinhTrang luu diem da su dung de RentReturnDialog doc lai
-            String tinhTrang = diemDung > 0 ? ("OK|diem=" + diemDung) : "OK";
+            // TinhTrang lưu điểm đã sử dụng để RentReturnDialog đọc lại
+            String tinhTrang = diemThucDung > 0 ? ("OK|diem=" + diemThucDung) : "OK";
 
-            // === LOGIC MOI ===
-            // DonGiaThue = tongThueGoc = GiaThueNgay x SoNgay
-            // RentReturnDialog chi can doc DonGiaThue tu DB, khong tinh lai tu ngay
             PhieuThue.CTPhieuThue ct =
                 new PhieuThue.CTPhieuThue(selectedMaCD, selectedTenGame, tongThueGoc, tinhTrang);
             ct.setMaNV(Session.getMaNV());
@@ -863,26 +939,40 @@ public class RentAddDialog extends JDialog {
 
             boolean ok = service.createPhieuThue(pt);
             if (ok) {
-                if (maKH > 0 && diemDung > 0) {
-                    khDAO.updatePoint(maKH, -diemDung);
+                if (maKH > 0 && diemThucDung > 0) {
+                    khDAO.updatePoint(maKH, -diemThucDung);
+
+                    // Ghi lịch sử trừ điểm vào DIEM_LICHSU
+                    try (java.sql.Connection con =
+                             otkhongluong.gamestoremanagement.util.DBConnection.getConnection();
+                         java.sql.PreparedStatement psLog = con.prepareStatement(
+                             "INSERT INTO DIEM_LICHSU (MaKH, Loai, SoDiem, GhiChu, MaPT) VALUES (?, 'TRU', ?, ?, ?)")) {
+                        psLog.setInt(1, maKH);
+                        psLog.setInt(2, diemThucDung);
+                        psLog.setString(3, "Thuê CD - CD" + selectedMaCD + " (" + selectedTenGame + ")");
+                        psLog.setInt(4, pt.getMaPT());
+                        psLog.executeUpdate();
+                    } catch (Exception exLog) {
+                        exLog.printStackTrace();
+                    }
                 }
                 JOptionPane.showMessageDialog(this,
                     String.format(
-                        "Tao phieu thue thanh cong!\n\n"
-                      + "  Da thu coc: %,.0f VND\n"
-                      + "  CD%d -> Dang thue\n\n"
-                      + "Vui long giao CD cho khach hang.",
+                        "Tạo phiếu thuê thành công!\n\n"
+                      + "  Đã thu cọc: %,.0f VNĐ\n"
+                      + "  CD%d → Đang thuê\n\n"
+                      + "Vui lòng giao CD cho khách hàng.",
                         tienCoc, selectedMaCD),
-                    "Hoan tat", JOptionPane.INFORMATION_MESSAGE);
+                    "Hoàn tất", JOptionPane.INFORMATION_MESSAGE);
                 dispose();
             } else {
-                showMsg("Tao phieu thue that bai!\n"
-                      + "CD co the da duoc thue boi giao dich khac.\n"
-                      + "Vui long lam moi danh sach va thu lai.");
+                showMsg("Tạo phiếu thuê thất bại!\n"
+                      + "CD có thể đã được thuê bởi giao dịch khác.\n"
+                      + "Vui lòng làm mới danh sách và thử lại.");
             }
         } catch (Exception ex) {
             ex.printStackTrace();
-            showMsg("Loi xu ly: " + ex.getMessage());
+            showMsg("Lỗi xử lý: " + ex.getMessage());
         }
     }
 
@@ -890,7 +980,7 @@ public class RentAddDialog extends JDialog {
     // HELPERS
     // =========================================================
     private void showMsg(String msg) {
-        JOptionPane.showMessageDialog(this, msg, "Thong bao", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, msg, "Thông báo", JOptionPane.INFORMATION_MESSAGE);
     }
 
     private JTextField makeInput() {
@@ -993,5 +1083,50 @@ public class RentAddDialog extends JDialog {
             super.paintComponent(g2);
             g2.dispose();
         }
+    }
+    
+    public static void openAndPreselectCD(Frame parent, int maCD) {
+        RentAddDialog dlg = new RentAddDialog(parent);
+ 
+        SwingUtilities.invokeLater(() -> {
+            if (dlg.cdList != null) {
+                for (int i = 0; i < dlg.cdList.size(); i++) {
+                    if ((int) dlg.cdList.get(i)[0] == maCD) {
+                        dlg.tblCD.setRowSelectionInterval(i, i);
+                        dlg.tblCD.scrollRectToVisible(dlg.tblCD.getCellRect(i, 0, true));
+                        break;
+                    }
+                }
+            }
+        });
+ 
+        dlg.setVisible(true);
+    }
+ 
+    /**
+     * Mở RentAddDialog và tự động chọn sẵn CD đầu tiên khớp tên game.
+     * Dùng khi chỉ biết tên game, không biết maCD cụ thể.
+     *
+     * @param parent  Frame cha
+     * @param tenGame Tên game (so khớp một phần, không phân biệt hoa thường)
+     */
+    public static void openAndPreselectByGameName(Frame parent, String tenGame) {
+        RentAddDialog dlg = new RentAddDialog(parent);
+ 
+        SwingUtilities.invokeLater(() -> {
+            if (dlg.cdList != null && tenGame != null) {
+                String keyword = tenGame.trim().toLowerCase();
+                for (int i = 0; i < dlg.cdList.size(); i++) {
+                    String rowName = ((String) dlg.cdList.get(i)[1]).trim().toLowerCase();
+                    if (rowName.contains(keyword) || keyword.contains(rowName)) {
+                        dlg.tblCD.setRowSelectionInterval(i, i);
+                        dlg.tblCD.scrollRectToVisible(dlg.tblCD.getCellRect(i, 0, true));
+                        break;
+                    }
+                }
+            }
+        });
+ 
+        dlg.setVisible(true);
     }
 }

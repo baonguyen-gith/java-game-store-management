@@ -16,34 +16,22 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * RentReturnDialog — Wizard 3 buoc tra CD/Game
+ * RentReturnDialog — Wizard 3 bước trả CD/Game
  *
- * Buoc 1 : Tim kiem phieu thue theo SDT
- * Buoc 2 : Xem chi tiet phieu + nhap chi phi hu hong
- * Buoc 3 : Xac nhan thanh toan va hoan tat
- *
- * LOGIC TINH TIEN THUE GOC:
- *   Doc thang tu CTPHIEUTHUE.DonGiaThue (da luu khi tao phieu / gia han)
- *   KHONG tinh lai tu ngay thue x don gia, tranh tinh lap phi gia han.
- *
- * LOGIC TINH PHAT TRE HAN:
- *   So ngay tre = ngayTraThucTe - ngayTraDuKien (neu > 0)
- *   Phat tre = soNgayTre x 10.000 VND/ngay
- *
- * LOGIC THANH TOAN:
- *   TongPhaiTra = TienThueGoc + PhatTre + ChiPhiHuHong
+ * LOGIC ĐIỂM: 1 điểm = 5.000 VNĐ
+ * LOGIC TÍNH PHẠT TRỄ HẠN: soNgayTre x 10.000 VNĐ/ngày
+ * LOGIC THANH TOÁN:
+ *   TongPhaiTra = (TienThueGoc - GiamDiem) + PhatTre + ChiPhiHuHong
  *   KetQua      = TongPhaiTra - TienCoc
- *   > 0 : Thu them tu khach
- *   < 0 : Hoan lai cho khach
- *   = 0 : Hoa nhau
  */
 public class RentReturnDialog extends JDialog {
 
+    private static final int    DIEM_TO_VND  = 5_000; // 1 điểm = 5.000 VNĐ
+
     // =========================================================
-    // PALETTE — dong nhat voi RentAddDialog
+    // PALETTE
     // =========================================================
     private static final Color BG           = new Color(28, 16, 72);
-    private static final Color BG_PANEL     = new Color(38, 24, 90);
     private static final Color BG_CARD      = new Color(52, 34, 118);
     private static final Color ACCENT       = new Color(124, 92, 220);
     private static final Color ACCENT_LIGHT = new Color(168, 144, 255);
@@ -70,7 +58,6 @@ public class RentReturnDialog extends JDialog {
     private static final Font F_TABLE_HDR    = new Font("Segoe UI", Font.BOLD, 12);
     private static final Font F_VALUE        = new Font("Segoe UI", Font.BOLD, 14);
     private static final Font F_MONEY        = new Font("Segoe UI", Font.BOLD, 16);
-    private static final Font F_BTN          = new Font("Segoe UI", Font.BOLD, 12);
     private static final Font F_HINT         = new Font("Segoe UI", Font.ITALIC, 11);
 
     // =========================================================
@@ -83,13 +70,13 @@ public class RentReturnDialog extends JDialog {
     // =========================================================
     private int currentStep = 1;
 
-    // Buoc 1
+    // Bước 1
     private JTextField        txtSDT;
     private JTable            tblPhieu;
     private DefaultTableModel tblModel;
     private List<PhieuThue>   searchResults;
 
-    // Buoc 2
+    // Bước 2
     private PhieuThue         selectedPhieu;
     private JTable            tblChiTiet;
     private DefaultTableModel tblChiTietModel;
@@ -97,11 +84,12 @@ public class RentReturnDialog extends JDialog {
     private JLabel            lblPhatTre;
     private JTextField        txtChiPhiHuHong;
     private LocalDateTime     ngayTraThucTe;
+    private int diemDaTruTheoMaPT = 0;
 
-    // Buoc 3 — labels
+    // Bước 3 — labels
     private JLabel lblS3MaPT, lblS3KhachHang;
     private JLabel lblS3NgayThue, lblS3NgayTra;
-    private JLabel lblS3TienThue, lblS3DiemTru;
+    private JLabel lblS3TienThue, lblS3DiemTru, lblS3TienThueNet;
     private JLabel lblS3PhatTre, lblS3HuHong;
     private JLabel lblS3TienCoc, lblS3KetQua;
 
@@ -112,17 +100,16 @@ public class RentReturnDialog extends JDialog {
     private JPanel  stepIndicator;
     private JButton btnBack, btnNext, btnConfirm;
 
-    // Ma phieu thue truyen vao de prefill (0 = khong prefill)
     private final int maPT;
 
     // =========================================================
     // CONSTRUCTOR
     // =========================================================
     public RentReturnDialog(Frame parent, int maPT) {
-        super(parent, "Tra CD / Game", true);
+        super(parent, "Trả CD / Game", true);
         this.maPT = maPT;
 
-        setSize(740, 580);
+        setSize(740, 600);
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout());
         setBackground(BG);
@@ -143,7 +130,6 @@ public class RentReturnDialog extends JDialog {
         if (maPT > 0) prefillFromMaPT(maPT);
     }
 
-    // Prefill neu mo tu man hinh quan ly phieu thue
     private void prefillFromMaPT(int id) {
         PhieuThue pt = service.getById(id);
         if (pt != null && pt.getSoDienThoai() != null) {
@@ -168,7 +154,7 @@ public class RentReturnDialog extends JDialog {
         p.setBackground(BG);
         p.setBorder(new EmptyBorder(16, 20, 0, 20));
 
-        JLabel title = new JLabel("TRA CD / GAME");
+        JLabel title = new JLabel("TRẢ CD / GAME");
         title.setFont(F_DIALOG_TITLE);
         title.setForeground(WHITE);
 
@@ -195,7 +181,7 @@ public class RentReturnDialog extends JDialog {
     private JPanel buildStepIndicator() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
         p.setBackground(BG);
-        String[] labels = {"1. Tim kiem", "2. Chi tiet", "3. Xac nhan"};
+        String[] labels = {"1. Tìm kiếm", "2. Chi tiết", "3. Xác nhận"};
         for (int i = 0; i < labels.length; i++) {
             JLabel lbl = new JLabel(labels[i]);
             lbl.setName("step_" + (i + 1));
@@ -230,18 +216,17 @@ public class RentReturnDialog extends JDialog {
     }
 
     // =========================================================
-    // BUOC 1 — Tim kiem phieu thue
+    // BƯỚC 1 — Tìm kiếm phiếu thuê
     // =========================================================
     private JPanel buildStep1() {
         JPanel p = new JPanel(new BorderLayout(0, 10));
         p.setBackground(BG);
         p.setBorder(new EmptyBorder(14, 20, 0, 20));
 
-        // Thanh tim kiem
         JPanel topBar = new JPanel(new BorderLayout(0, 6));
         topBar.setBackground(BG);
 
-        JLabel lbl = new JLabel("So dien thoai khach hang:");
+        JLabel lbl = new JLabel("Số điện thoại khách hàng:");
         lbl.setFont(F_SECTION);
         lbl.setForeground(TEXT_MAIN);
 
@@ -255,19 +240,18 @@ public class RentReturnDialog extends JDialog {
             }
         });
 
-        PillButton btnSearch = new PillButton("Tim kiem", ACCENT, WHITE);
+        PillButton btnSearch = new PillButton("Tìm kiếm", ACCENT, WHITE);
         btnSearch.setPreferredSize(new Dimension(120, 36));
         btnSearch.addActionListener(e -> doSearch());
 
-        inputRow.add(txtSDT,     BorderLayout.CENTER);
-        inputRow.add(btnSearch,  BorderLayout.EAST);
+        inputRow.add(txtSDT,    BorderLayout.CENTER);
+        inputRow.add(btnSearch, BorderLayout.EAST);
 
         topBar.add(lbl,      BorderLayout.NORTH);
         topBar.add(inputRow, BorderLayout.CENTER);
         p.add(topBar, BorderLayout.NORTH);
 
-        // Bang danh sach phieu thue
-        String[] cols = {"Ma PT", "Ho ten khach", "Ngay thue", "Ngay tra du kien", "Trang thai"};
+        String[] cols = {"Mã PT", "Họ tên khách", "Ngày thuê", "Ngày trả dự kiến", "Trạng thái"};
         tblModel = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -285,7 +269,7 @@ public class RentReturnDialog extends JDialog {
 
         p.add(wrapScroll(tblPhieu), BorderLayout.CENTER);
 
-        JLabel hint = new JLabel("Chon phieu thue roi nhan \"Tiep theo\", hoac double-click de sang buoc tiep.");
+        JLabel hint = new JLabel("Chọn phiếu thuê rồi nhấn \"Tiếp theo\", hoặc double-click để sang bước tiếp.");
         hint.setFont(F_HINT);
         hint.setForeground(TEXT_MUTED);
         p.add(hint, BorderLayout.SOUTH);
@@ -295,7 +279,7 @@ public class RentReturnDialog extends JDialog {
 
     private void doSearch() {
         String sdt = txtSDT.getText().trim();
-        if (sdt.isEmpty()) { showMsg("Vui long nhap so dien thoai!"); return; }
+        if (sdt.isEmpty()) { showMsg("Vui lòng nhập số điện thoại!"); return; }
 
         List<PhieuThue> all = service.getAll();
         searchResults = all.stream()
@@ -306,7 +290,7 @@ public class RentReturnDialog extends JDialog {
 
         tblModel.setRowCount(0);
         if (searchResults.isEmpty()) {
-            showMsg("Khong tim thay phieu thue dang hoat dong voi SDT: " + sdt);
+            showMsg("Không tìm thấy phiếu thuê đang hoạt động với SĐT: " + sdt);
             return;
         }
 
@@ -324,14 +308,13 @@ public class RentReturnDialog extends JDialog {
     }
 
     // =========================================================
-    // BUOC 2 — Chi tiet phieu + nhap chi phi
+    // BƯỚC 2 — Chi tiết phiếu + nhập chi phí
     // =========================================================
     private JPanel buildStep2() {
         JPanel p = new JPanel(new BorderLayout(0, 10));
         p.setBackground(BG);
         p.setBorder(new EmptyBorder(14, 20, 0, 20));
 
-        // --- Info cards ---
         lblNgayThue  = new JLabel("-");
         lblNgayDK    = new JLabel("-");
         lblTrangThai = new JLabel("-");
@@ -339,29 +322,28 @@ public class RentReturnDialog extends JDialog {
         JPanel cards = new JPanel(new GridLayout(1, 3, 10, 0));
         cards.setBackground(BG);
         cards.setPreferredSize(new Dimension(0, 68));
-        cards.add(infoCard("Ngay thue",       lblNgayThue));
-        cards.add(infoCard("Ngay tra du kien", lblNgayDK));
-        cards.add(infoCard("Trang thai",       lblTrangThai));
+        cards.add(infoCard("Ngày thuê",        lblNgayThue));
+        cards.add(infoCard("Ngày trả dự kiến", lblNgayDK));
+        cards.add(infoCard("Trạng thái",        lblTrangThai));
         p.add(cards, BorderLayout.NORTH);
 
-        // --- Bang chi tiet CD ---
-        String[] cols = {"Ma CD", "Ten Game", "Tien thue goc", "Tinh trang"};
+        String[] cols = {"Mã CD", "Tên Game", "Tiền thuê gốc", "Điểm đã dùng", "Tình trạng"};
         tblChiTietModel = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
         tblChiTiet = makeTable(tblChiTietModel);
-        tblChiTiet.getColumnModel().getColumn(0).setPreferredWidth(70);
-        tblChiTiet.getColumnModel().getColumn(1).setPreferredWidth(200);
-        tblChiTiet.getColumnModel().getColumn(2).setPreferredWidth(140);
-        tblChiTiet.getColumnModel().getColumn(3).setPreferredWidth(110);
+        tblChiTiet.getColumnModel().getColumn(0).setPreferredWidth(60);
+        tblChiTiet.getColumnModel().getColumn(1).setPreferredWidth(180);
+        tblChiTiet.getColumnModel().getColumn(2).setPreferredWidth(120);
+        tblChiTiet.getColumnModel().getColumn(3).setPreferredWidth(100);
+        tblChiTiet.getColumnModel().getColumn(4).setPreferredWidth(90);
 
-        // To mau hang bi hong
         tblChiTiet.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             public Component getTableCellRendererComponent(
                     JTable t, Object v, boolean sel, boolean foc, int r, int c) {
                 Component comp = super.getTableCellRendererComponent(t, v, sel, foc, r, c);
-                String tt = tblChiTietModel.getValueAt(r, 3) != null
-                    ? tblChiTietModel.getValueAt(r, 3).toString() : "";
+                String tt = tblChiTietModel.getValueAt(r, 4) != null
+                    ? tblChiTietModel.getValueAt(r, 4).toString() : "";
                 boolean isHong = tt.toUpperCase().startsWith("HONG");
                 if (isHong) {
                     comp.setBackground(new Color(80, 20, 30));
@@ -379,32 +361,29 @@ public class RentReturnDialog extends JDialog {
 
         p.add(wrapScroll(tblChiTiet), BorderLayout.CENTER);
 
-        // --- Phat tre + chi phi hu hong ---
         JPanel bottomRow = new JPanel(new GridLayout(1, 2, 16, 0));
         bottomRow.setBackground(BG);
         bottomRow.setPreferredSize(new Dimension(0, 76));
 
-        // Tien phat tre (tu dong tinh)
         JPanel trePanel = new JPanel(new BorderLayout(0, 6));
         trePanel.setBackground(BG);
-        JLabel lblTreLbl = new JLabel("Tien phat tre han (tu tinh):");
+        JLabel lblTreLbl = new JLabel("Tiền phạt trễ hạn (tự tính):");
         lblTreLbl.setFont(F_LABEL);
         lblTreLbl.setForeground(TEXT_MUTED);
-        lblPhatTre = new JLabel("0 VND");
+        lblPhatTre = new JLabel("0 VNĐ");
         lblPhatTre.setFont(F_MONEY);
         lblPhatTre.setForeground(SUCCESS);
         trePanel.add(lblTreLbl,  BorderLayout.NORTH);
         trePanel.add(lblPhatTre, BorderLayout.CENTER);
 
-        // Chi phi hu hong (nhap tay)
         JPanel huHongPanel = new JPanel(new BorderLayout(0, 6));
         huHongPanel.setBackground(BG);
-        JLabel lblHuHongLbl = new JLabel("Chi phi hu hong / sua chua (VND):");
+        JLabel lblHuHongLbl = new JLabel("Chi phí hư hỏng / sửa chữa (VNĐ):");
         lblHuHongLbl.setFont(F_LABEL);
         lblHuHongLbl.setForeground(TEXT_MUTED);
         txtChiPhiHuHong = makeInput();
         txtChiPhiHuHong.setText("0");
-        huHongPanel.add(lblHuHongLbl,   BorderLayout.NORTH);
+        huHongPanel.add(lblHuHongLbl,    BorderLayout.NORTH);
         huHongPanel.add(txtChiPhiHuHong, BorderLayout.CENTER);
 
         bottomRow.add(trePanel);
@@ -418,10 +397,13 @@ public class RentReturnDialog extends JDialog {
         if (selectedPhieu == null) return;
 
         PhieuThue full = service.getById(selectedPhieu.getMaPT());
-        if (full == null) { showMsg("Khong tai duoc thong tin phieu thue!"); return; }
+        if (full == null) { showMsg("Không tải được thông tin phiếu thuê!"); return; }
         selectedPhieu = full;
 
         ngayTraThucTe = LocalDate.now().atStartOfDay();
+
+        // ✅ Load điểm đã trừ từ DIEM_LICHSU thay vì parse TinhTrang
+        diemDaTruTheoMaPT = loadDiemDaTru(selectedPhieu.getMaPT());
 
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy");
         lblNgayThue.setText(selectedPhieu.getNgayThue() != null
@@ -431,37 +413,50 @@ public class RentReturnDialog extends JDialog {
         lblTrangThai.setText(selectedPhieu.getTrangThai() != null
             ? selectedPhieu.getTrangThai() : "-");
 
-        // Hien thi chi tiet CD — doc DonGiaThue tu DB (tong thue goc da luu)
         tblChiTietModel.setRowCount(0);
+        int soCD = selectedPhieu.getDanhSachChiTiet() != null
+                   ? selectedPhieu.getDanhSachChiTiet().size() : 1;
+
+        // Phân bổ điểm đều cho các CD (hiển thị tổng ở dòng đầu, còn lại "—")
+        boolean diemHienThi = false;
         if (selectedPhieu.getDanhSachChiTiet() != null) {
-            for (PhieuThue.CTPhieuThue ct : selectedPhieu.getDanhSachChiTiet()) {
-                String tinhTrangHienThi = ct.getTinhTrang() != null
-                    ? ct.getTinhTrang().split("\\|")[0] : "";
+            for (int idx = 0; idx < selectedPhieu.getDanhSachChiTiet().size(); idx++) {
+                PhieuThue.CTPhieuThue ct = selectedPhieu.getDanhSachChiTiet().get(idx);
+                String raw = ct.getTinhTrang() != null ? ct.getTinhTrang() : "";
+                String tinhTrangHienThi = raw.split("\\|")[0];
+
+                String diemCol;
+                if (!diemHienThi && diemDaTruTheoMaPT > 0) {
+                    // Hiển thị tổng điểm đã trừ ở dòng đầu tiên
+                    diemCol = String.format("%d điểm  (~%,.0f VNĐ)",
+                        diemDaTruTheoMaPT,
+                        (double) diemDaTruTheoMaPT * DIEM_TO_VND);
+                    diemHienThi = true;
+                } else if (diemHienThi) {
+                    diemCol = "—";
+                } else {
+                    diemCol = "Không dùng";
+                }
+
                 tblChiTietModel.addRow(new Object[]{
                     "CD" + ct.getMaCD(),
                     ct.getTenGame(),
-                    // DonGiaThue = tong thue goc da luu (khong tinh lai tu ngay)
-                    String.format("%,.0f VND", ct.getDonGiaThue()),
+                    String.format("%,.0f VNĐ", ct.getDonGiaThue()),
+                    diemCol,
                     tinhTrangHienThi
                 });
             }
         }
 
-        // Phat tre tinh tu ngay tra thuc te so voi ngay du kien
         double phatTre = tinhPhatTreHan(selectedPhieu, ngayTraThucTe);
         lblPhatTre.setForeground(phatTre > 0 ? DANGER : SUCCESS);
         lblPhatTre.setText(phatTre > 0
-            ? String.format("%,.0f VND", phatTre)
-            : "Dung han");
+            ? String.format("%,.0f VNĐ", phatTre)
+            : "Đúng hạn");
 
         txtChiPhiHuHong.setText("0");
     }
 
-    /**
-     * Tinh phat tre han:
-     * Phat = soNgayTre x 10.000 VND/ngay
-     * (Chi tinh neu ngayTra > ngayDuKien)
-     */
     private double tinhPhatTreHan(PhieuThue pt, LocalDateTime ngayTra) {
         if (pt == null || ngayTra == null || pt.getNgayTraDuKien() == null) return 0;
         LocalDateTime ngayDK = pt.getNgayTraDuKien();
@@ -471,50 +466,67 @@ public class RentReturnDialog extends JDialog {
         if (days <= 0) days = 1;
         return days * 10_000;
     }
+    private int loadDiemDaTru(int maPT) {
+        String sql = "SELECT COALESCE(SUM(SoDiem), 0) FROM DIEM_LICHSU "
+                   + "WHERE MaPT = ? AND Loai = 'TRU'";
+        try (java.sql.Connection con =
+                 otkhongluong.gamestoremanagement.util.DBConnection.getConnection();
+             java.sql.PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, maPT);
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return 0;
+    }
 
     // =========================================================
-    // BUOC 3 — Xac nhan thanh toan
+    // BƯỚC 3 — Xác nhận thanh toán
     // =========================================================
     private JPanel buildStep3() {
         JPanel p = new JPanel(new BorderLayout(0, 14));
         p.setBackground(BG);
         p.setBorder(new EmptyBorder(16, 20, 10, 20));
 
-        lblS3MaPT      = sumValue(TEXT_MAIN);
-        lblS3KhachHang = sumValue(TEXT_MAIN);
-        lblS3NgayThue  = sumValue(TEXT_MAIN);
-        lblS3NgayTra   = sumValue(TEXT_MAIN);
-        lblS3TienThue  = sumValue(TEXT_MAIN);
-        lblS3DiemTru   = sumValue(SUCCESS);
-        lblS3PhatTre   = sumValue(SUCCESS);
-        lblS3HuHong    = sumValue(DANGER);
-        lblS3TienCoc   = sumValue(GOLD);
-        lblS3KetQua    = sumValue(TEXT_MAIN);
+        lblS3MaPT        = sumValue(TEXT_MAIN);
+        lblS3KhachHang   = sumValue(TEXT_MAIN);
+        lblS3NgayThue    = sumValue(TEXT_MAIN);
+        lblS3NgayTra     = sumValue(TEXT_MAIN);
+        lblS3TienThue    = sumValue(TEXT_MAIN);
+        lblS3DiemTru     = sumValue(SUCCESS);
+        lblS3TienThueNet = sumValue(ACCENT_LIGHT);
+        lblS3PhatTre     = sumValue(SUCCESS);
+        lblS3HuHong      = sumValue(DANGER);
+        lblS3TienCoc     = sumValue(GOLD);
+        lblS3KetQua      = sumValue(TEXT_MAIN);
         lblS3KetQua.setFont(F_MONEY);
 
-        JPanel card = new JPanel(new GridLayout(10, 2, 8, 10));
+        // 11 dòng
+        JPanel card = new JPanel(new GridLayout(11, 2, 8, 10));
         card.setBackground(BG_CARD);
         card.setBorder(new CompoundBorder(
             new LineBorder(DIVIDER, 1, true),
             new EmptyBorder(16, 20, 16, 20)
         ));
 
-        card.add(sumKey("Ma phieu thue:"));       card.add(lblS3MaPT);
-        card.add(sumKey("Khach hang:"));          card.add(lblS3KhachHang);
-        card.add(sumKey("Ngay thue:"));           card.add(lblS3NgayThue);
-        card.add(sumKey("Ngay tra thuc te:"));    card.add(lblS3NgayTra);
-        card.add(sumKey("Tien thue goc:"));       card.add(lblS3TienThue);
-        card.add(sumKey("Giam tu diem:"));        card.add(lblS3DiemTru);
-        card.add(sumKey("Phat tre han:"));        card.add(lblS3PhatTre);
-        card.add(sumKey("Chi phi hu hong:"));     card.add(lblS3HuHong);
-        card.add(sumKey("Tien coc da dat:"));     card.add(lblS3TienCoc);
-        card.add(sumKey("Ket qua thanh toan:")); card.add(lblS3KetQua);
+        card.add(sumKey("Mã phiếu thuê:"));         card.add(lblS3MaPT);
+        card.add(sumKey("Khách hàng:"));             card.add(lblS3KhachHang);
+        card.add(sumKey("Ngày thuê:"));              card.add(lblS3NgayThue);
+        card.add(sumKey("Ngày trả thực tế:"));       card.add(lblS3NgayTra);
+        card.add(sumKey("Tiền thuê gốc:"));          card.add(lblS3TienThue);
+        card.add(sumKey("Giảm từ điểm:"));           card.add(lblS3DiemTru);
+        card.add(sumKey("Tiền thuê sau giảm:"));     card.add(lblS3TienThueNet);
+        card.add(sumKey("Phạt trễ hạn:"));           card.add(lblS3PhatTre);
+        card.add(sumKey("Chi phí hư hỏng:"));        card.add(lblS3HuHong);
+        card.add(sumKey("Tiền cọc đã đặt:"));        card.add(lblS3TienCoc);
+        card.add(sumKey("Kết quả thanh toán:"));     card.add(lblS3KetQua);
 
         JLabel notice = new JLabel(
             "<html><center>"
-          + "Cong thuc: Tong phai tra = Thue goc + Phat tre + Hu hong  |  "
-          + "Ket qua = Tong phai tra - Coc<br>"
-          + "Sau xac nhan: Phieu thue chuyen sang Da Tra  |  CD chuyen sang San sang  |  Cong diem tich luy"
+          + "Tổng phải trả = (Thuê gốc − Giảm điểm) + Phạt trễ + Hư hỏng  |  Kết quả = Tổng phải trả − Cọc<br>"
+          + "Sau xác nhận: Phiếu thuê → Đã Trả  |  CD → Sẵn sàng  |  Cộng điểm tích lũy"
           + "</center></html>"
         );
         notice.setFont(F_HINT);
@@ -541,34 +553,19 @@ public class RentReturnDialog extends JDialog {
         return l;
     }
 
-    /**
-     * Cap nhat man hinh xac nhan (buoc 3).
-     *
-     * LOGIC TINH TIEN THUE:
-     *   - Doc DonGiaThue tu tung CTPhieuThue (tong thue goc da luu, khong tinh lai)
-     *   - Tru diem da su dung (luu trong TinhTrang "OK|diem=N")
-     *   - Tong sau giam = tienThueGoc - giamDiem
-     */
     private void updateStep3Summary() {
         if (selectedPhieu == null) return;
 
         try {
-            // Tong tien thue goc tu DonGiaThue (da luu khi tao / gia han phieu)
             double tienThueGoc = 0;
-            int    diemDaGiam  = 0;
-            if (selectedPhieu.getDanhSachChiTiet() != null) {
-                for (PhieuThue.CTPhieuThue ct : selectedPhieu.getDanhSachChiTiet()) {
-                    tienThueGoc += ct.getDonGiaThue(); // Doc thang, khong tinh lai
-                    String tt = ct.getTinhTrang();
-                    if (tt != null && tt.contains("|diem=")) {
-                        try {
-                            diemDaGiam += Integer.parseInt(tt.split("\\|diem=")[1].trim());
-                        } catch (NumberFormatException ignored) {}
-                    }
-                }
-            }
+            if (selectedPhieu.getDanhSachChiTiet() != null)
+                for (PhieuThue.CTPhieuThue ct : selectedPhieu.getDanhSachChiTiet())
+                    tienThueGoc += ct.getDonGiaThue();
 
-            double giamDiem    = diemDaGiam * 1_000;
+            int diemDaGiam = diemDaTruTheoMaPT; // ✅ lấy từ DIEM_LICHSU
+
+            // ✅ 1 điểm = 5.000 VNĐ
+            double giamDiem    = diemDaGiam * (double) DIEM_TO_VND;
             double tienThueNet = Math.max(0, tienThueGoc - giamDiem);
             double phatTre     = tinhPhatTreHan(selectedPhieu, ngayTraThucTe);
             double chiPhiHuHong = 0;
@@ -586,59 +583,57 @@ public class RentReturnDialog extends JDialog {
             lblS3MaPT.setText("PT" + selectedPhieu.getMaPT());
             lblS3KhachHang.setText(selectedPhieu.getTenKhachHang() != null
                 ? selectedPhieu.getTenKhachHang() : "-");
-
             lblS3NgayThue.setText(selectedPhieu.getNgayThue() != null
                 ? selectedPhieu.getNgayThue().format(fmt) : "-");
             lblS3NgayTra.setText(ngayTraThucTe.format(fmt));
 
-            if (diemDaGiam > 0) {
-                lblS3TienThue.setText(String.format(
-                    "%,.0f VND  (goc %,.0f  -  giam %,.0f tu %d diem)",
-                    tienThueNet, tienThueGoc, giamDiem, diemDaGiam));
-            } else {
-                lblS3TienThue.setText(String.format("%,.0f VND", tienThueGoc));
-            }
+            lblS3TienThue.setText(String.format("%,.0f VNĐ", tienThueGoc));
+            lblS3TienThue.setForeground(TEXT_MAIN);
 
             if (diemDaGiam > 0) {
-                lblS3DiemTru.setText(String.format("-%,.0f VND  (%d diem)", giamDiem, diemDaGiam));
+                lblS3DiemTru.setText(String.format("-%,.0f VNĐ  (%d điểm x %,.0f VNĐ/điểm)",
+                    giamDiem, diemDaGiam, (double) DIEM_TO_VND));
                 lblS3DiemTru.setForeground(SUCCESS);
             } else {
-                lblS3DiemTru.setText("Khong su dung diem");
+                lblS3DiemTru.setText("Không sử dụng điểm");
                 lblS3DiemTru.setForeground(TEXT_MUTED);
             }
 
+            lblS3TienThueNet.setText(String.format("%,.0f VNĐ", tienThueNet));
+            lblS3TienThueNet.setForeground(ACCENT_LIGHT);
+
             if (phatTre > 0) {
-                lblS3PhatTre.setText(String.format("%,.0f VND", phatTre));
+                lblS3PhatTre.setText(String.format("%,.0f VNĐ", phatTre));
                 lblS3PhatTre.setForeground(DANGER);
             } else {
-                lblS3PhatTre.setText("Khong co  (dung han)");
+                lblS3PhatTre.setText("Không có  (đúng hạn)");
                 lblS3PhatTre.setForeground(SUCCESS);
             }
 
             if (chiPhiHuHong > 0) {
-                lblS3HuHong.setText(String.format("%,.0f VND", chiPhiHuHong));
+                lblS3HuHong.setText(String.format("%,.0f VNĐ", chiPhiHuHong));
                 lblS3HuHong.setForeground(DANGER);
             } else {
-                lblS3HuHong.setText("Khong co");
+                lblS3HuHong.setText("Không có");
                 lblS3HuHong.setForeground(TEXT_MUTED);
             }
 
-            lblS3TienCoc.setText(String.format("%,.0f VND", coc));
+            lblS3TienCoc.setText(String.format("%,.0f VNĐ", coc));
             lblS3TienCoc.setForeground(GOLD);
 
             if (delta > 0) {
-                lblS3KetQua.setText(String.format("Thu them tu khach:  %,.0f VND", delta));
+                lblS3KetQua.setText(String.format("Thu thêm từ khách:  %,.0f VNĐ", delta));
                 lblS3KetQua.setForeground(DANGER);
             } else if (delta < 0) {
-                lblS3KetQua.setText(String.format("Hoan lai cho khach:  %,.0f VND", -delta));
+                lblS3KetQua.setText(String.format("Hoàn lại cho khách:  %,.0f VNĐ", -delta));
                 lblS3KetQua.setForeground(SUCCESS);
             } else {
-                lblS3KetQua.setText("Hoa nhau");
+                lblS3KetQua.setText("Hòa nhau");
                 lblS3KetQua.setForeground(TEXT_MUTED);
             }
 
         } catch (Exception ex) {
-            showMsg("Loi tinh toan: " + ex.getMessage());
+            showMsg("Lỗi tính toán: " + ex.getMessage());
         }
     }
 
@@ -656,24 +651,24 @@ public class RentReturnDialog extends JDialog {
         JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
         btnRow.setBackground(BG);
 
-        btnBack = new PillButton("Quay lai", INPUT_BG, TEXT_DARK);
+        btnBack = new PillButton("Quay lại", INPUT_BG, TEXT_DARK);
         btnBack.setPreferredSize(new Dimension(110, 36));
         btnBack.setVisible(false);
         btnBack.addActionListener(e -> { if (currentStep > 1) showStep(currentStep - 1); });
 
-        btnNext = new PillButton("Tiep theo", ACCENT, WHITE);
+        btnNext = new PillButton("Tiếp theo", ACCENT, WHITE);
         btnNext.setPreferredSize(new Dimension(120, 36));
         btnNext.addActionListener(e -> {
             if (currentStep == 1) goToStep2();
             else if (currentStep == 2) goToStep3();
         });
 
-        btnConfirm = new PillButton("Xac nhan tra", BTN_GREEN, TEXT_DARK);
+        btnConfirm = new PillButton("Xác nhận trả", BTN_GREEN, TEXT_DARK);
         btnConfirm.setPreferredSize(new Dimension(150, 36));
         btnConfirm.setVisible(false);
         btnConfirm.addActionListener(e -> doConfirmReturn());
 
-        PillButton btnCancel = new PillButton("Huy", BTN_RED, WHITE);
+        PillButton btnCancel = new PillButton("Hủy", BTN_RED, WHITE);
         btnCancel.setPreferredSize(new Dimension(80, 36));
         btnCancel.addActionListener(e -> dispose());
 
@@ -701,7 +696,7 @@ public class RentReturnDialog extends JDialog {
 
     private void goToStep2() {
         int row = tblPhieu.getSelectedRow();
-        if (row < 0) { showMsg("Vui long chon mot phieu thue!"); return; }
+        if (row < 0) { showMsg("Vui lòng chọn một phiếu thuê!"); return; }
         if (searchResults == null || row >= searchResults.size()) return;
         selectedPhieu = searchResults.get(row);
         loadStep2Data();
@@ -712,41 +707,28 @@ public class RentReturnDialog extends JDialog {
         try {
             double val = Double.parseDouble(
                 txtChiPhiHuHong.getText().trim().replace(",", ""));
-            if (val < 0) { showMsg("Chi phi hu hong khong duoc am!"); return; }
+            if (val < 0) { showMsg("Chi phí hư hỏng không được âm!"); return; }
         } catch (NumberFormatException e) {
-            showMsg("Chi phi hu hong phai la so!"); return;
+            showMsg("Chi phí hư hỏng phải là số!"); return;
         }
         updateStep3Summary();
         showStep(3);
     }
 
     // =========================================================
-    // XAC NHAN TRA CD
-    //
-    // LOGIC TINH TIEN:
-    //   - Doc DonGiaThue tu CTPhieuThue (khong tinh lai tu ngay)
-    //   - chiPhiHuHong lay tu input
-    //   - Service.returnCD(maPT, ngayTra, chiPhiHuHong):
-    //       TienPhat = phatTreHan(tu DB) + chiPhiHuHong
+    // XÁC NHẬN TRẢ CD
     // =========================================================
     private void doConfirmReturn() {
         try {
-            // Tinh tong thue goc tu DonGiaThue (da luu san, khong tinh lai)
             double tienThueGoc = 0;
-            int    diemDaGiam  = 0;
-            if (selectedPhieu.getDanhSachChiTiet() != null) {
-                for (PhieuThue.CTPhieuThue ct : selectedPhieu.getDanhSachChiTiet()) {
+            if (selectedPhieu.getDanhSachChiTiet() != null)
+                for (PhieuThue.CTPhieuThue ct : selectedPhieu.getDanhSachChiTiet())
                     tienThueGoc += ct.getDonGiaThue();
-                    String tt = ct.getTinhTrang();
-                    if (tt != null && tt.contains("|diem=")) {
-                        try {
-                            diemDaGiam += Integer.parseInt(tt.split("\\|diem=")[1].trim());
-                        } catch (NumberFormatException ignored) {}
-                    }
-                }
-            }
 
-            double giamDiem    = diemDaGiam * 1_000;
+            int diemDaGiam = diemDaTruTheoMaPT; // ✅ lấy từ DIEM_LICHSU
+
+            // ✅ 1 điểm = 5.000 VNĐ
+            double giamDiem    = diemDaGiam * (double) DIEM_TO_VND;
             double tienThueNet = Math.max(0, tienThueGoc - giamDiem);
             double phatTre     = tinhPhatTreHan(selectedPhieu, ngayTraThucTe);
 
@@ -761,55 +743,102 @@ public class RentReturnDialog extends JDialog {
             double delta       = tongPhaiTra - coc;
 
             String ketQua;
-            if      (delta > 0) ketQua = String.format("Thu them tu khach:  %,.0f VND", delta);
-            else if (delta < 0) ketQua = String.format("Hoan lai cho khach:  %,.0f VND", -delta);
-            else                ketQua = "Hoa nhau";
+            if      (delta > 0) ketQua = String.format("Thu thêm từ khách:  %,.0f VNĐ", delta);
+            else if (delta < 0) ketQua = String.format("Hoàn lại cho khách:  %,.0f VNĐ", -delta);
+            else                ketQua = "Hòa nhau";
+
+            // Tính điểm tích lũy: 100.000 VNĐ tiền thuê gốc = 1 điểm
+            int diemTichLuy = (int) (tienThueGoc / 100_000);
 
             String msg = String.format(
-                "Xac nhan thanh toan va hoan tat tra?\n\n"
-              + "  Tien thue goc  : %,.0f VND\n"
-              + "  Giam tu diem   : %,.0f VND\n"
-              + "  Phat tre han   : %,.0f VND\n"
-              + "  Chi phi hu hong: %,.0f VND\n"
-              + "  Tong phai tra  : %,.0f VND\n"
-              + "  Tien coc       : %,.0f VND\n"
-              + "  ---------------------------\n"
-              + "  %s",
-                tienThueGoc, giamDiem, phatTre, chiPhiHuHong,
-                tongPhaiTra, coc, ketQua);
+                "Xác nhận thanh toán và hoàn tất trả?\n\n"
+              + "  Tiền thuê gốc      : %,.0f VNĐ\n"
+              + "  Giảm từ điểm       : -%,.0f VNĐ  (%d điểm x %,d VNĐ)\n"
+              + "  Tiền thuê sau giảm : %,.0f VNĐ\n"
+              + "  Phạt trễ hạn       : %,.0f VNĐ\n"
+              + "  Chi phí hư hỏng    : %,.0f VNĐ\n"
+              + "  Tổng phải trả      : %,.0f VNĐ\n"
+              + "  Tiền cọc           : %,.0f VNĐ\n"
+              + "  --------------------------------\n"
+              + "  %s\n\n"
+              + "  Điểm tích lũy sẽ cộng: +%d điểm",
+                tienThueGoc, giamDiem, diemDaGiam, DIEM_TO_VND,
+                tienThueNet, phatTre, chiPhiHuHong,
+                tongPhaiTra, coc, ketQua, diemTichLuy);
 
             int confirm = JOptionPane.showConfirmDialog(this, msg,
-                "Xac nhan thanh toan", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+                "Xác nhận thanh toán", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
             if (confirm != JOptionPane.YES_OPTION) return;
 
-            // Ghi DB: service tu tinh lai phatTreHan + cong chiPhiHuHong → luu TienPhat
             boolean ok = service.returnCD(selectedPhieu.getMaPT(), ngayTraThucTe, chiPhiHuHong);
 
             if (ok) {
-                // Cong diem tich luy: 10.000 VND = 1 diem (tinh tren tienThueNet)
-                int diemTichLuy = (int) (tienThueNet / 10_000);
+                boolean diemOk  = false;
+                String  diemMsg = "";
+
                 if (selectedPhieu.getMaKH() > 0 && diemTichLuy > 0) {
-                    new otkhongluong.gamestoremanagement.dao.KhachHangDAO()
-                        .updatePoint(selectedPhieu.getMaKH(), diemTichLuy);
+                    try (java.sql.Connection con =
+                             otkhongluong.gamestoremanagement.util.DBConnection.getConnection()) {
+
+                        con.setAutoCommit(false);
+
+                        // Cộng điểm vào KHACHHANG
+                        try (java.sql.PreparedStatement psUpdate = con.prepareStatement(
+                                "UPDATE KHACHHANG SET DiemTichLuy = COALESCE(DiemTichLuy, 0) + ? WHERE MaKH = ?")) {
+                            psUpdate.setInt(1, diemTichLuy);
+                            psUpdate.setInt(2, selectedPhieu.getMaKH());
+                            int rows = psUpdate.executeUpdate();
+                            if (rows == 0)
+                                throw new Exception("Không tìm thấy khách hàng MaKH=" + selectedPhieu.getMaKH());
+                        }
+
+                        // Ghi lịch sử vào DIEM_LICHSU (có MaPT)
+                        try (java.sql.PreparedStatement psLog = con.prepareStatement(
+                                "INSERT INTO DIEM_LICHSU (MaKH, Loai, SoDiem, GhiChu, MaPT) VALUES (?, 'CONG', ?, ?, ?)")) {
+                            psLog.setInt(1, selectedPhieu.getMaKH());
+                            psLog.setInt(2, diemTichLuy);
+                            psLog.setString(3, "Trả CD - PT" + selectedPhieu.getMaPT());
+                            psLog.setInt(4, selectedPhieu.getMaPT());
+                            psLog.executeUpdate();
+                        }
+
+                        con.commit();
+                        diemOk = true;
+
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                        diemMsg = "\n⚠ Cộng điểm thất bại: " + ex.getMessage()
+                                + "\nVui lòng cộng thủ công cho MaKH=" + selectedPhieu.getMaKH();
+                    }
+                } else if (diemTichLuy == 0) {
+                    diemOk  = true;
+                    diemMsg = "\n(Chưa đủ 100.000 VNĐ để tích điểm)";
+                } else {
+                    diemOk = true;
                 }
 
-                JOptionPane.showMessageDialog(this,
-                    String.format(
-                        "Tra CD thanh cong!\n\n"
-                      + "  Phieu thue -> Da Tra\n"
-                      + "  CD -> San sang\n"
-                      + "  Diem tich luy cong: +%d diem\n\n"
-                      + "  %s",
-                        diemTichLuy, ketQua),
-                    "Hoan tat", JOptionPane.INFORMATION_MESSAGE);
+                String finalMsg = String.format(
+                    "Trả CD thành công!\n\n"
+                  + "  Phiếu thuê → Đã Trả\n"
+                  + "  CD → Sẵn sàng\n"
+                  + "  Điểm tích lũy cộng: +%d điểm%s\n\n"
+                  + "  %s",
+                    diemTichLuy,
+                    diemOk ? (diemTichLuy > 0 ? " ✓" : "") : " ✗",
+                    ketQua + (diemOk ? "" : diemMsg));
+
+                JOptionPane.showMessageDialog(this, finalMsg,
+                    diemOk ? "Hoàn tất" : "Hoàn tất (có cảnh báo)",
+                    diemOk ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE);
                 dispose();
+
             } else {
-                showMsg("Tra that bai! Vui long thu lai hoac lien he quan tri.");
+                showMsg("Trả thất bại! Vui lòng thử lại hoặc liên hệ quản trị.");
             }
 
         } catch (Exception ex) {
             ex.printStackTrace();
-            showMsg("Loi xu ly: " + ex.getMessage());
+            showMsg("Lỗi xử lý: " + ex.getMessage());
         }
     }
 
@@ -817,7 +846,7 @@ public class RentReturnDialog extends JDialog {
     // HELPERS
     // =========================================================
     private void showMsg(String msg) {
-        JOptionPane.showMessageDialog(this, msg, "Thong bao", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, msg, "Thông báo", JOptionPane.INFORMATION_MESSAGE);
     }
 
     private JTextField makeInput() {
@@ -898,7 +927,7 @@ public class RentReturnDialog extends JDialog {
     }
 
     // =========================================================
-    // PILL BUTTON — dong nhat voi RentAddDialog
+    // PILL BUTTON
     // =========================================================
     static class PillButton extends JButton {
         private final Color bg, fg;

@@ -160,6 +160,7 @@ public class KhachHangDAO {
                 kh.setMaKH(rs.getInt("MaKH"));
                 kh.setHoTen(rs.getString("HoTen"));
                 kh.setSdt(rs.getString("SDT"));
+                kh.setCccd(rs.getString("CCCD")); 
                 kh.setDiemTichLuy(rs.getInt("DiemTichLuy"));
                 return kh;
             }
@@ -223,6 +224,25 @@ public class KhachHangDAO {
 
         return list;
     }
+    public void truDiem(int maKH, int diem) {
+        String sql =
+            "UPDATE KHACHHANG " +
+            "SET DiemTichLuy = CASE WHEN DiemTichLuy - ? < 0 THEN 0 ELSE DiemTichLuy - ? END " +
+            "WHERE MaKH = ?";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, diem);
+            ps.setInt(2, diem);
+            ps.setInt(3, maKH);
+            ps.executeUpdate();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    public void congDiem(int maKH, int diem) {
+        updatePoint(maKH, diem); // hàm updatePoint đã có sẵn trong KhachHangDAO
+    }
+
 
     // ================= MAPPER =================
     private KhachHang map(ResultSet rs) throws SQLException {
