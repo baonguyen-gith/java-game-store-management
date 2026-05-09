@@ -1,5 +1,6 @@
 package otkhongluong.gamestoremanagement.dao;
 
+import otkhongluong.gamestoremanagement.model.NhanVien;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 
 import java.sql.*;
@@ -76,5 +77,97 @@ public class NhanVienDAO {
         }
 
         return list;
+    }
+
+    // ================= CRUD OPERATIONS =================
+    public List<NhanVien> findAll() {
+        List<NhanVien> list = new ArrayList<>();
+        String sql = "SELECT * FROM NHANVIEN ORDER BY MaNV DESC";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                list.add(mapResultSetToNhanVien(rs));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    public NhanVien findById(int maNV) {
+        String sql = "SELECT * FROM NHANVIEN WHERE MaNV = ?";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, maNV);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return mapResultSetToNhanVien(rs);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public boolean insert(NhanVien nv) {
+        String sql = "INSERT INTO NHANVIEN (HoTen, SDT, NgaySinh, CCCD, NgayVaoLam) VALUES (?, ?, ?, ?, ?)";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, nv.getHoTen());
+            ps.setString(2, nv.getSdt());
+            ps.setDate(3, nv.getNgaySinh() != null ? java.sql.Date.valueOf(nv.getNgaySinh()) : null);
+            ps.setString(4, nv.getCccd());
+            ps.setDate(5, nv.getNgayVaoLam() != null ? java.sql.Date.valueOf(nv.getNgayVaoLam()) : null);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public boolean update(NhanVien nv) {
+        String sql = "UPDATE NHANVIEN SET HoTen = ?, SDT = ?, NgaySinh = ?, CCCD = ?, NgayVaoLam = ? WHERE MaNV = ?";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, nv.getHoTen());
+            ps.setString(2, nv.getSdt());
+            ps.setDate(3, nv.getNgaySinh() != null ? java.sql.Date.valueOf(nv.getNgaySinh()) : null);
+            ps.setString(4, nv.getCccd());
+            ps.setDate(5, nv.getNgayVaoLam() != null ? java.sql.Date.valueOf(nv.getNgayVaoLam()) : null);
+            ps.setInt(6, nv.getMaNV());
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public boolean delete(int maNV) {
+        String sql = "DELETE FROM NHANVIEN WHERE MaNV = ?";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, maNV);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    private NhanVien mapResultSetToNhanVien(ResultSet rs) throws SQLException {
+        NhanVien nv = new NhanVien();
+        nv.setMaNV(rs.getInt("MaNV"));
+        nv.setHoTen(rs.getString("HoTen"));
+        nv.setSdt(rs.getString("SDT"));
+        
+        Date ngaySinh = rs.getDate("NgaySinh");
+        if (ngaySinh != null) nv.setNgaySinh(ngaySinh.toLocalDate());
+        
+        nv.setCccd(rs.getString("CCCD"));
+        
+        Date ngayVaoLam = rs.getDate("NgayVaoLam");
+        if (ngayVaoLam != null) nv.setNgayVaoLam(ngayVaoLam.toLocalDate());
+        
+        return nv;
     }
 }

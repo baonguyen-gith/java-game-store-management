@@ -5,6 +5,7 @@ import otkhongluong.gamestoremanagement.view.dialog.RentReturnDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentAddDialog;
 import otkhongluong.gamestoremanagement.dao.PhieuThueDAO;
 import otkhongluong.gamestoremanagement.model.PhieuThue;
+import otkhongluong.gamestoremanagement.util.IconUtils;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -115,10 +116,8 @@ public class RentPanel extends JPanel {
                 g2.setColor(INPUT_BG);
                 g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
                 super.paintComponent(g);
-                // calendar icon
-                g2.setColor(TEXT_MUTED);
-                g2.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 14));
-                g2.drawString("📅", getWidth() - 28, getHeight() / 2 + 5);
+                Icon calIcon = IconUtils.getCalendarIcon(14, TEXT_MUTED);
+                calIcon.paintIcon(this, g2, getWidth() - 28, getHeight() / 2 - 7);
                 g2.dispose();
             }
         };
@@ -145,9 +144,8 @@ public class RentPanel extends JPanel {
                 g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
                 super.paintComponent(g);
                 if (getText().isEmpty()) {
-                    g2.setColor(TEXT_MUTED);
-                    g2.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 14));
-                    g2.drawString("🔍", 8, getHeight() / 2 + 5);
+                    Icon searchIcon = IconUtils.getSearchIcon(14, TEXT_MUTED);
+                    searchIcon.paintIcon(this, g2, 8, getHeight() / 2 - 7);
                 }
                 g2.dispose();
             }
@@ -157,7 +155,8 @@ public class RentPanel extends JPanel {
             public void keyReleased(KeyEvent e) { currentPage = 1; renderPage(); }
         });
 
-        RoundButton btnAdd = new RoundButton("+", BTN_ADD, Color.WHITE);
+        RoundButton btnAdd = new RoundButton("", BTN_ADD, Color.WHITE);
+        btnAdd.setIcon(IconUtils.getAddIcon(18, Color.WHITE));
         btnAdd.setPreferredSize(new Dimension(40, 40));
         btnAdd.addActionListener(e -> {
             Window parent = SwingUtilities.getWindowAncestor(this);
@@ -199,6 +198,9 @@ public class RentPanel extends JPanel {
         table = new JTable(tableModel) {
             @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
+                if (c instanceof JLabel) {
+                    ((JLabel) c).setHorizontalAlignment(SwingConstants.CENTER);
+                }
                 if (isRowSelected(row)) {
                     c.setBackground(ACCENT);
                     c.setForeground(Color.WHITE);
@@ -228,6 +230,7 @@ public class RentPanel extends JPanel {
                 lbl.setFont(FONT_HEADER);
                 lbl.setForeground(Color.WHITE);
                 lbl.setBackground(PURPLE_HEADER);
+                lbl.setHorizontalAlignment(SwingConstants.CENTER);
                 lbl.setOpaque(true);
                 lbl.setBorder(new EmptyBorder(10, 12, 10, 12));
                 return lbl;
@@ -285,7 +288,8 @@ public class RentPanel extends JPanel {
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         btnPanel.setBackground(BG_DARK);
 
-        RoundButton btnEdit = new RoundButton("✏  Sửa", BTN_EDIT, BG_DARK);
+        RoundButton btnEdit = new RoundButton(" Sửa", BTN_EDIT, BG_DARK);
+        btnEdit.setIcon(IconUtils.getEditIcon(16, BG_DARK));
         btnEdit.setPreferredSize(new Dimension(110, 40));
         btnEdit.addActionListener(e -> {
             int row = table.getSelectedRow();
@@ -304,7 +308,8 @@ public class RentPanel extends JPanel {
             loadData(); // refresh
         });
         
-        RoundButton btnReturn = new RoundButton("↩  Trả CD", new Color(255, 165, 0), BG_DARK);
+        RoundButton btnReturn = new RoundButton(" Trả CD", new Color(255, 165, 0), BG_DARK);
+        btnReturn.setIcon(IconUtils.getReturnIcon(16, BG_DARK));
         btnReturn.setPreferredSize(new Dimension(130, 40));
 
         btnReturn.addActionListener(e -> {
@@ -325,7 +330,8 @@ public class RentPanel extends JPanel {
             loadData(); // refresh
         });
 
-        RoundButton btnDelete = new RoundButton("🗑  Xóa", BTN_DELETE, BG_DARK);
+        RoundButton btnDelete = new RoundButton(" Xóa", BTN_DELETE, BG_DARK);
+        btnDelete.setIcon(IconUtils.getDeleteIcon(16, BG_DARK));
         btnDelete.setPreferredSize(new Dimension(110, 40));
         btnDelete.addActionListener(e -> {
             int row = table.getSelectedRow();
@@ -363,8 +369,8 @@ public class RentPanel extends JPanel {
             panel.add(btn);
         }
         if (total > 4) {
-            RoundButton btnNext = new RoundButton(">>", INPUT_BG, TEXT_WHITE);
-            btnNext.setPreferredSize(new Dimension(44, 36));
+            RoundButton btnNext = new RoundButton("Tiếp", INPUT_BG, TEXT_WHITE);
+            btnNext.setPreferredSize(new Dimension(60, 36));
             btnNext.addActionListener(e -> {
                 if (currentPage < total) { currentPage++; renderPage(); }
             });
