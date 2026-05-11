@@ -49,13 +49,12 @@ public class SanPhamService {
     }
 
     // ================= DELETE =================
-    public boolean deleteSanPham(int id) {
+    public boolean deleteSanPham(int maSP) {
 
-        if (id <= 0) {
+        if (maSP <= 0) {
             throw new IllegalArgumentException("Mã sản phẩm không hợp lệ");
         }
-
-        return sanPhamDAO.delete(id);
+        return sanPhamDAO.delete(maSP);
     }
 
     // ================= FIND BY GAME =================

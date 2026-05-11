@@ -45,6 +45,8 @@ public class EmployeePanel extends JPanel {
     private JTable table;
     private DefaultTableModel tableModel;
     private JTextField txtSearch;
+    private boolean isFilterMode = false;
+    private TableRowSorter<DefaultTableModel> rowSorter;
     private JPanel paginationPanel;
     private int currentPage = 1;
     private static final int PAGE_SIZE = 8;
@@ -119,30 +121,46 @@ public class EmployeePanel extends JPanel {
             public void keyReleased(KeyEvent e) { currentPage = 1; renderPage(); }
         });
 
+        // --- Nút Lọc ---
+        RoundButton btnFilter = new RoundButton(" Lọc", PURPLE_HEADER, Color.WHITE);
+        btnFilter.setPreferredSize(new Dimension(70, 40));
+        btnFilter.addActionListener(e -> toggleFilterMode(btnFilter));
+
+        // --- Nút Sắp xếp ---
+        RoundButton btnSort = new RoundButton(" Sắp xếp", PURPLE_HEADER, Color.WHITE);
+        btnSort.setPreferredSize(new Dimension(90, 40));
+        btnSort.addActionListener(e -> showSortMenu(btnSort));
+
+        // --- Nút Thêm NV ---
         RoundButton btnAdd = new RoundButton("", BTN_ADD, Color.WHITE);
         btnAdd.setIcon(IconUtils.getAddIcon(18, Color.WHITE));
         btnAdd.setPreferredSize(new Dimension(40, 40));
         btnAdd.addActionListener(e -> {
-            new EmployeeDialog(
-                (Frame) SwingUtilities.getWindowAncestor(this),
-                null,
-                this::loadData
-            ).setVisible(true);
+            new EmployeeDialog((Frame) SwingUtilities.getWindowAncestor(this), null, this::loadData).setVisible(true);
         });
 
-        // Nút Tài khoản
+        // --- Nút Tài khoản ---
         RoundButton btnUser = new RoundButton("", INPUT_BG, BG_DARK);
         btnUser.setIcon(IconUtils.getUserIcon(18, BG_DARK));
         btnUser.setPreferredSize(new Dimension(40, 40));
         btnUser.addActionListener(e -> openUserPanel());
 
-        JPanel btnGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        btnGroup.setBackground(BG_DARK);
-        btnGroup.add(btnAdd);
-        btnGroup.add(btnUser);
+        // Cụm Lọc + Sort bên trái ô Search
+        JPanel leftGroup = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        leftGroup.setBackground(BG_DARK);
+        leftGroup.add(btnFilter);
+        leftGroup.add(btnSort);
 
+        // Cụm Add + User bên phải ô Search
+        JPanel rightGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        rightGroup.setBackground(BG_DARK);
+        rightGroup.add(btnAdd);
+        rightGroup.add(btnUser);
+
+        row.add(leftGroup, BorderLayout.WEST);
         row.add(txtSearch, BorderLayout.CENTER);
-        row.add(btnGroup,  BorderLayout.EAST);
+        row.add(rightGroup,  BorderLayout.EAST);
+        
         p.add(row, BorderLayout.CENTER);
         return p;
     }
@@ -285,26 +303,46 @@ public class EmployeePanel extends JPanel {
     }
 
     private void rebuildPagination(JPanel panel) {
+        // 1. Xóa sạch mọi thứ đang có (bao gồm các nút số và dấu ...)
         panel.removeAll();
+        panel.setOpaque(false);
+        
         List<NhanVien> filtered = getFilteredData();
         final int total = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
 
-        for (int i = 1; i <= Math.min(total, 4); i++) {
-            final int pg = i;
-            RoundButton btn = new RoundButton(String.valueOf(i),
-                pg == currentPage ? ACCENT : INPUT_BG, TEXT_WHITE);
-            btn.setPreferredSize(new Dimension(36, 36));
-            btn.addActionListener(e -> { currentPage = pg; renderPage(); });
-            panel.add(btn);
-        }
-        if (total > 4) {
-            RoundButton btnNext = new RoundButton("Tiếp", INPUT_BG, TEXT_WHITE);
-            btnNext.setPreferredSize(new Dimension(60, 36));
-            btnNext.addActionListener(e -> {
-                if (currentPage < total) { currentPage++; renderPage(); }
-            });
-            panel.add(btnNext);
-        }
+        // 2. Tạo nút Quay lại (<)
+        // Sử dụng màu ACCENT nếu bấm được, INPUT_BG nếu bị vô hiệu hóa
+        RoundButton btnPrev = new RoundButton("<", (currentPage > 1 ? ACCENT : INPUT_BG), TEXT_WHITE);
+        btnPrev.setPreferredSize(new Dimension(40, 40));
+        btnPrev.setEnabled(currentPage > 1);
+        btnPrev.addActionListener(e -> {
+            if (currentPage > 1) {
+                currentPage--;
+                renderPage();
+            }
+        });
+        panel.add(btnPrev);
+
+        // 3. Tạo nhãn hiển thị số trang (Ví dụ: 1 / 5)
+        JLabel lblPage = new JLabel(currentPage + " / " + total);
+        lblPage.setForeground(Color.WHITE);
+        lblPage.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lblPage.setBorder(new EmptyBorder(0, 15, 0, 15)); // Tạo khoảng cách hai bên cho đẹp
+        panel.add(lblPage);
+
+        // 4. Tạo nút Tiếp theo (>)
+        RoundButton btnNext = new RoundButton(">", (currentPage < total ? ACCENT : INPUT_BG), TEXT_WHITE);
+        btnNext.setPreferredSize(new Dimension(40, 40));
+        btnNext.setEnabled(currentPage < total);
+        btnNext.addActionListener(e -> {
+            if (currentPage < total) {
+                currentPage++;
+                renderPage();
+            }
+        });
+        panel.add(btnNext);
+
+        // 5. Vẽ lại giao diện
         panel.revalidate();
         panel.repaint();
     }
@@ -373,6 +411,125 @@ public class EmployeePanel extends JPanel {
         } catch (Exception e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(this, "Lỗi mở UserPanel!");
+        }
+    }
+
+    // ==========================================
+    // LOGIC SẮP XẾP (SORT)
+    // ==========================================
+    private void showSortMenu(Component invoker) {
+        JPopupMenu sortMenu = new JPopupMenu();
+
+        // --- Sắp xếp Mã Nhân Viên ---
+        JMenu menuMaNV = new JMenu("Mã Nhân Viên");
+        JMenuItem maNVAsc = new JMenuItem("Tăng dần (1, 2, 10...)");
+        maNVAsc.addActionListener(e -> sortData(0, true));
+        JMenuItem maNVDesc = new JMenuItem("Giảm dần (10, 2, 1...)");
+        maNVDesc.addActionListener(e -> sortData(0, false));
+        menuMaNV.add(maNVAsc); menuMaNV.add(maNVDesc);
+
+        // --- Sắp xếp Ngày Sinh ---
+        JMenu menuNgaySinh = new JMenu("Ngày Sinh");
+        JMenuItem birthAsc = new JMenuItem("Cũ nhất -> Mới nhất");
+        birthAsc.addActionListener(e -> sortData(3, true));
+        JMenuItem birthDesc = new JMenuItem("Mới nhất -> Cũ nhất");
+        birthDesc.addActionListener(e -> sortData(3, false));
+        menuNgaySinh.add(birthAsc); menuNgaySinh.add(birthDesc);
+
+        // --- Sắp xếp Ngày Vào Làm ---
+        JMenu menuNgayVaoLam = new JMenu("Ngày Vào Làm");
+        JMenuItem workAsc = new JMenuItem("Cũ nhất -> Mới nhất");
+        workAsc.addActionListener(e -> sortData(5, true));
+        JMenuItem workDesc = new JMenuItem("Mới nhất -> Cũ nhất");
+        workDesc.addActionListener(e -> sortData(5, false));
+        menuNgayVaoLam.add(workAsc); menuNgayVaoLam.add(workDesc);
+
+        sortMenu.add(menuMaNV);
+        sortMenu.add(menuNgaySinh);
+        sortMenu.add(menuNgayVaoLam);
+
+        sortMenu.show(invoker, 0, invoker.getHeight());
+    }
+
+    private void sortData(int colIndex, boolean ascending) {
+        allData.sort((nv1, nv2) -> {
+            int result = 0;
+            switch (colIndex) {
+                case 0: // Sắp xếp theo Mã Nhân Viên
+                    // So sánh trực tiếp bằng số nguyên (int) để 2 luôn đứng trước 11
+                    result = Integer.compare(nv1.getMaNV(), nv2.getMaNV());
+                    break;
+                case 3: // Sắp xếp theo Ngày sinh
+                    if (nv1.getNgaySinh() != null && nv2.getNgaySinh() != null) {
+                        result = nv1.getNgaySinh().compareTo(nv2.getNgaySinh());
+                    }
+                    break;
+                case 5: // Sắp xếp theo Ngày vào làm
+                    if (nv1.getNgayVaoLam() != null && nv2.getNgayVaoLam() != null) {
+                        result = nv1.getNgayVaoLam().compareTo(nv2.getNgayVaoLam());
+                    }
+                    break;
+                default:
+                    result = 0;
+            }
+            return ascending ? result : -result;
+        });
+        
+        currentPage = 1; // Quay về trang đầu sau khi sắp xếp
+        renderPage();
+    }
+
+    // Hàm phụ để tách số từ chuỗi (Ví dụ: "NV012" -> 12)
+    private int extractNumber(String s) {
+        if (s == null) return 0;
+        // Loại bỏ tất cả các ký tự không phải là số
+        String digits = s.replaceAll("\\D", ""); 
+        return digits.isEmpty() ? 0 : Integer.parseInt(digits);
+    }
+
+    // ==========================================
+    // LOGIC LỌC (FILTER) TẠI CỘT
+    // ==========================================
+    private void toggleFilterMode(RoundButton btnFilter) {
+        isFilterMode = !isFilterMode;
+        
+        if (isFilterMode) {
+            // Đổi màu nút để báo hiệu Đang Bật
+            btnFilter.setBackground(BTN_ADD); 
+            
+            if (rowSorter == null) {
+                rowSorter = new TableRowSorter<>(tableModel);
+                table.setRowSorter(rowSorter);
+                
+                table.getTableHeader().addMouseListener(new MouseAdapter() {
+                    @Override
+                    public void mouseClicked(MouseEvent e) {
+                        if (!isFilterMode) return; 
+                        
+                        int col = table.columnAtPoint(e.getPoint());
+                        String colName = table.getColumnName(col);
+                        
+                        String keyword = JOptionPane.showInputDialog(
+                                EmployeePanel.this, 
+                                "Nhập từ khóa lọc cho cột [" + colName + "]:", 
+                                "Lọc dữ liệu", 
+                                JOptionPane.QUESTION_MESSAGE);
+                                
+                        if (keyword != null && !keyword.trim().isEmpty()) {
+                            rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + keyword.trim(), col));
+                        } else if (keyword != null && keyword.trim().isEmpty()) {
+                            rowSorter.setRowFilter(null); // Xóa lọc nếu để trống
+                        }
+                    }
+                });
+            }
+            JOptionPane.showMessageDialog(this, "Chế độ Lọc ĐÃ BẬT.\nHãy click chuột vào Tiêu đề cột (VD: 'Họ Tên') trên bảng để lọc.");
+        } else {
+            // Tắt lọc, trả màu về mặc định
+            btnFilter.setBackground(PURPLE_HEADER);
+            if (rowSorter != null) {
+                rowSorter.setRowFilter(null);
+            }
         }
     }
 

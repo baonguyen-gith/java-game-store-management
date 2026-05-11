@@ -44,6 +44,10 @@ public class GameManagePanel extends JPanel {
     private JPanel paginationPanel;
     private int currentPage = 1;
     private static final int PAGE_SIZE = 8;
+    private RoundButton btnSort;
+    private RoundButton btnFilter;
+    private boolean isFilterMode = false;
+    private TableRowSorter<DefaultTableModel> rowSorter;
 
     private GameService service = new GameService();
     private List<Game> allData;
@@ -91,6 +95,33 @@ public class GameManagePanel extends JPanel {
         JPanel row = new JPanel(new BorderLayout(8, 0));
         row.setBackground(BG_DARK);
 
+        // --- Cụm nút bên TRÁI ô tìm kiếm (MỚI) ---
+        JPanel leftGroup = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        leftGroup.setBackground(BG_DARK);
+
+        btnSort = new RoundButton("Sắp xếp", INPUT_BG, BG_DARK);
+        btnSort.setPreferredSize(new Dimension(90, 40));
+        btnSort.addActionListener(e -> showSortPopupMenu(btnSort));
+
+        btnFilter = new RoundButton("Lọc", INPUT_BG, BG_DARK);
+        btnFilter.setPreferredSize(new Dimension(70, 40));
+        btnFilter.addActionListener(e -> {
+            isFilterMode = !isFilterMode;
+            if (isFilterMode) {
+                btnFilter.setBackground(ACCENT);
+                btnFilter.setForeground(Color.WHITE);
+                JOptionPane.showMessageDialog(this, "Chế độ Lọc ĐÃ BẬT.\nHãy nhấn vào tiêu đề cột để tiến hành lọc.");
+            } else {
+                btnFilter.setBackground(INPUT_BG);
+                btnFilter.setForeground(BG_DARK);
+                rowSorter.setRowFilter(null);
+            }
+        });
+
+        leftGroup.add(btnSort);
+        leftGroup.add(btnFilter);
+
+        // --- Ô tìm kiếm ở giữa ---
         txtSearch = new JTextField(22) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -110,13 +141,12 @@ public class GameManagePanel extends JPanel {
             public void keyReleased(KeyEvent e) { currentPage = 1; renderPage(); }
         });
 
+        // --- Cụm nút bên PHẢI (Add, Refresh) ---
         RoundButton btnAdd = new RoundButton("", BTN_ADD, Color.WHITE);
         btnAdd.setIcon(IconUtils.getAddIcon(18, Color.WHITE));
         btnAdd.setPreferredSize(new Dimension(40, 40));
         btnAdd.setToolTipText("Thêm Game");
-        btnAdd.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Chức năng thêm Game đang cập nhật!");
-        });
+        btnAdd.addActionListener(e -> showAddGameDialog());
 
         RoundButton btnRefresh = new RoundButton("", INPUT_BG, BG_DARK);
         btnRefresh.setIcon(IconUtils.getRefreshIcon(18, BG_DARK));
@@ -129,8 +159,11 @@ public class GameManagePanel extends JPanel {
         btnGroup.add(btnAdd);
         btnGroup.add(btnRefresh);
 
+        // Ráp vào row: Trái (Sắp xếp/Lọc) - Giữa (Search) - Phải (Thêm/Refresh)
+        row.add(leftGroup, BorderLayout.WEST); 
         row.add(txtSearch, BorderLayout.CENTER);
         row.add(btnGroup,  BorderLayout.EAST);
+
         p.add(row, BorderLayout.CENTER);
         return p;
     }
@@ -152,13 +185,14 @@ public class GameManagePanel extends JPanel {
         TABLE
     ====================================================== */
     private JScrollPane buildTable() {
-        String[] cols = {"Mã Game", "Tên Game", "Thể Loại", "Nền Tảng", "Giá Thuê (CD)", "Giá Bán (ROM)"};
+        String[] cols = {"Mã Game", "Tên Game", "Thể Loại", "Nền Tảng", "Giá CD", "Giá ROM", "Giá Thuê"};
         tableModel = new DefaultTableModel(cols, 0) {
-            public boolean isCellEditable(int r, int c) { return false; }
+            @Override public boolean isCellEditable(int r, int c) { return false; }
         };
 
         table = new JTable(tableModel) {
-            @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
+            @Override 
+            public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
                 if (c instanceof JLabel) {
                     ((JLabel) c).setHorizontalAlignment(SwingConstants.CENTER);
@@ -174,6 +208,35 @@ public class GameManagePanel extends JPanel {
             }
         };
 
+        // --- PHẦN QUAN TRỌNG: Kích hoạt bộ lọc và sự kiện click tiêu đề ---
+        rowSorter = new TableRowSorter<>(tableModel);
+        table.setRowSorter(rowSorter);
+
+        table.getTableHeader().addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (isFilterMode) {
+                    int viewColumn = table.columnAtPoint(e.getPoint());
+                    if (viewColumn == -1) return;
+                    
+                    int modelColumn = table.convertColumnIndexToModel(viewColumn);
+                    String colName = table.getColumnName(viewColumn);
+                    
+                    String filter = JOptionPane.showInputDialog(null, 
+                        "Nhập từ khóa để lọc cột [" + colName + "]:");
+                    
+                    if (filter != null && !filter.trim().isEmpty()) {
+                        // Lọc không phân biệt hoa thường (?i)
+                        rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + filter.trim(), modelColumn));
+                    } else if (filter != null) {
+                        // Nếu nhấn OK mà để trống thì xóa lọc của cột đó
+                        rowSorter.setRowFilter(null);
+                    }
+                }
+            }
+        });
+        // -----------------------------------------------------------------
+
         table.setFont(FONT_CELL);
         table.setRowHeight(38);
         table.setShowGrid(false);
@@ -185,7 +248,8 @@ public class GameManagePanel extends JPanel {
 
         JTableHeader header = table.getTableHeader();
         header.setDefaultRenderer(new DefaultTableCellRenderer() {
-            @Override public Component getTableCellRendererComponent(
+            @Override 
+            public Component getTableCellRendererComponent(
                     JTable t, Object v, boolean sel, boolean foc, int r, int c) {
                 JLabel lbl = new JLabel(v == null ? "" : v.toString());
                 lbl.setFont(FONT_HEADER);
@@ -201,7 +265,7 @@ public class GameManagePanel extends JPanel {
         header.setPreferredSize(new Dimension(0, 42));
         header.setBorder(BorderFactory.createEmptyBorder());
 
-        int[] widths = {80, 200, 100, 100, 120, 120};
+        int[] widths = {80, 180, 100, 100, 100, 100, 120}; 
         for (int i = 0; i < widths.length; i++)
             table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
 
@@ -233,24 +297,41 @@ public class GameManagePanel extends JPanel {
         btnEdit.setPreferredSize(new Dimension(110, 40));
         btnEdit.addActionListener(e -> {
             int row = table.getSelectedRow();
-            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn game để sửa!"); return; }
-            JOptionPane.showMessageDialog(this, "Chức năng sửa Game đang cập nhật!");
+            if (row < 0) { 
+                JOptionPane.showMessageDialog(this, "Vui lòng chọn game cần sửa!"); 
+                return; 
+            }
+            // Lấy game từ danh sách dữ liệu hiện tại của trang
+            Game selectedGame = currentPageData.get(row);
+            // GỌI HÀM NÀY ĐỂ MỞ DIALOG (Đổi tên hàm cho đúng thẻ Game)
+            showEditGameDialog(selectedGame); 
         });
 
         RoundButton btnDelete = new RoundButton(" Xóa", BTN_DELETE, BG_DARK);
         btnDelete.setIcon(IconUtils.getDeleteIcon(16, BG_DARK));
         btnDelete.setPreferredSize(new Dimension(110, 40));
         btnDelete.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn game để xóa!"); return; }
-            Game g = currentPageData.get(row);
-            int confirm = JOptionPane.showConfirmDialog(this, "Xác nhận xóa game " + g.getTenGame() + "?", "Xác nhận", JOptionPane.YES_NO_OPTION);
+            int viewRow = table.getSelectedRow(); // Dòng đang chọn trên màn hình
+            if (viewRow < 0) { 
+                JOptionPane.showMessageDialog(this, "Vui lòng chọn game để xóa!"); 
+                return; 
+            }
+            
+            // Chuyển chỉ số từ giao diện sang chỉ số thực tế trong Model
+            int modelRow = table.convertRowIndexToModel(viewRow);
+            Game g = currentPageData.get(modelRow);
+            
+            int confirm = JOptionPane.showConfirmDialog(this, 
+                "Xác nhận xóa game: " + g.getTenGame() + "?", 
+                "Xác nhận xóa", JOptionPane.YES_NO_OPTION);
+                
             if (confirm == JOptionPane.YES_OPTION) {
                 if (service.deleteGame(g.getMaGame())) {
                     JOptionPane.showMessageDialog(this, "Xóa thành công!");
-                    loadData();
+                    loadData(); // Tải lại bảng để cập nhật danh sách mới
                 } else {
-                    JOptionPane.showMessageDialog(this, "Lỗi khi xóa!");
+                    JOptionPane.showMessageDialog(this, 
+                        "Lỗi khi xóa! Game này có thể đang tồn tại trong Hóa đơn hoặc Phiếu thuê.");
                 }
             }
         });
@@ -267,22 +348,32 @@ public class GameManagePanel extends JPanel {
         List<Game> filtered = getFilteredData();
         final int total = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
 
-        for (int i = 1; i <= Math.min(total, 4); i++) {
-            final int pg = i;
-            RoundButton btn = new RoundButton(String.valueOf(i),
-                pg == currentPage ? ACCENT : INPUT_BG, TEXT_WHITE);
-            btn.setPreferredSize(new Dimension(36, 36));
-            btn.addActionListener(e -> { currentPage = pg; renderPage(); });
-            panel.add(btn);
-        }
-        if (total > 4) {
-            RoundButton btnNext = new RoundButton("Tiếp", INPUT_BG, TEXT_WHITE);
-            btnNext.setPreferredSize(new Dimension(60, 36));
-            btnNext.addActionListener(e -> {
-                if (currentPage < total) { currentPage++; renderPage(); }
-            });
-            panel.add(btnNext);
-        }
+        // Nút Quay lại <
+        RoundButton btnPrev = new RoundButton("<", INPUT_BG, BG_DARK);
+        btnPrev.setPreferredSize(new Dimension(40, 36));
+        btnPrev.setEnabled(currentPage > 1);
+        btnPrev.addActionListener(e -> { 
+            if (currentPage > 1) { currentPage--; renderPage(); } 
+        });
+
+        // Nhãn hiển thị Trang X / Y
+        JLabel lblPageInfo = new JLabel("Trang " + currentPage + " / " + total);
+        lblPageInfo.setForeground(TEXT_WHITE);
+        lblPageInfo.setFont(FONT_LABEL);
+        lblPageInfo.setBorder(new EmptyBorder(0, 10, 0, 10));
+
+        // Nút Tiếp theo >
+        RoundButton btnNext = new RoundButton(">", INPUT_BG, BG_DARK);
+        btnNext.setPreferredSize(new Dimension(40, 36));
+        btnNext.setEnabled(currentPage < total);
+        btnNext.addActionListener(e -> { 
+            if (currentPage < total) { currentPage++; renderPage(); } 
+        });
+
+        panel.add(btnPrev);
+        panel.add(lblPageInfo);
+        panel.add(btnNext);
+
         panel.revalidate();
         panel.repaint();
     }
@@ -300,12 +391,79 @@ public class GameManagePanel extends JPanel {
 
         return allData == null ? java.util.Collections.emptyList() :
             allData.stream()
-                .filter(g -> keyword.isEmpty()
-                    || g.getTenGame().toLowerCase().contains(keyword)
-                    || (g.getTheLoai() != null && g.getTheLoai().toLowerCase().contains(keyword))
-                    || (g.getNenTang() != null && g.getNenTang().toLowerCase().contains(keyword)))
+                .filter(g -> {
+                    if (keyword.isEmpty()) return true;
+                    
+                    String maFull = "g" + String.format("%03d", g.getMaGame());
+                    String maSo = String.valueOf(g.getMaGame());
+                    
+                    return g.getTenGame().toLowerCase().contains(keyword)
+                        || (g.getTheLoai() != null && g.getTheLoai().toLowerCase().contains(keyword))
+                        || (g.getNenTang() != null && g.getNenTang().toLowerCase().contains(keyword)) // THÊM DÒNG NÀY
+                        || maFull.contains(keyword)
+                        || maSo.contains(keyword);
+                })
                 .collect(java.util.stream.Collectors.toList());
     }
+
+    private void showAddGameDialog() {
+        // Tạo Panel chứa các ô nhập liệu
+        JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
+        
+        JTextField txtTen = new JTextField();
+        JTextField txtTheLoai = new JTextField();
+        JTextField txtNenTang = new JTextField();
+        JTextField txtGhiChu = new JTextField();
+        JTextField txtHinhAnh = new JTextField();
+        JTextField txtGiaCD = new JTextField("0");
+        JTextField txtGiaROM = new JTextField("0");
+        JTextField txtGiaThue = new JTextField("0");
+
+        panel.add(new JLabel("Tên Game (*):")); panel.add(txtTen);
+        panel.add(new JLabel("Thể Loại (*):")); panel.add(txtTheLoai);
+        panel.add(new JLabel("Nền Tảng (*):")); panel.add(txtNenTang);
+        panel.add(new JLabel("Ghi Chú:")); panel.add(txtGhiChu);
+        panel.add(new JLabel("Link Hình Ảnh:")); panel.add(txtHinhAnh);
+        panel.add(new JLabel("Giá CD (VNĐ):")); panel.add(txtGiaCD);
+        panel.add(new JLabel("Giá ROM (VNĐ):")); panel.add(txtGiaROM);
+        panel.add(new JLabel("Giá Thuê/Ngày (VNĐ):")); panel.add(txtGiaThue);
+
+        int result = JOptionPane.showConfirmDialog(this, panel, 
+                "Thêm Game Mới", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                // Khởi tạo đối tượng Game và gán dữ liệu
+                Game g = new Game();
+                g.setTenGame(txtTen.getText().trim());
+                g.setTheLoai(txtTheLoai.getText().trim());
+                g.setNenTang(txtNenTang.getText().trim());
+                g.setGhiChu(txtGhiChu.getText().trim());
+                g.setHinhAnh(txtHinhAnh.getText().trim());
+                
+                // Chuyển đổi dữ liệu số cho các loại giá
+                g.setGiaCD(Double.parseDouble(txtGiaCD.getText().trim()));
+                g.setGiaROM(Double.parseDouble(txtGiaROM.getText().trim()));
+                g.setGiaThueNgay(Double.parseDouble(txtGiaThue.getText().trim()));
+
+                // Gọi Service để lưu vào Database
+                if (service.addGame(g)) {
+                    JOptionPane.showMessageDialog(this, "Thêm game thành công!");
+                    loadData(); // Tải lại bảng để cập nhật danh sách
+                } else {
+                    JOptionPane.showMessageDialog(this, "Thêm thất bại! Vui lòng kiểm tra lại kết nối Database.");
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Giá tiền phải là con số!", "Lỗi nhập liệu", JOptionPane.ERROR_MESSAGE);
+            } catch (IllegalArgumentException ex) {
+                JOptionPane.showMessageDialog(this, ex.getMessage(), "Lỗi dữ liệu", JOptionPane.ERROR_MESSAGE);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Lỗi hệ thống: " + ex.getMessage());
+            }
+        }
+    }
+
+    
 
     private void renderPage() {
         tableModel.setRowCount(0);
@@ -326,10 +484,10 @@ public class GameManagePanel extends JPanel {
                 g.getTheLoai() != null ? g.getTheLoai() : "",
                 g.getNenTang() != null ? g.getNenTang() : "",
                 g.getGiaCDText(),
-                g.getGiaROMText()
+                g.getGiaROMText(),
+                g.getGiaThueText() // THÊM DÒNG NÀY ĐỂ HIỆN GIÁ THUÊ
             });
         }
-
         rebuildPagination(paginationPanel);
     }
 
@@ -356,5 +514,110 @@ public class GameManagePanel extends JPanel {
             super.paintComponent(g2);
             g2.dispose();
         }
+    }
+
+    // Đổi tên từ showEditCustomerDialog thành showEditGameDialog
+    private void showEditGameDialog(Game g) { 
+        JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
+        
+        JTextField txtTen = new JTextField(g.getTenGame());
+        JTextField txtTheLoai = new JTextField(g.getTheLoai());
+        JTextField txtNenTang = new JTextField(g.getNenTang());
+        JTextField txtGhiChu = new JTextField(g.getGhiChu());
+        JTextField txtHinhAnh = new JTextField(g.getHinhAnh());
+        
+        // Đổ dữ liệu giá hiện tại
+        JTextField txtGiaCD = new JTextField(String.valueOf(g.getGiaCD()));
+        JTextField txtGiaROM = new JTextField(String.valueOf(g.getGiaROM()));
+        JTextField txtGiaThue = new JTextField(String.valueOf(g.getGiaThueNgay()));
+
+        panel.add(new JLabel("Tên Game (*):")); panel.add(txtTen);
+        panel.add(new JLabel("Thể Loại (*):")); panel.add(txtTheLoai);
+        panel.add(new JLabel("Nền Tảng (*):")); panel.add(txtNenTang);
+        panel.add(new JLabel("Ghi Chú:")); panel.add(txtGhiChu);
+        panel.add(new JLabel("Link Hình Ảnh:")); panel.add(txtHinhAnh);
+        panel.add(new JLabel("Giá CD (VNĐ):")); panel.add(txtGiaCD);
+        panel.add(new JLabel("Giá ROM (VNĐ):")); panel.add(txtGiaROM);
+        panel.add(new JLabel("Giá Thuê/Ngày (VNĐ):")); panel.add(txtGiaThue);
+
+        int result = JOptionPane.showConfirmDialog(this, panel, 
+                "Cập Nhật Thông Tin Game", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                g.setTenGame(txtTen.getText().trim());
+                g.setTheLoai(txtTheLoai.getText().trim());
+                g.setNenTang(txtNenTang.getText().trim());
+                g.setGhiChu(txtGhiChu.getText().trim());
+                g.setHinhAnh(txtHinhAnh.getText().trim());
+                g.setGiaCD(Double.parseDouble(txtGiaCD.getText().trim()));
+                g.setGiaROM(Double.parseDouble(txtGiaROM.getText().trim()));
+                g.setGiaThueNgay(Double.parseDouble(txtGiaThue.getText().trim()));
+
+                if (service.updateGame(g)) {
+                    JOptionPane.showMessageDialog(this, "Cập nhật thành công!");
+                    loadData();
+                } else {
+                    JOptionPane.showMessageDialog(this, "Cập nhật thất bại!");
+                }
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Lỗi: " + ex.getMessage());
+            }
+        }
+    }
+
+    private void showSortPopupMenu(Component invoker) {
+        JPopupMenu menu = new JPopupMenu();
+        
+        JMenuItem m1 = new JMenuItem("Mã Game (Tăng dần)");
+        m1.addActionListener(e -> executeSort("MaGame", true));
+        JMenuItem m2 = new JMenuItem("Mã Game (Giảm dần)");
+        m2.addActionListener(e -> executeSort("MaGame", false));
+        
+        JMenuItem m3 = new JMenuItem("Giá Bán ROM (Tăng dần)");
+        m3.addActionListener(e -> executeSort("GiaROM", true));
+        JMenuItem m4 = new JMenuItem("Giá Bán ROM (Giảm dần)");
+        m4.addActionListener(e -> executeSort("GiaROM", false));
+        
+        JMenuItem m5 = new JMenuItem("Giá Thuê CD (Tăng dần)");
+        m5.addActionListener(e -> executeSort("GiaThue", true));
+        JMenuItem m6 = new JMenuItem("Giá Thuê CD (Giảm dần)");
+        m6.addActionListener(e -> executeSort("GiaThue", false));
+
+        menu.add(m1); menu.add(m2);
+        menu.addSeparator();
+        menu.add(m3); menu.add(m4);
+        menu.addSeparator();
+        menu.add(m5); menu.add(m6);
+        
+        menu.show(invoker, 0, invoker.getHeight());
+    }
+
+    private void executeSort(String type, boolean ascending) {
+        if (allData == null) return;
+        
+        allData.sort((g1, g2) -> {
+            int res = 0;
+            switch (type) {
+                case "MaGame":
+                    res = Integer.compare(g1.getMaGame(), g2.getMaGame());
+                    break;
+                case "GiaROM":
+                    // Sắp xếp số học cho giá tiền (Double)
+                    double r1 = g1.getGiaROM() == null ? 0 : g1.getGiaROM();
+                    double r2 = g2.getGiaROM() == null ? 0 : g2.getGiaROM();
+                    res = Double.compare(r1, r2);
+                    break;
+                case "GiaThue":
+                    double t1 = g1.getGiaThueNgay() == null ? 0 : g1.getGiaThueNgay();
+                    double t2 = g2.getGiaThueNgay() == null ? 0 : g2.getGiaThueNgay();
+                    res = Double.compare(t1, t2);
+                    break;
+            }
+            return ascending ? res : -res;
+        });
+        
+        currentPage = 1; // Quay về trang đầu để thấy kết quả sắp xếp
+        renderPage();
     }
 }

@@ -27,6 +27,7 @@ public class KhachHangDAO {
             return ps.executeUpdate() > 0;
 
         } catch (SQLException e) {
+            System.out.println("Lỗi SQL cụ thể: " + e.getMessage()); // Thêm dòng này để xem lỗi ở Console
             e.printStackTrace();
         }
 
@@ -155,7 +156,7 @@ public class KhachHangDAO {
 
             ResultSet rs = ps.executeQuery();
 
-            if (rs.next()) {
+            if (rs.next()) {    
                 KhachHang kh = new KhachHang();
                 kh.setMaKH(rs.getInt("MaKH"));
                 kh.setHoTen(rs.getString("HoTen"));

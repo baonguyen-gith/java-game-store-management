@@ -44,6 +44,9 @@ public class ProductPanel extends JPanel {
     private JPanel paginationPanel;
     private int currentPage = 1;
     private static final int PAGE_SIZE = 8;
+    private RoundButton btnSort, btnFilter; 
+    private boolean isFilterMode = false;   
+    private TableRowSorter<DefaultTableModel> rowSorter;
 
     private SanPhamService service = new SanPhamService();
     private List<SanPham> allData;
@@ -84,13 +87,28 @@ public class ProductPanel extends JPanel {
         JPanel p = new JPanel(new BorderLayout(0, 6));
         p.setBackground(BG_DARK);
         JLabel lbl = new JLabel("Tìm kiếm từ khóa");
-        lbl.setFont(FONT_LABEL);
-        lbl.setForeground(TEXT_WHITE);
+        lbl.setFont(FONT_LABEL); lbl.setForeground(TEXT_WHITE);
         p.add(lbl, BorderLayout.NORTH);
 
         JPanel row = new JPanel(new BorderLayout(8, 0));
         row.setBackground(BG_DARK);
 
+        // --- Cụm nút Lọc & Sắp xếp bên TRÁI ---
+        JPanel leftGroup = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        leftGroup.setBackground(BG_DARK);
+
+        btnSort = new RoundButton("Sắp xếp", INPUT_BG, BG_DARK);
+        btnSort.setPreferredSize(new Dimension(90, 40));
+        btnSort.addActionListener(e -> showSortPopupMenu(btnSort));
+
+        btnFilter = new RoundButton("Lọc", INPUT_BG, BG_DARK);
+        btnFilter.setPreferredSize(new Dimension(70, 40));
+        btnFilter.addActionListener(e -> toggleFilterMode());
+
+        leftGroup.add(btnSort);
+        leftGroup.add(btnFilter);
+
+        // --- Ô tìm kiếm ở giữa ---
         txtSearch = new JTextField(22) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -110,25 +128,22 @@ public class ProductPanel extends JPanel {
             public void keyReleased(KeyEvent e) { currentPage = 1; renderPage(); }
         });
 
+        // --- Cụm nút bên PHẢI (Add, Refresh) ---
         RoundButton btnAdd = new RoundButton("", BTN_ADD, Color.WHITE);
         btnAdd.setIcon(IconUtils.getAddIcon(18, Color.WHITE));
         btnAdd.setPreferredSize(new Dimension(40, 40));
-        btnAdd.setToolTipText("Thêm sản phẩm");
-        btnAdd.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Chức năng thêm Sản Phẩm đang cập nhật!");
-        });
+        btnAdd.addActionListener(e -> showAddProductDialog());
 
         RoundButton btnRefresh = new RoundButton("", INPUT_BG, BG_DARK);
         btnRefresh.setIcon(IconUtils.getRefreshIcon(18, BG_DARK));
         btnRefresh.setPreferredSize(new Dimension(40, 40));
-        btnRefresh.setToolTipText("Làm mới");
         btnRefresh.addActionListener(e -> loadData());
 
         JPanel btnGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         btnGroup.setBackground(BG_DARK);
-        btnGroup.add(btnAdd);
-        btnGroup.add(btnRefresh);
+        btnGroup.add(btnAdd); btnGroup.add(btnRefresh);
 
+        row.add(leftGroup, BorderLayout.WEST); 
         row.add(txtSearch, BorderLayout.CENTER);
         row.add(btnGroup,  BorderLayout.EAST);
         p.add(row, BorderLayout.CENTER);
@@ -209,6 +224,30 @@ public class ProductPanel extends JPanel {
         sp.setBorder(new LineBorder(PURPLE_HEADER, 1, true));
         sp.setBackground(BG_CARD);
         sp.getViewport().setBackground(PURPLE_ALT);
+
+        // Khởi tạo bộ lọc bảng
+        rowSorter = new TableRowSorter<>(tableModel);
+        table.setRowSorter(rowSorter);
+
+        // Sự kiện click tiêu đề cột để lọc
+        table.getTableHeader().addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (isFilterMode) {
+                    int viewCol = table.columnAtPoint(e.getPoint());
+                    if (viewCol == -1) return;
+                    int modelCol = table.convertColumnIndexToModel(viewCol);
+                    String colName = table.getColumnName(viewCol);
+                    
+                    String filter = JOptionPane.showInputDialog(null, "Lọc theo " + colName + ":");
+                    if (filter != null && !filter.trim().isEmpty()) {
+                        rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + filter.trim(), modelCol));
+                    } else if (filter != null) {
+                        rowSorter.setRowFilter(null);
+                    }
+                }
+            }
+        });
         return sp;
     }
 
@@ -228,29 +267,52 @@ public class ProductPanel extends JPanel {
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         btnPanel.setBackground(BG_DARK);
 
+        // Tìm đoạn btnEdit trong hàm buildBottomBar()
         RoundButton btnEdit = new RoundButton(" Sửa", BTN_EDIT, BG_DARK);
         btnEdit.setIcon(IconUtils.getEditIcon(16, BG_DARK));
         btnEdit.setPreferredSize(new Dimension(110, 40));
         btnEdit.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn sản phẩm để sửa!"); return; }
-            JOptionPane.showMessageDialog(this, "Chức năng sửa Sản phẩm đang cập nhật!");
+            int viewRow = table.getSelectedRow();
+            if (viewRow < 0) { 
+                JOptionPane.showMessageDialog(this, "Vui lòng chọn sản phẩm cần sửa!"); 
+                return; 
+            }
+            
+            // Lấy dữ liệu sản phẩm từ hàng đang chọn (xử lý chính xác cả khi đang lọc/sắp xếp)
+            int modelRow = table.convertRowIndexToModel(viewRow);
+            SanPham selected = currentPageData.get(modelRow);
+            
+            // Gọi hàm mở Dialog sửa
+            showEditProductDialog(selected); 
         });
 
+        // Tìm đoạn btnDelete trong hàm buildBottomBar()
         RoundButton btnDelete = new RoundButton(" Xóa", BTN_DELETE, BG_DARK);
         btnDelete.setIcon(IconUtils.getDeleteIcon(16, BG_DARK));
         btnDelete.setPreferredSize(new Dimension(110, 40));
         btnDelete.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn sản phẩm để xóa!"); return; }
-            SanPham sp = currentPageData.get(row);
-            int confirm = JOptionPane.showConfirmDialog(this, "Xác nhận xóa SP " + sp.getMaSP() + "?", "Xác nhận", JOptionPane.YES_NO_OPTION);
+            int viewRow = table.getSelectedRow();
+            if (viewRow < 0) { 
+                JOptionPane.showMessageDialog(this, "Vui lòng chọn sản phẩm để xóa!"); 
+                return; 
+            }
+            
+            // Chuyển đổi chỉ số hàng từ giao diện sang model (quan trọng khi đang lọc/sắp xếp)
+            int modelRow = table.convertRowIndexToModel(viewRow);
+            SanPham sp = currentPageData.get(modelRow);
+            
+            // Hiện hộp thoại xác nhận
+            int confirm = JOptionPane.showConfirmDialog(this, 
+                "Xác nhận xóa sản phẩm mã: SP" + String.format("%03d", sp.getMaSP()) + "?", 
+                "Xác nhận", JOptionPane.YES_NO_OPTION);
+                
             if (confirm == JOptionPane.YES_OPTION) {
+                // Gọi Service để xóa dưới Database
                 if (service.deleteSanPham(sp.getMaSP())) {
                     JOptionPane.showMessageDialog(this, "Xóa thành công!");
-                    loadData();
+                    loadData(); // Tải lại bảng để cập nhật danh sách
                 } else {
-                    JOptionPane.showMessageDialog(this, "Lỗi khi xóa!");
+                    JOptionPane.showMessageDialog(this, "Lỗi: Không thể xóa sản phẩm này (có thể nó đang nằm trong một hóa đơn cũ).");
                 }
             }
         });
@@ -267,22 +329,38 @@ public class ProductPanel extends JPanel {
         List<SanPham> filtered = getFilteredData();
         final int total = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
 
-        for (int i = 1; i <= Math.min(total, 4); i++) {
-            final int pg = i;
-            RoundButton btn = new RoundButton(String.valueOf(i),
-                pg == currentPage ? ACCENT : INPUT_BG, TEXT_WHITE);
-            btn.setPreferredSize(new Dimension(36, 36));
-            btn.addActionListener(e -> { currentPage = pg; renderPage(); });
-            panel.add(btn);
-        }
-        if (total > 4) {
-            RoundButton btnNext = new RoundButton("Tiếp", INPUT_BG, TEXT_WHITE);
-            btnNext.setPreferredSize(new Dimension(60, 36));
-            btnNext.addActionListener(e -> {
-                if (currentPage < total) { currentPage++; renderPage(); }
-            });
-            panel.add(btnNext);
-        }
+        // Nút Quay lại <
+        RoundButton btnPrev = new RoundButton("<", INPUT_BG, BG_DARK);
+        btnPrev.setPreferredSize(new Dimension(40, 36));
+        btnPrev.setEnabled(currentPage > 1);
+        btnPrev.addActionListener(e -> { 
+            if (currentPage > 1) { 
+                currentPage--; 
+                renderPage(); 
+            } 
+        });
+
+        // Nhãn hiển thị Trang X / Y
+        JLabel lblPageInfo = new JLabel("Trang " + currentPage + " / " + total);
+        lblPageInfo.setForeground(TEXT_WHITE);
+        lblPageInfo.setFont(FONT_LABEL);
+        lblPageInfo.setBorder(new EmptyBorder(0, 10, 0, 10));
+
+        // Nút Tiếp theo >
+        RoundButton btnNext = new RoundButton(">", INPUT_BG, BG_DARK);
+        btnNext.setPreferredSize(new Dimension(40, 36));
+        btnNext.setEnabled(currentPage < total);
+        btnNext.addActionListener(e -> { 
+            if (currentPage < total) { 
+                currentPage++; 
+                renderPage(); 
+            } 
+        });
+
+        panel.add(btnPrev);
+        panel.add(lblPageInfo);
+        panel.add(btnNext);
+
         panel.revalidate();
         panel.repaint();
     }
@@ -300,9 +378,25 @@ public class ProductPanel extends JPanel {
 
         return allData == null ? java.util.Collections.emptyList() :
             allData.stream()
-                .filter(sp -> keyword.isEmpty()
-                    || String.valueOf(sp.getMaSP()).contains(keyword)
-                    || String.valueOf(sp.getMaGame()).contains(keyword))
+                .filter(sp -> {
+                    if (keyword.isEmpty()) return true;
+                    
+                    // 1. Mã SP (VD: "SP001" và "1")
+                    String maSPStr = "sp" + String.format("%03d", sp.getMaSP());
+                    String maSPRaw = String.valueOf(sp.getMaSP());
+                    
+                    // 2. Mã Game (VD: "G005" và "5")
+                    String maGameStr = "g" + String.format("%03d", sp.getMaGame());
+                    String maGameRaw = String.valueOf(sp.getMaGame());
+                    
+                    // 3. Giá tiền (dạng số thuần túy)
+                    String giaBan = String.valueOf(sp.getGiaBan());
+                    String giaThue = String.valueOf(sp.getGiaThueNgay());
+                    
+                    return maSPStr.contains(keyword) || maSPRaw.contains(keyword)
+                        || maGameStr.contains(keyword) || maGameRaw.contains(keyword)
+                        || giaBan.contains(keyword) || giaThue.contains(keyword);
+                })
                 .collect(java.util.stream.Collectors.toList());
     }
 
@@ -353,5 +447,142 @@ public class ProductPanel extends JPanel {
             super.paintComponent(g2);
             g2.dispose();
         }
+    }
+
+    private void showAddProductDialog() {
+        // Tạo Panel nhập liệu đơn giản
+        JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
+        
+        JTextField txtMaGame = new JTextField();
+        JTextField txtGiaBan = new JTextField("0");
+        JTextField txtGiaThue = new JTextField("0");
+
+        panel.add(new JLabel("Mã Game liên kết (*):")); 
+        panel.add(txtMaGame);
+        panel.add(new JLabel("Giá Bán (ROM) - VNĐ:")); 
+        panel.add(txtGiaBan);
+        panel.add(new JLabel("Giá Thuê (CD) - VNĐ:")); 
+        panel.add(txtGiaThue);
+
+        int result = JOptionPane.showConfirmDialog(this, panel, 
+                "Thêm Sản Phẩm Mới", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                // Kiểm tra trống
+                if (txtMaGame.getText().trim().isEmpty()) {
+                    JOptionPane.showMessageDialog(this, "Vui lòng nhập Mã Game!");
+                    return;
+                }
+
+                // Khởi tạo đối tượng Sản phẩm
+                SanPham sp = new SanPham();
+                sp.setMaGame(Integer.parseInt(txtMaGame.getText().trim()));
+                sp.setGiaBan(Double.parseDouble(txtGiaBan.getText().trim()));
+                sp.setGiaThueNgay(Double.parseDouble(txtGiaThue.getText().trim()));
+
+                // Gọi Service lưu vào DB
+                if (service.addSanPham(sp)) {
+                    JOptionPane.showMessageDialog(this, "Thêm sản phẩm thành công!");
+                    loadData(); // Tải lại bảng
+                } else {
+                    JOptionPane.showMessageDialog(this, "Lỗi: Không tìm thấy Mã Game này hoặc lỗi kết nối!");
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Mã Game và Giá tiền phải là con số!");
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Lỗi hệ thống: " + ex.getMessage());
+            }
+        }
+    }
+
+    private void showEditProductDialog(SanPham sp) {
+        // Tạo Panel chứa các ô nhập liệu và đổ dữ liệu hiện tại vào
+        JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
+        
+        JTextField txtMaGame = new JTextField(String.valueOf(sp.getMaGame()));
+        JTextField txtGiaBan = new JTextField(String.valueOf(sp.getGiaBan()));
+        JTextField txtGiaThue = new JTextField(String.valueOf(sp.getGiaThueNgay()));
+
+        panel.add(new JLabel("Mã Game liên kết (*):")); 
+        panel.add(txtMaGame);
+        panel.add(new JLabel("Giá Bán (ROM) - VNĐ:")); 
+        panel.add(txtGiaBan);
+        panel.add(new JLabel("Giá Thuê (CD) - VNĐ:")); 
+        panel.add(txtGiaThue);
+
+        int result = JOptionPane.showConfirmDialog(this, panel, 
+                "Cập Nhật Sản Phẩm", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                // Cập nhật thông tin vào đối tượng
+                sp.setMaGame(Integer.parseInt(txtMaGame.getText().trim()));
+                sp.setGiaBan(Double.parseDouble(txtGiaBan.getText().trim()));
+                sp.setGiaThueNgay(Double.parseDouble(txtGiaThue.getText().trim()));
+
+                // Gọi Service để lưu xuống Database
+                if (service.updateSanPham(sp)) {
+                    JOptionPane.showMessageDialog(this, "Cập nhật thành công!");
+                    loadData(); // Tải lại bảng để thấy thay đổi
+                } else {
+                    JOptionPane.showMessageDialog(this, "Cập nhật thất bại! Vui lòng kiểm tra lại Mã Game.");
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Dữ liệu nhập vào phải là con số hợp lệ!", "Lỗi nhập liệu", JOptionPane.ERROR_MESSAGE);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Lỗi: " + ex.getMessage());
+            }
+        }
+    }
+
+    private void toggleFilterMode() {
+        isFilterMode = !isFilterMode;
+        if (isFilterMode) {
+            btnFilter.setBackground(ACCENT);
+            btnFilter.setForeground(Color.WHITE);
+            JOptionPane.showMessageDialog(this, "Chế độ Lọc ĐÃ BẬT.\nHãy nhấn vào tên cột trên bảng để lọc.");
+        } else {
+            btnFilter.setBackground(INPUT_BG);
+            btnFilter.setForeground(BG_DARK);
+            rowSorter.setRowFilter(null);
+        }
+    }
+
+    private void showSortPopupMenu(Component invoker) {
+        JPopupMenu menu = new JPopupMenu();
+        
+        addSortItem(menu, "Mã Sản Phẩm", "MaSP");
+        addSortItem(menu, "Mã Game", "MaGame");
+        addSortItem(menu, "Giá Bán", "GiaBan");
+        addSortItem(menu, "Giá Thuê", "GiaThue");
+
+        menu.show(invoker, 0, invoker.getHeight());
+    }
+
+    private void addSortItem(JPopupMenu menu, String label, String type) {
+        JMenuItem asc = new JMenuItem(label + " (Thấp -> Cao)");
+        asc.addActionListener(e -> executeSort(type, true));
+        JMenuItem desc = new JMenuItem(label + " (Cao -> Thấp)");
+        desc.addActionListener(e -> executeSort(type, false));
+        menu.add(asc);
+        menu.add(desc);
+        menu.addSeparator();
+    }
+
+    private void executeSort(String type, boolean ascending) {
+        if (allData == null) return;
+        allData.sort((s1, s2) -> {
+            int res = 0;
+            switch (type) {
+                case "MaSP": res = Integer.compare(s1.getMaSP(), s2.getMaSP()); break;
+                case "MaGame": res = Integer.compare(s1.getMaGame(), s2.getMaGame()); break;
+                case "GiaBan": res = Double.compare(s1.getGiaBan(), s2.getGiaBan()); break;
+                case "GiaThue": res = Double.compare(s1.getGiaThueNgay(), s2.getGiaThueNgay()); break;
+            }
+            return ascending ? res : -res;
+        });
+        currentPage = 1;
+        renderPage();
     }
 }
