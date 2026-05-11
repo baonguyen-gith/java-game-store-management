@@ -139,14 +139,7 @@ public class GamePanel extends JPanel {
 
     // ── GAME CARD ───────────────────────────────────────────────
     private JPanel createGameCard(Game game) {
-
-        // Tính chiều cao card theo số nút thực tế
-        // ── Tính chiều cao card theo số nút thực tế ───────────────
-        int btnCount = 0;
-        if (game.getGiaCD()       != null && game.getGiaCD()       > 0) btnCount++; // Mua CD
-        if (game.getGiaROM()      != null && game.getGiaROM()      > 0) btnCount++; // Mua ROM
-        if (game.getGiaThueNgay() != null && game.getGiaThueNgay() > 0) btnCount++; // Thuê CD  ← đúng điều kiện
-        final int cardH = Math.max(130, 56 + btnCount * 48 + Math.max(0, btnCount - 1) * 6);
+        final int cardH = 145;
 
         JPanel card = new JPanel(new BorderLayout()) {
             private boolean hovered = false;
@@ -233,42 +226,42 @@ public class GamePanel extends JPanel {
         right.setOpaque(false);
         right.setBorder(new EmptyBorder(14, 8, 14, 14));
 
-        boolean hasAnyBtn = false;
+        // boolean hasAnyBtn = false;
 
-        // ── Mua CD — chỉ hiện khi GiaCD > 0 ──────────────────────
-        if (game.getGiaCD() != null && game.getGiaCD() > 0) {
-            JButton btnCD = makeActionButton("Mua CD", game.getGiaCDText(), BTN_CD);
-            btnCD.addActionListener(e -> {
-                Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
-                BillAddDialog.openAndPreselectGame(f, game.getMaGame(), "CD");
-            });
-            right.add(btnCD);
-            hasAnyBtn = true;
-        }
+        // // ── Mua CD — chỉ hiện khi GiaCD > 0 ──────────────────────
+        // if (game.getGiaCD() != null && game.getGiaCD() > 0) {
+        //     JButton btnCD = makeActionButton("Mua CD", game.getGiaCDText(), BTN_CD);
+        //     btnCD.addActionListener(e -> {
+        //         Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
+        //         BillAddDialog.openAndPreselectGame(f, game.getMaGame(), "CD");
+        //     });
+        //     right.add(btnCD);
+        //     hasAnyBtn = true;
+        // }
 
-        // ── Mua ROM — chỉ hiện khi GiaROM > 0 ────────────────────
-        if (game.getGiaROM() != null && game.getGiaROM() > 0) {
-            if (hasAnyBtn) right.add(Box.createVerticalStrut(6));
-            JButton btnROM = makeActionButton("Mua ROM", game.getGiaROMText(), BTN_ROM);
-            btnROM.addActionListener(e -> {
-                Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
-                BillAddDialog.openAndPreselectGame(f, game.getMaGame(), "ROM");
-            });
-            right.add(btnROM);
-            hasAnyBtn = true;
-        }
+        // // ── Mua ROM — chỉ hiện khi GiaROM > 0 ────────────────────
+        // if (game.getGiaROM() != null && game.getGiaROM() > 0) {
+        //     if (hasAnyBtn) right.add(Box.createVerticalStrut(6));
+        //     JButton btnROM = makeActionButton("Mua ROM", game.getGiaROMText(), BTN_ROM);
+        //     btnROM.addActionListener(e -> {
+        //         Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
+        //         BillAddDialog.openAndPreselectGame(f, game.getMaGame(), "ROM");
+        //     });
+        //     right.add(btnROM);
+        //     hasAnyBtn = true;
+        // }
 
-        // ── Thuê CD — chỉ hiện khi GiaThueNgay > 0 (TÁCH RIÊNG, KHÔNG dùng GiaCD) ──
-        if (game.getGiaThueNgay() != null && game.getGiaThueNgay() > 0) {
-            if (hasAnyBtn) right.add(Box.createVerticalStrut(6));
-            JButton btnRent = makeActionButton("Thuê CD", game.getGiaThueText(), BTN_RENT);
-            btnRent.addActionListener(e -> {
-                Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
-                RentAddDialog.openAndPreselectByGameName(f, game.getTenGame());
-            });
-            right.add(btnRent);
-            hasAnyBtn = true;
-        }
+        // // ── Thuê CD — chỉ hiện khi GiaThueNgay > 0 (TÁCH RIÊNG, KHÔNG dùng GiaCD) ──
+        // if (game.getGiaThueNgay() != null && game.getGiaThueNgay() > 0) {
+        //     if (hasAnyBtn) right.add(Box.createVerticalStrut(6));
+        //     JButton btnRent = makeActionButton("Thuê CD", game.getGiaThueText(), BTN_RENT);
+        //     btnRent.addActionListener(e -> {
+        //         Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
+        //         RentAddDialog.openAndPreselectByGameName(f, game.getTenGame());
+        //     });
+        //     right.add(btnRent);
+        //     hasAnyBtn = true;
+        // }
 
         card.add(imgLabel, BorderLayout.WEST);
         card.add(center,   BorderLayout.CENTER);
