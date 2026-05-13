@@ -1,6 +1,6 @@
 package otkhongluong.gamestoremanagement.view.panel;
 
-import otkhongluong.gamestoremanagement.view.dialog.BillDetailDialog;
+import otkhongluong.gamestoremanagement.view.dialog.InvoiceDetailDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentDetailDialog;
 import otkhongluong.gamestoremanagement.view.dialog.TransactionDetailDialog;
 
@@ -42,7 +42,7 @@ public class ButtonEditor extends DefaultCellEditor {
 
             if (type.equals("HOADON")) {
 
-                new BillDetailDialog(frame, id).setVisible(true);
+                new InvoiceDetailDialog(frame, id).setVisible(true);
 
             } else if (type.equals("PHIEUTHUE")) {
 

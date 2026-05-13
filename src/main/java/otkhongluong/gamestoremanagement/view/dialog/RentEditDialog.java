@@ -1,11 +1,11 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.dao.KhachHangDAO;
-import otkhongluong.gamestoremanagement.dao.NhanVienDAO;
-import otkhongluong.gamestoremanagement.dao.PhieuThueDAO;
-import otkhongluong.gamestoremanagement.model.KhachHang;
-import otkhongluong.gamestoremanagement.model.NhanVien;
-import otkhongluong.gamestoremanagement.model.PhieuThue;
+import otkhongluong.gamestoremanagement.dao.CustomerDAO;
+import otkhongluong.gamestoremanagement.dao.EmployeeDAO;
+import otkhongluong.gamestoremanagement.dao.RentalOrderDAO;
+import otkhongluong.gamestoremanagement.model.Customer;
+import otkhongluong.gamestoremanagement.model.Employee;
+import otkhongluong.gamestoremanagement.model.RentalOrder;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -44,13 +44,13 @@ public class RentEditDialog extends JDialog {
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     /* ── State ── */
-    private final PhieuThue    pt;
-    private final PhieuThueDAO ptDAO = new PhieuThueDAO();
-    private final KhachHangDAO khDAO = new KhachHangDAO();
-    private final NhanVienDAO  nvDAO = new NhanVienDAO();
+    private final RentalOrder    pt;
+    private final RentalOrderDAO ptDAO = new RentalOrderDAO();
+    private final CustomerDAO khDAO = new CustomerDAO();
+    private final EmployeeDAO  nvDAO = new EmployeeDAO();
 
-    private KhachHang     foundKH    = null;
-    private NhanVien      foundNV    = null;
+    private Customer     foundKH    = null;
+    private Employee      foundNV    = null;
     private LocalDateTime newNgayTra = null; // LocalDateTime để khớp model + DAO
 
     /* ── Components ── */
@@ -63,7 +63,7 @@ public class RentEditDialog extends JDialog {
     private JButton    btnSave;
 
     // ═══════════════════════════════════════════════════════════
-    public RentEditDialog(Frame parent, PhieuThue pt) {
+    public RentEditDialog(Frame parent, RentalOrder pt) {
         super(parent, "Sửa Phiếu Thuê", true);
         this.pt = pt;
 
@@ -322,7 +322,7 @@ public class RentEditDialog extends JDialog {
             foundKH = null;
             return;
         }
-        KhachHang kh = khDAO.findBySDT(sdt);
+        Customer kh = khDAO.findBySDT(sdt);
         if (kh == null) {
             setResult(lblKHResult, "✗  Không tìm thấy khách hàng với SĐT: " + sdt, RED);
             foundKH = null;
@@ -348,7 +348,7 @@ public class RentEditDialog extends JDialog {
             foundNV = null;
             return;
         }
-        NhanVien nv = nvDAO.findById(maNV);
+        Employee nv = nvDAO.findById(maNV);
         if (nv == null) {
             setResult(lblNVResult, "✗  Không tìm thấy nhân viên với mã: " + maNV, RED);
             foundNV = null;

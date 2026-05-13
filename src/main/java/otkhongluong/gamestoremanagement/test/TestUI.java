@@ -1,4 +1,4 @@
-package otkhongluong.gamestoremanagement;
+package otkhongluong.gamestoremanagement.test;
 
 import otkhongluong.gamestoremanagement.view.AdminView;
 import otkhongluong.gamestoremanagement.model.User;

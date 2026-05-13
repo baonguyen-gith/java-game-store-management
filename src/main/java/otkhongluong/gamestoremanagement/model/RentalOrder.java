@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PhieuThue {
+public class RentalOrder {
 
     private int maPT;
     private int maKH;

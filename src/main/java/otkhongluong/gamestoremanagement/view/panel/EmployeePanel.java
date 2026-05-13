@@ -1,8 +1,8 @@
 package otkhongluong.gamestoremanagement.view.panel;
 
-import otkhongluong.gamestoremanagement.model.NhanVien;
+import otkhongluong.gamestoremanagement.model.Employee;
 import otkhongluong.gamestoremanagement.model.User;
-import otkhongluong.gamestoremanagement.service.NhanVienService;
+import otkhongluong.gamestoremanagement.controller.EmployeeController;
 import otkhongluong.gamestoremanagement.util.IconUtils;
 import otkhongluong.gamestoremanagement.view.dialog.EmployeeDialog;
 
@@ -52,9 +52,9 @@ public class EmployeePanel extends JPanel {
     private static final int PAGE_SIZE = 8;
 
     private User currentUser;
-    private NhanVienService service = new NhanVienService();
-    private List<NhanVien> allData;
-    private List<NhanVien> currentPageData;
+    private EmployeeController controller;
+    private List<Employee> allData;
+    private List<Employee> currentPageData;
 
     public EmployeePanel(User user) {
         this.currentUser = user;
@@ -66,7 +66,8 @@ public class EmployeePanel extends JPanel {
         add(buildTopBar(),    BorderLayout.NORTH);
         add(buildTable(),     BorderLayout.CENTER);
         add(buildBottomBar(), BorderLayout.SOUTH);
-
+        controller = new EmployeeController(this);
+        
         loadData();
     }
 
@@ -265,7 +266,7 @@ public class EmployeePanel extends JPanel {
             int row = table.getSelectedRow();
             if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn nhân viên để sửa!"); return; }
             
-            NhanVien nv = currentPageData.get(row);
+            Employee nv = currentPageData.get(row);
             new EmployeeDialog(
                 (Frame) SwingUtilities.getWindowAncestor(this),
                 nv,
@@ -279,19 +280,9 @@ public class EmployeePanel extends JPanel {
         btnDelete.addActionListener(e -> {
             int row = table.getSelectedRow();
             if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn nhân viên để xóa!"); return; }
-            
-            NhanVien nv = currentPageData.get(row);
-            int confirm = JOptionPane.showConfirmDialog(this,
-                "Xác nhận xóa nhân viên " + nv.getHoTen() + "?",
-                "Xác nhận", JOptionPane.YES_NO_OPTION);
-            
-            if (confirm == JOptionPane.YES_OPTION) {
-                if (service.deleteNhanVien(nv.getMaNV())) {
-                    JOptionPane.showMessageDialog(this, "Đã xóa thành công!");
-                    loadData();
-                } else {
-                    JOptionPane.showMessageDialog(this, "Lỗi khi xóa nhân viên!");
-                }
+            Employee nv = currentPageData.get(row);
+            if (controller.handleDelete(nv)) {
+                loadData();
             }
         });
 
@@ -307,7 +298,7 @@ public class EmployeePanel extends JPanel {
         panel.removeAll();
         panel.setOpaque(false);
         
-        List<NhanVien> filtered = getFilteredData();
+        List<Employee> filtered = getFilteredData();
         final int total = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
 
         // 2. Tạo nút Quay lại (<)
@@ -351,26 +342,18 @@ public class EmployeePanel extends JPanel {
         DATA
     ====================================================== */
     private void loadData() {
-        allData = service.getAllNhanVien();
+        allData = controller.loadAll();
         renderPage();
     }
     
-    private List<NhanVien> getFilteredData() {
-        String keyword = txtSearch == null ? "" : txtSearch.getText().trim().toLowerCase();
-
-        return allData == null ? java.util.Collections.emptyList() :
-            allData.stream()
-                .filter(nv -> keyword.isEmpty()
-                    || nv.getHoTen().toLowerCase().contains(keyword)
-                    || nv.getMaNVFormatted().toLowerCase().contains(keyword)
-                    || (nv.getSdt() != null && nv.getSdt().contains(keyword))
-                    || (nv.getCccd() != null && nv.getCccd().contains(keyword)))
-                .collect(java.util.stream.Collectors.toList());
+    private List<Employee> getFilteredData() {
+        String keyword = txtSearch == null ? "" : txtSearch.getText().trim();
+        return controller.filter(allData, keyword);
     }
 
     private void renderPage() {
         tableModel.setRowCount(0);
-        List<NhanVien> filtered = getFilteredData();
+        List<Employee> filtered = getFilteredData();
 
         int totalPage = (int) Math.ceil((double) filtered.size() / PAGE_SIZE);
         if (currentPage > totalPage) currentPage = totalPage == 0 ? 1 : totalPage;
@@ -381,7 +364,7 @@ public class EmployeePanel extends JPanel {
         currentPageData = filtered.subList(from, to);
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-        for (NhanVien nv : currentPageData) {
+        for (Employee nv : currentPageData) {
             tableModel.addRow(new Object[]{
                 nv.getMaNVFormatted(),
                 nv.getHoTen(),
@@ -452,30 +435,8 @@ public class EmployeePanel extends JPanel {
     }
 
     private void sortData(int colIndex, boolean ascending) {
-        allData.sort((nv1, nv2) -> {
-            int result = 0;
-            switch (colIndex) {
-                case 0: // Sắp xếp theo Mã Nhân Viên
-                    // So sánh trực tiếp bằng số nguyên (int) để 2 luôn đứng trước 11
-                    result = Integer.compare(nv1.getMaNV(), nv2.getMaNV());
-                    break;
-                case 3: // Sắp xếp theo Ngày sinh
-                    if (nv1.getNgaySinh() != null && nv2.getNgaySinh() != null) {
-                        result = nv1.getNgaySinh().compareTo(nv2.getNgaySinh());
-                    }
-                    break;
-                case 5: // Sắp xếp theo Ngày vào làm
-                    if (nv1.getNgayVaoLam() != null && nv2.getNgayVaoLam() != null) {
-                        result = nv1.getNgayVaoLam().compareTo(nv2.getNgayVaoLam());
-                    }
-                    break;
-                default:
-                    result = 0;
-            }
-            return ascending ? result : -result;
-        });
-        
-        currentPage = 1; // Quay về trang đầu sau khi sắp xếp
+        controller.sort(allData, colIndex, ascending); // sort in-place
+        currentPage = 1;
         renderPage();
     }
 

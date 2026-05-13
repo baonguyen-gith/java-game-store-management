@@ -1,29 +1,29 @@
 package otkhongluong.gamestoremanagement.service;
 
-import otkhongluong.gamestoremanagement.dao.NhanVienDAO;
-import otkhongluong.gamestoremanagement.model.NhanVien;
+import otkhongluong.gamestoremanagement.dao.EmployeeDAO;
+import otkhongluong.gamestoremanagement.model.Employee;
 
 import java.util.List;
 
-public class NhanVienService {
-    private NhanVienDAO nhanVienDAO = new NhanVienDAO();
+public class EmployeeService {
+    private EmployeeDAO nhanVienDAO = new EmployeeDAO();
 
-    public List<NhanVien> getAllNhanVien() {
+    public List<Employee> getAllNhanVien() {
         return nhanVienDAO.findAll();
     }
 
-    public NhanVien getNhanVienById(int maNV) {
+    public Employee getNhanVienById(int maNV) {
         return nhanVienDAO.findById(maNV);
     }
 
-    public boolean addNhanVien(NhanVien nv) {
+    public boolean addNhanVien(Employee nv) {
         if (nv == null || nv.getHoTen() == null || nv.getHoTen().trim().isEmpty()) {
             return false;
         }
         return nhanVienDAO.insert(nv);
     }
 
-    public boolean updateNhanVien(NhanVien nv) {
+    public boolean updateNhanVien(Employee nv) {
         if (nv == null || nv.getMaNV() <= 0) {
             return false;
         }

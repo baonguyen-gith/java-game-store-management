@@ -1,19 +1,19 @@
 package otkhongluong.gamestoremanagement.dao;
 
-import otkhongluong.gamestoremanagement.model.HoaDon;
-import otkhongluong.gamestoremanagement.model.HoaDon.ChiTietHoaDon;
+import otkhongluong.gamestoremanagement.model.Invoice;
+import otkhongluong.gamestoremanagement.model.Invoice.ChiTietHoaDon;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class HoaDonDAO {
+public class InvoiceDAO {
 
     /* =====================================================
         INSERT
      ===================================================== */
-    public boolean insert(HoaDon hd) {
+    public boolean insert(Invoice hd) {
         String sql =
             "INSERT INTO HOADON(MaKH,MaNV,NgayLap,TongTien,TrangThai) " +
             "VALUES(?,?,?,?,?)";
@@ -43,27 +43,41 @@ public class HoaDonDAO {
     /* =====================================================
         INSERT DETAIL
      ===================================================== */
-    private void insertChiTiet(Connection conn, HoaDon hd) throws SQLException {
-        String sql =
+    private void insertChiTiet(Connection conn, Invoice hd) throws SQLException {
+        String sqlCT =
             "INSERT INTO CTHOADON(MaHD,MaSP,SoLuong,DonGia) " +
             "VALUES(?,?,?,?)";
 
-        PreparedStatement ps = conn.prepareStatement(sql);
+        // Thêm query cập nhật trạng thái CD
+        String sqlUpdateCD =
+            "UPDATE CD SET TrangThai = N'DaBan' " +
+            "WHERE MaSP = ? AND TrangThai = N'SanSang'";
+
+        PreparedStatement ps   = conn.prepareStatement(sqlCT);
+        PreparedStatement psCD = conn.prepareStatement(sqlUpdateCD);
+
         for (ChiTietHoaDon ct : hd.getDanhSachChiTiet()) {
+            // Insert chi tiết hóa đơn
             ps.setInt(1, hd.getMaHD());
             ps.setInt(2, ct.getMaSP());
             ps.setInt(3, ct.getSoLuong());
             ps.setDouble(4, ct.getDonGia());
             ps.addBatch();
+
+            // Cập nhật CD → DaBan (chỉ ảnh hưởng loại CD, ROM không có dòng nào khớp)
+            psCD.setInt(1, ct.getMaSP());
+            psCD.addBatch();
         }
+
         ps.executeBatch();
+        psCD.executeBatch();
     }
 
     /* =====================================================
         FIND ALL
      ===================================================== */
-    public List<HoaDon> findAll() {
-        List<HoaDon> list = new ArrayList<>();
+    public List<Invoice> findAll() {
+        List<Invoice> list = new ArrayList<>();
 
         String sql =
             "SELECT hd.MaHD, hd.MaKH, hd.MaNV, hd.NgayLap, hd.TongTien, " +
@@ -77,7 +91,7 @@ public class HoaDonDAO {
              ResultSet rs = ps.executeQuery()) {
 
             while (rs.next()) {
-                HoaDon hd = new HoaDon();
+                Invoice hd = new Invoice();
                 hd.setMaHD(rs.getInt("MaHD"));
                 hd.setMaKH(rs.getInt("MaKH"));
                 hd.setMaNV(rs.getInt("MaNV"));
@@ -97,7 +111,7 @@ public class HoaDonDAO {
     /* =====================================================
         FIND BY ID + DETAIL
      ===================================================== */
-    public HoaDon findById(int maHD) {
+    public Invoice findById(int maHD) {
         String sql = "SELECT * FROM HOADON WHERE MaHD=?";
 
         try (Connection conn = DBConnection.getConnection();
@@ -107,7 +121,7 @@ public class HoaDonDAO {
             ResultSet rs = ps.executeQuery();
 
             if (rs.next()) {
-                HoaDon hd = mapHoaDon(rs);
+                Invoice hd = mapHoaDon(rs);
                 hd.setDanhSachChiTiet(getChiTiet(conn, maHD));
                 return hd;
             }
@@ -159,7 +173,7 @@ public class HoaDonDAO {
     /* =====================================================
         UPDATE TRANG THAI
      ===================================================== */
-    public boolean updateTrangThai(HoaDon hd) {
+    public boolean updateTrangThai(Invoice hd) {
         String sql = "UPDATE HOADON SET TrangThai=? WHERE MaHD=?";
 
         try (Connection conn = DBConnection.getConnection();
@@ -176,7 +190,7 @@ public class HoaDonDAO {
     /* =====================================================
         UPDATE TONG TIEN
      ===================================================== */
-    public boolean update(HoaDon hd) {
+    public boolean update(Invoice hd) {
         String sql = "UPDATE HOADON SET TongTien=? WHERE MaHD=?";
 
         try (Connection conn = DBConnection.getConnection();
@@ -194,7 +208,7 @@ public class HoaDonDAO {
         DELETE WITH ROLLBACK
      ===================================================== */
     public boolean deleteWithRollback(int maHD) {
-        HoaDon hd = findById(maHD);
+        Invoice hd = findById(maHD);
         if (hd == null) return false;
 
         String sqlGetCT =
@@ -331,8 +345,8 @@ public class HoaDonDAO {
     /* =====================================================
         MAP OBJECT
      ===================================================== */
-    private HoaDon mapHoaDon(ResultSet rs) throws SQLException {
-        HoaDon hd = new HoaDon();
+    private Invoice mapHoaDon(ResultSet rs) throws SQLException {
+        Invoice hd = new Invoice();
         hd.setMaHD(rs.getInt("MaHD"));
         hd.setMaKH(rs.getInt("MaKH"));
         hd.setMaNV(rs.getInt("MaNV"));

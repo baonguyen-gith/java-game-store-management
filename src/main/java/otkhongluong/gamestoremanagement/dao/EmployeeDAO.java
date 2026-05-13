@@ -1,13 +1,13 @@
 package otkhongluong.gamestoremanagement.dao;
 
-import otkhongluong.gamestoremanagement.model.NhanVien;
+import otkhongluong.gamestoremanagement.model.Employee;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class NhanVienDAO {
+public class EmployeeDAO {
 
     // ================= GET ALL NAMES (for autocomplete) =================
     public List<String> getAllTenNhanVien() {
@@ -81,8 +81,8 @@ public class NhanVienDAO {
     }
 
     // ================= CRUD OPERATIONS =================
-    public List<NhanVien> findAll() {
-        List<NhanVien> list = new ArrayList<>();
+    public List<Employee> findAll() {
+        List<Employee> list = new ArrayList<>();
         String sql = "SELECT * FROM NHANVIEN ORDER BY MaNV DESC";
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql);
@@ -96,7 +96,7 @@ public class NhanVienDAO {
         return list;
     }
 
-    public NhanVien findById(int maNV) {
+    public Employee findById(int maNV) {
         String sql = "SELECT * FROM NHANVIEN WHERE MaNV = ?";
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -110,7 +110,7 @@ public class NhanVienDAO {
         return null;
     }
 
-    public boolean insert(NhanVien nv) {
+    public boolean insert(Employee nv) {
         String sql = "INSERT INTO NHANVIEN (HoTen, SDT, NgaySinh, CCCD, NgayVaoLam) VALUES (?, ?, ?, ?, ?)";
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -126,7 +126,7 @@ public class NhanVienDAO {
         return false;
     }
 
-    public boolean update(NhanVien nv) {
+    public boolean update(Employee nv) {
         String sql = "UPDATE NHANVIEN SET HoTen = ?, SDT = ?, NgaySinh = ?, CCCD = ?, NgayVaoLam = ? WHERE MaNV = ?";
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -155,8 +155,8 @@ public class NhanVienDAO {
         return false;
     }
 
-    private NhanVien mapResultSetToNhanVien(ResultSet rs) throws SQLException {
-        NhanVien nv = new NhanVien();
+    private Employee mapResultSetToNhanVien(ResultSet rs) throws SQLException {
+        Employee nv = new Employee();
         nv.setMaNV(rs.getInt("MaNV"));
         nv.setHoTen(rs.getString("HoTen"));
         nv.setSdt(rs.getString("SDT"));

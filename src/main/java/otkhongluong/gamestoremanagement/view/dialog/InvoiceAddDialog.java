@@ -1,7 +1,7 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.dao.KhachHangDAO;
-import otkhongluong.gamestoremanagement.model.KhachHang;
+import otkhongluong.gamestoremanagement.dao.CustomerDAO;
+import otkhongluong.gamestoremanagement.model.Customer;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 import otkhongluong.gamestoremanagement.util.Session;
 
@@ -20,24 +20,24 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * BillAddDialog — Wizard 2 bước tạo hóa đơn mua game
- *
- * Bước 1 : Chọn game + loại sản phẩm (CD / ROM), thêm vào giỏ hàng
- * Bước 2 : Nhập thông tin KH, dùng điểm, xác nhận thanh toán
- *
- * LOGIC ĐIỂM:
- *   Cộng điểm  : cứ 100.000 VNĐ (tổng gốc) = 1 điểm
- *   Dùng điểm  : 1 điểm = 5.000 VNĐ giảm, không vượt quá tổng gốc
- *
- * DATABASE:
- *   HOADON       : MaHD, MaKH, MaNV, NgayLap, TongTien, DiemSuDung, TienGiam, TrangThai
- *   CTHOADON     : MaHD, MaSP, SoLuong, DonGia
- *   CD           : TrangThai = 'DaBan' sau khi bán
- *   ROM          : SoLuotBan++ sau khi bán
- *   KHACHHANG    : DiemTichLuy cộng/trừ
- *   DIEM_LICHSU  : ghi log cộng/trừ điểm
+ * InvoiceAddDialog — Wizard 2 bước tạo hóa đơn mua game
+
+Bước 1 : Chọn game + loại sản phẩm (CD / ROM), thêm vào giỏ hàng
+Bước 2 : Nhập thông tin KH, dùng điểm, xác nhận thanh toán
+
+LOGIC ĐIỂM:
+  Cộng điểm  : cứ 100.000 VNĐ (tổng gốc) = 1 điểm
+  Dùng điểm  : 1 điểm = 5.000 VNĐ giảm, không vượt quá tổng gốc
+
+DATABASE:
+  HOADON       : MaHD, MaKH, MaNV, NgayLap, TongTien, DiemSuDung, TienGiam, TrangThai
+  CTHOADON     : MaHD, MaSP, SoLuong, DonGia
+  CD           : TrangThai = 'DaBan' sau khi bán
+  ROM          : SoLuotBan++ sau khi bán
+  KHACHHANG    : DiemTichLuy cộng/trừ
+  DIEM_LICHSU  : ghi log cộng/trừ điểm
  */
-public class BillAddDialog extends JDialog {
+public class InvoiceAddDialog extends JDialog {
 
     // =========================================================
     // PALETTE — giữ nhất quán với RentAddDialog
@@ -84,7 +84,7 @@ public class BillAddDialog extends JDialog {
     // =========================================================
     // DAO
     // =========================================================
-    private final KhachHangDAO khDAO = new KhachHangDAO();
+    private final CustomerDAO khDAO = new CustomerDAO();
 
     // =========================================================
     // STATE — Bước 1
@@ -116,7 +116,7 @@ public class BillAddDialog extends JDialog {
     private JTextField      txtDiemSuDung;
     private JLabel          lblTongGoc, lblGiamDiem, lblTongPhaiTra, lblDiemSeSau;
 
-    private KhachHang       currentKH   = null;
+    private Customer       currentKH   = null;
     private int             maKH        = -1;
     private int             diemHienCo  = 0;
 
@@ -131,7 +131,7 @@ public class BillAddDialog extends JDialog {
     // =========================================================
     // CONSTRUCTOR
     // =========================================================
-    public BillAddDialog(Frame parent) {
+    public InvoiceAddDialog(Frame parent) {
         super(parent, "Tạo hóa đơn mua game", true);
         setSize(900, 620);
         setLocationRelativeTo(parent);
@@ -462,29 +462,40 @@ public class BillAddDialog extends JDialog {
         }
 
         // Đếm CD hết hàng (TrangThai != SanSang)
-        String sqlCDHet = "SELECT COUNT(*) AS total FROM CD cd " +
-                          "JOIN SANPHAM sp ON cd.MaSP = sp.MaSP " +
-                          "WHERE sp.MaGame = ? AND cd.TrangThai != N'SanSang'";
+        String sqlCDHet =
+            "SELECT " +
+            "  SUM(CASE WHEN cd.TrangThai='DangThue' THEN 1 ELSE 0 END) as SoDangThue, " +
+            "  SUM(CASE WHEN cd.TrangThai='DaBan'    THEN 1 ELSE 0 END) as SoDaBan, " +
+            "  SUM(CASE WHEN cd.TrangThai='Hong'     THEN 1 ELSE 0 END) as SoHong " +
+            "FROM CD cd JOIN SANPHAM sp ON cd.MaSP = sp.MaSP " +
+            "WHERE sp.MaGame = ? AND cd.TrangThai != N'SanSang'";
+
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sqlCDHet)) {
             ps.setInt(1, maGame);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
-                int hetHang = rs.getInt("total");
-                if (hetHang > 0) {
-                    // Hiển thị dòng mờ cho biết còn bao nhiêu CD đã hết
-                    spList.add(new Object[]{-1, -1, "CD", 0.0, "Hết hàng", false, maGame});
-                    tblSPModel.addRow(new Object[]{
-                        "—",
-                        "CD",
-                        "—",
-                        "⚠ " + hetHang + " CD khác đã hết hàng"
-                    });
+                int dangThue = rs.getInt("SoDangThue");
+                int daBan    = rs.getInt("SoDaBan");
+                int hong     = rs.getInt("SoHong");
+
+                if (dangThue > 0) {
+                    spList.add(new Object[]{-1, -1, "CD", 0.0, "DangThue", false, maGame});
+                    tblSPModel.addRow(new Object[]{"—", "CD", "—",
+                        "🔒 " + dangThue + " CD đang được thuê"});
+                }
+                if (daBan > 0) {
+                    spList.add(new Object[]{-1, -1, "CD", 0.0, "DaBan", false, maGame});
+                    tblSPModel.addRow(new Object[]{"—", "CD", "—",
+                        "💰 " + daBan + " CD đã bán"});
+                }
+                if (hong > 0) {
+                    spList.add(new Object[]{-1, -1, "CD", 0.0, "Hong", false, maGame});
+                    tblSPModel.addRow(new Object[]{"—", "CD", "—",
+                        "⚠ " + hong + " CD hỏng / mất"});
                 }
             }
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-        }
+        } catch (SQLException ex) { ex.printStackTrace(); }
 
         // Load ROM
         String sqlROM = "SELECT sp.MaSP, r.DungLuong, r.LinkLuuTru, sp.GiaBan " +
@@ -791,7 +802,7 @@ public class BillAddDialog extends JDialog {
             lblDiemHienCo.setText("---");
             recalc(); return;
         }
-        KhachHang kh = khDAO.findBySDT(sdt);
+        Customer kh = khDAO.findBySDT(sdt);
         if (kh != null) {
             currentKH = kh; maKH = kh.getMaKH(); diemHienCo = kh.getDiemTichLuy();
             lblTenKH.setText(kh.getHoTen());
@@ -821,7 +832,7 @@ public class BillAddDialog extends JDialog {
         String sdt = txtSDT.getText().trim();
         if (sdt.isEmpty()) { showMsg("Vui lòng nhập số điện thoại trước!"); return; }
 
-        KhachHang existing = khDAO.findBySDT(sdt);
+        Customer existing = khDAO.findBySDT(sdt);
         if (existing != null) {
             showMsg("Khách hàng với SĐT " + sdt + " đã tồn tại!");
             currentKH = existing; maKH = existing.getMaKH(); diemHienCo = existing.getDiemTichLuy();
@@ -849,7 +860,7 @@ public class BillAddDialog extends JDialog {
         String email = fldEmail.getText().trim();
         if (hoTen.isEmpty()) { showMsg("Họ và tên không được để trống!"); return; }
 
-        KhachHang kh = new KhachHang();
+        Customer kh = new Customer();
         kh.setHoTen(hoTen); kh.setSdt(sdt); kh.setEmail(email.isEmpty() ? null : email);
         kh.setDiemTichLuy(0);
         if (khDAO.insert(kh)) {
@@ -1053,19 +1064,10 @@ public class BillAddDialog extends JDialog {
                 }
 
                 // 2. Xử lý khách vãng lai nếu chưa có KH
+                // ✅ Khách vãng lai: chỉ reset điểm, không INSERT gì cả
                 if (maKH == -1) {
-                    int yn = JOptionPane.showConfirmDialog(this,
-                        "Khách hàng chưa xác định.\n[Có] Tiếp tục không tích điểm\n[Không] Quay lại nhập SĐT",
-                        "Khách vãng lai?", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-                    if (yn != JOptionPane.YES_OPTION) { con.rollback(); showStep(2); return; }
-
-                    String insKH = "INSERT INTO KHACHHANG (HoTen, SDT, DiemTichLuy) VALUES (N'Khách vãng lai', NULL, 0)";
-                    try (PreparedStatement ps = con.prepareStatement(insKH, Statement.RETURN_GENERATED_KEYS)) {
-                        ps.executeUpdate();
-                        ResultSet gk = ps.getGeneratedKeys();
-                        if (gk.next()) maKH = gk.getInt(1);
-                    }
-                    diemThucDung = 0; giamTienDiem = 0;
+                    diemThucDung = 0;
+                    giamTienDiem = 0;
                 }
 
                 // 3. Tạo HOADON
@@ -1073,7 +1075,8 @@ public class BillAddDialog extends JDialog {
                "VALUES (?, ?, GETDATE(), ?, ?, ?, N'DaThanhToan')";
                 int maHD = -1;   // ← khởi tạo mặc định
                 try (PreparedStatement ps = con.prepareStatement(insHD, Statement.RETURN_GENERATED_KEYS)) {
-                    ps.setInt(1, maKH);
+                    if (maKH > 0) ps.setInt(1, maKH);
+                    else          ps.setNull(1, java.sql.Types.INTEGER);
                     int maNV = Session.getMaNV();
                     if (maNV > 0) ps.setInt(2, maNV);
                     else          ps.setNull(2, java.sql.Types.INTEGER);
@@ -1333,7 +1336,7 @@ public class BillAddDialog extends JDialog {
     }
     
     public static void openAndPreselectGame(Frame parent, int maGame, String loaiSP) {
-        BillAddDialog dlg = new BillAddDialog(parent);
+        InvoiceAddDialog dlg = new InvoiceAddDialog(parent);
  
         SwingUtilities.invokeLater(() -> {
             // Bước 1: tìm & chọn dòng game

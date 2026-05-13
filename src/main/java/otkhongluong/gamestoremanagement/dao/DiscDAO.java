@@ -9,7 +9,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CDDAO {
+public class DiscDAO {
 
     // ================= UPDATE TRẠNG THÁI =================
     public boolean updateTrangThai(int maCD, String trangThai) {

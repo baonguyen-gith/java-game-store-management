@@ -1,25 +1,25 @@
 package otkhongluong.gamestoremanagement.service;
 
-import otkhongluong.gamestoremanagement.dao.SanPhamDAO;
-import otkhongluong.gamestoremanagement.model.SanPham;
+import otkhongluong.gamestoremanagement.dao.ProductDAO;
+import otkhongluong.gamestoremanagement.model.Product;
 
 import java.util.List;
 
-public class SanPhamService {
+public class ProductService {
 
-    private final SanPhamDAO sanPhamDAO;
+    private final ProductDAO sanPhamDAO;
 
-    public SanPhamService() {
-        this.sanPhamDAO = new SanPhamDAO();
+    public ProductService() {
+        this.sanPhamDAO = new ProductDAO();
     }
 
     // ================= GET ALL =================
-    public List<SanPham> getAllSanPham() {
+    public List<Product> getAllSanPham() {
         return sanPhamDAO.findAll();
     }
 
     // ================= GET BY ID =================
-    public SanPham getSanPhamById(int id) {
+    public Product getSanPhamById(int id) {
 
         if (id <= 0) {
             throw new IllegalArgumentException("Mã sản phẩm không hợp lệ");
@@ -29,7 +29,7 @@ public class SanPhamService {
     }
 
     // ================= ADD =================
-    public boolean addSanPham(SanPham sp) {
+    public boolean addSanPham(Product sp) {
 
         validateSanPham(sp);
 
@@ -37,7 +37,7 @@ public class SanPhamService {
     }
 
     // ================= UPDATE =================
-    public boolean updateSanPham(SanPham sp) {
+    public boolean updateSanPham(Product sp) {
 
         if (sp == null || sp.getMaSP() <= 0) {
             throw new IllegalArgumentException("Sản phẩm không hợp lệ");
@@ -49,21 +49,22 @@ public class SanPhamService {
     }
 
     // ================= DELETE =================
-    public boolean deleteSanPham(int maSP) {
+    public boolean deleteSanPham(int id) {
 
-        if (maSP <= 0) {
+        if (id <= 0) {
             throw new IllegalArgumentException("Mã sản phẩm không hợp lệ");
         }
-        return sanPhamDAO.delete(maSP);
+
+        return sanPhamDAO.delete(id);
     }
 
     // ================= FIND BY GAME =================
-    public List<SanPham> getByGame(int maGame) {
+    public List<Product> getByGame(int maGame) {
         return sanPhamDAO.findByMaGame(maGame);
     }
 
     // ================= VALIDATION =================
-    private void validateSanPham(SanPham sp) {
+    private void validateSanPham(Product sp) {
 
         if (sp == null) {
             throw new IllegalArgumentException("Sản phẩm không được null");

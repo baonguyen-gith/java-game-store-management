@@ -1,7 +1,7 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.model.HoaDon;
-import otkhongluong.gamestoremanagement.service.HoaDonService;
+import otkhongluong.gamestoremanagement.model.Invoice;
+import otkhongluong.gamestoremanagement.service.InvoiceService;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -10,7 +10,7 @@ import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
 import java.time.format.DateTimeFormatter;
 
-public class BillDetailDialog extends JDialog {
+public class InvoiceDetailDialog extends JDialog {
 
     /* ── Colors ── */
     private static final Color BG_DARK       = new Color(35, 20, 85);
@@ -48,7 +48,7 @@ public class BillDetailDialog extends JDialog {
     private final int maHD;
 
     // ═══════════════════════════════════════════════════════════
-    public BillDetailDialog(Frame parent, int maHD) {
+    public InvoiceDetailDialog(Frame parent, int maHD) {
         super(parent, "Chi tiết hóa đơn", true);
         this.maHD = maHD;
 
@@ -248,7 +248,7 @@ public class BillDetailDialog extends JDialog {
 
     // ── LOAD DATA ───────────────────────────────────────────────
     private void loadData() {
-        HoaDon hd = new HoaDonService().getHoaDonById(maHD);
+        Invoice hd = new InvoiceService().getHoaDonById(maHD);
         if (hd == null) {
             JOptionPane.showMessageDialog(this,
                 "Không tìm thấy hóa đơn HD" + String.format("%03d", maHD),
@@ -275,7 +275,7 @@ public class BillDetailDialog extends JDialog {
         // Fill table
         tableModel.setRowCount(0);
         if (hd.getDanhSachChiTiet() != null) {
-            for (HoaDon.ChiTietHoaDon ct : hd.getDanhSachChiTiet()) {
+            for (Invoice.ChiTietHoaDon ct : hd.getDanhSachChiTiet()) {
                 double thanhTien = ct.getSoLuong() * ct.getDonGia();
                 tableModel.addRow(new Object[]{
                     ct.getTenGame(),

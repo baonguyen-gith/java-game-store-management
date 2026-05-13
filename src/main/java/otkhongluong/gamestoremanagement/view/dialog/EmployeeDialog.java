@@ -1,7 +1,7 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.model.NhanVien;
-import otkhongluong.gamestoremanagement.service.NhanVienService;
+import otkhongluong.gamestoremanagement.model.Employee;
+import otkhongluong.gamestoremanagement.controller.EmployeeController;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -15,15 +15,15 @@ public class EmployeeDialog extends JDialog {
     private JTextField txtHoTen, txtSdt, txtCccd, txtNgaySinh, txtNgayVaoLam;
     private JButton btnSave, btnCancel;
 
-    private NhanVienService service = new NhanVienService();
-    private NhanVien currentNhanVien;
+    private EmployeeController controller;
+    private Employee currentNhanVien;
     private Runnable onSuccess;
 
-    public EmployeeDialog(Frame parent, NhanVien nv, Runnable onSuccess) {
+    public EmployeeDialog(Frame parent, Employee nv, Runnable onSuccess) {
         super(parent, nv == null ? "Thêm nhân viên mới" : "Cập nhật nhân viên", true);
         this.currentNhanVien = nv;
         this.onSuccess = onSuccess;
-
+        controller = new EmployeeController((JComponent) getContentPane());
         setSize(400, 450);
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout());
@@ -84,56 +84,17 @@ public class EmployeeDialog extends JDialog {
     }
 
     private void saveNhanVien() {
-        String hoTen = txtHoTen.getText().trim();
-        String sdt = txtSdt.getText().trim();
-        String cccd = txtCccd.getText().trim();
-        String ngaySinhStr = txtNgaySinh.getText().trim();
-        String ngayVaoLamStr = txtNgayVaoLam.getText().trim();
-
-        if (hoTen.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Họ tên không được để trống!");
-            return;
-        }
-
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-        LocalDate ngaySinh = null;
-        LocalDate ngayVaoLam = null;
-
-        try {
-            if (!ngaySinhStr.isEmpty()) {
-                ngaySinh = LocalDate.parse(ngaySinhStr, dtf);
-            }
-            if (!ngayVaoLamStr.isEmpty()) {
-                ngayVaoLam = LocalDate.parse(ngayVaoLamStr, dtf);
-            }
-        } catch (DateTimeParseException e) {
-            JOptionPane.showMessageDialog(this, "Sai định dạng ngày (dd/MM/yyyy)!");
-            return;
-        }
-
-        if (currentNhanVien == null) {
-            NhanVien nv = new NhanVien(0, hoTen, sdt, ngaySinh, cccd, ngayVaoLam);
-            if (service.addNhanVien(nv)) {
-                JOptionPane.showMessageDialog(this, "Thêm nhân viên thành công!");
-                if (onSuccess != null) onSuccess.run();
-                dispose();
-            } else {
-                JOptionPane.showMessageDialog(this, "Lỗi thêm nhân viên!");
-            }
-        } else {
-            currentNhanVien.setHoTen(hoTen);
-            currentNhanVien.setSdt(sdt);
-            currentNhanVien.setCccd(cccd);
-            currentNhanVien.setNgaySinh(ngaySinh);
-            currentNhanVien.setNgayVaoLam(ngayVaoLam);
-
-            if (service.updateNhanVien(currentNhanVien)) {
-                JOptionPane.showMessageDialog(this, "Cập nhật nhân viên thành công!");
-                if (onSuccess != null) onSuccess.run();
-                dispose();
-            } else {
-                JOptionPane.showMessageDialog(this, "Lỗi cập nhật nhân viên!");
-            }
+        boolean ok = controller.handleSave(
+                currentNhanVien,
+                txtHoTen.getText(),
+                txtSdt.getText(),
+                txtCccd.getText(),
+                txtNgaySinh.getText(),
+                txtNgayVaoLam.getText()
+        );
+        if (ok) {
+            if (onSuccess != null) onSuccess.run();
+            dispose();
         }
     }
 }

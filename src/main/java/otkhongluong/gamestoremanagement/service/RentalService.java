@@ -1,10 +1,10 @@
 package otkhongluong.gamestoremanagement.service;
 
-import otkhongluong.gamestoremanagement.dao.CDDAO;
-import otkhongluong.gamestoremanagement.dao.PhieuThueDAO;
-import otkhongluong.gamestoremanagement.dao.KhachHangDAO;
-import otkhongluong.gamestoremanagement.dao.NhanVienDAO;
-import otkhongluong.gamestoremanagement.model.PhieuThue;
+import otkhongluong.gamestoremanagement.dao.DiscDAO;
+import otkhongluong.gamestoremanagement.dao.RentalOrderDAO;
+import otkhongluong.gamestoremanagement.dao.CustomerDAO;
+import otkhongluong.gamestoremanagement.dao.EmployeeDAO;
+import otkhongluong.gamestoremanagement.model.RentalOrder;
 import otkhongluong.gamestoremanagement.util.DBConnection;  // ✅ THÊM
 
 import java.sql.Connection;        // ✅ THÊM
@@ -16,21 +16,21 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
-public class ThueService {
+public class RentalService {
 
-    private final PhieuThueDAO phieuThueDAO;
-    private final CDDAO cdDAO;
-    private final KhachHangDAO khachHangDAO = new KhachHangDAO();
-    private final NhanVienDAO nhanVienDAO   = new NhanVienDAO();
+    private final RentalOrderDAO phieuThueDAO;
+    private final DiscDAO cdDAO;
+    private final CustomerDAO khachHangDAO = new CustomerDAO();
+    private final EmployeeDAO nhanVienDAO   = new EmployeeDAO();
 
-    public ThueService() {
-        phieuThueDAO = new PhieuThueDAO();
-        cdDAO        = new CDDAO();
+    public RentalService() {
+        phieuThueDAO = new RentalOrderDAO();
+        cdDAO        = new DiscDAO();
     }
 
     /* ================= CREATE ================= */
 
-    public boolean createPhieuThue(PhieuThue pt) {
+    public boolean createPhieuThue(RentalOrder pt) {
         if (pt == null || pt.getDanhSachChiTiet() == null) return false;
         pt.setTrangThai("DangThue");
 
@@ -39,7 +39,7 @@ public class ThueService {
             con.setAutoCommit(false);
             try {
                 // ✅ CHECK RACE CONDITION trước khi insert
-                for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+                for (RentalOrder.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
                     String chk = "SELECT TrangThai FROM CD WHERE MaCD = ?";
                     try (PreparedStatement ps = con.prepareStatement(chk)) {
                         ps.setInt(1, ct.getMaCD());
@@ -61,7 +61,7 @@ public class ThueService {
                 if (!ok) { con.rollback(); return false; }
 
                 // Cập nhật TrangThai CD
-                for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+                for (RentalOrder.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
                     String upd = "UPDATE CD SET TrangThai = N'DangThue' WHERE MaCD = ?";
                     try (PreparedStatement ps = con.prepareStatement(upd)) {
                         ps.setInt(1, ct.getMaCD());
@@ -92,7 +92,7 @@ public class ThueService {
     }
 
     public boolean returnCD(int maPT, LocalDateTime ngayTraThucTe, double chiPhiHuHong) {
-        PhieuThue pt = phieuThueDAO.findById(maPT);
+        RentalOrder pt = phieuThueDAO.findById(maPT);
         if (pt == null) return false;
 
         double phatTreHan   = tinhPhatTreHanOnly(pt, ngayTraThucTe);
@@ -112,7 +112,7 @@ public class ThueService {
 
                 // Update TrangThai tất cả CD về SanSang
                 String sqlCD = "UPDATE CD SET TrangThai = N'SanSang' WHERE MaCD = ?";
-                for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+                for (RentalOrder.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
                     try (PreparedStatement ps = con.prepareStatement(sqlCD)) {
                         ps.setInt(1, ct.getMaCD());
                         ps.executeUpdate();
@@ -134,7 +134,7 @@ public class ThueService {
     }
 
     /** Tính riêng phạt trễ hạn (không cộng phạt hư hỏng) */
-    private double tinhPhatTreHanOnly(PhieuThue pt, LocalDateTime ngayTra) {
+    private double tinhPhatTreHanOnly(RentalOrder pt, LocalDateTime ngayTra) {
         if (pt == null || ngayTra == null || pt.getNgayTraDuKien() == null) return 0;
         LocalDateTime ngayDK = pt.getNgayTraDuKien();
         if (!ngayTra.isAfter(ngayDK)) return 0;
@@ -149,9 +149,9 @@ public class ThueService {
      * Chỉ dùng để hiển thị ước tính — KHÔNG dùng ghi DB.
      * Tính: trễ hạn + phạt hỏng cố định 50k/CD.
      */
-    public double tinhTienPhat(PhieuThue pt,
+    public double tinhTienPhat(RentalOrder pt,
                                LocalDateTime ngayTra,
-                               List<PhieuThue.CTPhieuThue> cds) {
+                               List<RentalOrder.CTPhieuThue> cds) {
         if (pt == null || ngayTra == null || pt.getNgayTraDuKien() == null) return 0;
         double phat = 0;
         LocalDateTime ngayDK = pt.getNgayTraDuKien();
@@ -161,7 +161,7 @@ public class ThueService {
             phat += days * 10_000;
         }
         if (cds != null) {
-            for (PhieuThue.CTPhieuThue ct : cds) {
+            for (RentalOrder.CTPhieuThue ct : cds) {
                 if (ct != null && "HONG".equalsIgnoreCase(ct.getTinhTrang())) {
                     phat += 50_000;
                 }
@@ -192,10 +192,10 @@ public class ThueService {
 
     /* ================= CRUD ================= */
 
-    public boolean updatePhieuThue(PhieuThue pt) { return phieuThueDAO.update(pt); }
+    public boolean updatePhieuThue(RentalOrder pt) { return phieuThueDAO.update(pt); }
     public boolean deletePhieuThue(int maPT)     { return phieuThueDAO.delete(maPT); }
-    public List<PhieuThue> getAll()              { return phieuThueDAO.findAll(); }
-    public PhieuThue getById(int id)             { return phieuThueDAO.findById(id); }
+    public List<RentalOrder> getAll()              { return phieuThueDAO.findAll(); }
+    public RentalOrder getById(int id)             { return phieuThueDAO.findById(id); }
 
     public List<String> getAllKhachHangNames()   { return khachHangDAO.getAllTenKhachHang(); }
     public List<String> getAllNhanVienNames()    { return nhanVienDAO.getAllTenNhanVien(); }

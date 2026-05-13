@@ -1,10 +1,10 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.dao.CDDAO;
-import otkhongluong.gamestoremanagement.dao.KhachHangDAO;
-import otkhongluong.gamestoremanagement.model.KhachHang;
-import otkhongluong.gamestoremanagement.model.PhieuThue;
-import otkhongluong.gamestoremanagement.service.ThueService;
+import otkhongluong.gamestoremanagement.dao.DiscDAO;
+import otkhongluong.gamestoremanagement.dao.CustomerDAO;
+import otkhongluong.gamestoremanagement.model.Customer;
+import otkhongluong.gamestoremanagement.model.RentalOrder;
+import otkhongluong.gamestoremanagement.service.RentalService;
 import otkhongluong.gamestoremanagement.util.Session;
 
 import javax.swing.*;
@@ -75,9 +75,9 @@ public class RentAddDialog extends JDialog {
     // =========================================================
     // DAO / SERVICE
     // =========================================================
-    private final CDDAO        cdDAO   = new CDDAO();
-    private final KhachHangDAO khDAO   = new KhachHangDAO();
-    private final ThueService  service = new ThueService();
+    private final DiscDAO        cdDAO   = new DiscDAO();
+    private final CustomerDAO khDAO   = new CustomerDAO();
+    private final RentalService  service = new RentalService();
 
     // =========================================================
     // STATE
@@ -99,7 +99,7 @@ public class RentAddDialog extends JDialog {
     private JTextField txtSoNgay, txtDiemSuDung;
     private JLabel     lblInfoTongThueGoc, lblInfoGiamDiem, lblInfoTongPhaiTra, lblInfoTienCoc;
 
-    private KhachHang currentKH  = null;
+    private Customer currentKH  = null;
     private int       maKH       = -1;
     private int       diemHienCo = 0;
 
@@ -470,7 +470,7 @@ public class RentAddDialog extends JDialog {
             lblDiemHienCo.setText("---");
             recalc(); return;
         }
-        KhachHang kh = khDAO.findBySDT(sdt);
+        Customer kh = khDAO.findBySDT(sdt);
         if (kh != null) {
             currentKH = kh; maKH = kh.getMaKH(); diemHienCo = kh.getDiemTichLuy();
             lblTenKH.setText(kh.getHoTen());
@@ -501,7 +501,7 @@ public class RentAddDialog extends JDialog {
         String sdt = txtSDT.getText().trim();
         if (sdt.isEmpty()) { showMsg("Vui lòng nhập số điện thoại trước!"); return; }
 
-        KhachHang existing = khDAO.findBySDT(sdt);
+        Customer existing = khDAO.findBySDT(sdt);
 
         // Trường hợp KH đã tồn tại nhưng chưa có CCCD → yêu cầu cập nhật CCCD
         if (existing != null && (existing.getCccd() == null || existing.getCccd().trim().isEmpty())) {
@@ -576,7 +576,7 @@ public class RentAddDialog extends JDialog {
         if (hoTen.isEmpty()) { showMsg("Họ và tên không được để trống!"); return; }
         if (!cccd.matches("\\d{9}|\\d{12}")) { showMsg("CCCD phải có 9 hoặc 12 chữ số!"); return; }
 
-        KhachHang kh = new KhachHang();
+        Customer kh = new Customer();
         kh.setHoTen(hoTen); kh.setSdt(sdt); kh.setCccd(cccd); kh.setDiemTichLuy(0);
         if (khDAO.insert(kh)) {
             currentKH = khDAO.findBySDT(sdt); maKH = currentKH.getMaKH(); diemHienCo = 0;
@@ -886,12 +886,12 @@ public class RentAddDialog extends JDialog {
                     "Khách vãng lai?", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
                 if (yn != JOptionPane.YES_OPTION) { showStep(2); return; }
 
-                KhachHang kh = new KhachHang();
+                Customer kh = new Customer();
                 kh.setHoTen("Khách vãng lai");
                 kh.setSdt(null);
                 kh.setDiemTichLuy(0);
                 if (!khDAO.insert(kh)) { showMsg("Không thể tạo khách vãng lai!"); return; }
-                KhachHang newKH = khDAO.findBySDT(kh.getSdt());
+                Customer newKH = khDAO.findBySDT(kh.getSdt());
                 if (newKH == null) { showMsg("Lỗi tạo khách!"); return; }
                 maKH = newKH.getMaKH();
                 diemThucDung = 0;
@@ -921,7 +921,7 @@ public class RentAddDialog extends JDialog {
 
             LocalDateTime now = LocalDateTime.now();
 
-            PhieuThue pt = new PhieuThue();
+            RentalOrder pt = new RentalOrder();
             pt.setMaKH(maKH);
             pt.setMaNV(Session.getMaNV());
             pt.setNgayThue(now);
@@ -932,8 +932,8 @@ public class RentAddDialog extends JDialog {
             // TinhTrang lưu điểm đã sử dụng để RentReturnDialog đọc lại
             String tinhTrang = diemThucDung > 0 ? ("OK|diem=" + diemThucDung) : "OK";
 
-            PhieuThue.CTPhieuThue ct =
-                new PhieuThue.CTPhieuThue(selectedMaCD, selectedTenGame, tongThueGoc, tinhTrang);
+            RentalOrder.CTPhieuThue ct =
+                new RentalOrder.CTPhieuThue(selectedMaCD, selectedTenGame, tongThueGoc, tinhTrang);
             ct.setMaNV(Session.getMaNV());
             pt.getDanhSachChiTiet().add(ct);
 

@@ -2,7 +2,7 @@ package otkhongluong.gamestoremanagement.model;
 
 import java.time.LocalDate;
 
-public class NhanVien {
+public class Employee {
 
     private int maNV;
     private String hoTen;
@@ -11,9 +11,9 @@ public class NhanVien {
     private String cccd;
     private LocalDate ngayVaoLam;
 
-    public NhanVien() {}
+    public Employee() {}
 
-    public NhanVien(int maNV, String hoTen, String sdt,
+    public Employee(int maNV, String hoTen, String sdt,
                     LocalDate ngaySinh, String cccd,
                     LocalDate ngayVaoLam) {
 

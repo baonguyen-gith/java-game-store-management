@@ -1,20 +1,20 @@
 package otkhongluong.gamestoremanagement.service;
 
-import otkhongluong.gamestoremanagement.dao.HoaDonDAO;
-import otkhongluong.gamestoremanagement.model.HoaDon;
+import otkhongluong.gamestoremanagement.dao.InvoiceDAO;
+import otkhongluong.gamestoremanagement.model.Invoice;
 
 import java.util.List;
 
-public class HoaDonService {
+public class InvoiceService {
 
-    private final HoaDonDAO hoaDonDAO;
+    private final InvoiceDAO hoaDonDAO;
 
-    public HoaDonService() {
-        hoaDonDAO = new HoaDonDAO();
+    public InvoiceService() {
+        hoaDonDAO = new InvoiceDAO();
     }
 
     // ================= CREATE =================
-    public boolean createHoaDon(HoaDon hd) {
+    public boolean createHoaDon(Invoice hd) {
 
         if(hd == null) return false;
 
@@ -31,13 +31,13 @@ public class HoaDonService {
     }
 
     // ================= CALCULATE =================
-    public double calculateTotal(List<HoaDon.ChiTietHoaDon> list) {
+    public double calculateTotal(List<Invoice.ChiTietHoaDon> list) {
 
         double total = 0;
 
         if(list == null) return 0;
 
-        for(HoaDon.ChiTietHoaDon ct : list){
+        for(Invoice.ChiTietHoaDon ct : list){
 
             total += ct.getSoLuong() * ct.getDonGia();
         }
@@ -48,7 +48,7 @@ public class HoaDonService {
     // ================= PAYMENT =================
     public boolean thanhToanHoaDon(int maHD){
 
-        HoaDon hd = hoaDonDAO.findById(maHD);
+        Invoice hd = hoaDonDAO.findById(maHD);
         if(hd == null) return false;
 
         hd.setTrangThai("DaThanhToan");
@@ -57,7 +57,7 @@ public class HoaDonService {
     }
 
     // ================= UPDATE =================
-    public boolean updateHoaDon(HoaDon hd){
+    public boolean updateHoaDon(Invoice hd){
 
         double total =
                 calculateTotal(hd.getDanhSachChiTiet());
@@ -73,11 +73,11 @@ public class HoaDonService {
     }
 
     // ================= READ =================
-    public List<HoaDon> getAllHoaDon(){
+    public List<Invoice> getAllHoaDon(){
         return hoaDonDAO.findAll();
     }
 
-    public HoaDon getHoaDonById(int id){
+    public Invoice getHoaDonById(int id){
         return hoaDonDAO.findById(id);
     }
 }

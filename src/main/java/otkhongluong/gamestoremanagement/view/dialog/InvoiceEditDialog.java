@@ -1,12 +1,12 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.dao.HoaDonDAO;
-import otkhongluong.gamestoremanagement.dao.KhachHangDAO;
-import otkhongluong.gamestoremanagement.dao.NhanVienDAO;
-import otkhongluong.gamestoremanagement.model.HoaDon;
-import otkhongluong.gamestoremanagement.model.KhachHang;
-import otkhongluong.gamestoremanagement.model.NhanVien;
-import otkhongluong.gamestoremanagement.service.HoaDonService;
+import otkhongluong.gamestoremanagement.dao.InvoiceDAO;
+import otkhongluong.gamestoremanagement.dao.CustomerDAO;
+import otkhongluong.gamestoremanagement.dao.EmployeeDAO;
+import otkhongluong.gamestoremanagement.model.Invoice;
+import otkhongluong.gamestoremanagement.model.Customer;
+import otkhongluong.gamestoremanagement.model.Employee;
+import otkhongluong.gamestoremanagement.service.InvoiceService;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 
 import javax.swing.*;
@@ -39,7 +39,7 @@ import java.util.List;
  *
  * Tất cả thay đổi chỉ được áp vào DB khi nhấn "Lưu tất cả".
  */
-public class BillEditDialog extends JDialog {
+public class InvoiceEditDialog extends JDialog {
 
     /* ══════════════════════════════════════════════════════
        PALETTE — đồng bộ RentEditDialog
@@ -76,20 +76,20 @@ public class BillEditDialog extends JDialog {
     /* ══════════════════════════════════════════════════════
        DAO / SERVICE
     ══════════════════════════════════════════════════════ */
-    private final KhachHangDAO khDAO = new KhachHangDAO();
-    private final NhanVienDAO  nvDAO = new NhanVienDAO();
-    private final HoaDonService hdSvc = new HoaDonService();
+    private final CustomerDAO khDAO = new CustomerDAO();
+    private final EmployeeDAO  nvDAO = new EmployeeDAO();
+    private final InvoiceService hdSvc = new InvoiceService();
 
     /* ══════════════════════════════════════════════════════
        STATE — bản gốc
     ══════════════════════════════════════════════════════ */
-    private final HoaDon hd;
+    private final Invoice hd;
 
     /* ══════════════════════════════════════════════════════
        STATE — Tab 1
     ══════════════════════════════════════════════════════ */
-    private KhachHang foundKH   = null;
-    private NhanVien  foundNV   = null;
+    private Customer foundKH   = null;
+    private Employee  foundNV   = null;
     private LocalDate newNgayLap = null;
 
     /* ══════════════════════════════════════════════════════
@@ -144,15 +144,15 @@ public class BillEditDialog extends JDialog {
     /* ══════════════════════════════════════════════════════
        CONSTRUCTOR
     ══════════════════════════════════════════════════════ */
-    public BillEditDialog(Frame parent, int maHD) {
+    public InvoiceEditDialog(Frame parent, int maHD) {
         super(parent, "Sửa Hóa Đơn", true);
 
-        HoaDon loaded = hdSvc.getHoaDonById(maHD);
+        Invoice loaded = hdSvc.getHoaDonById(maHD);
         if (loaded == null) {
             JOptionPane.showMessageDialog(parent,
                 "Không tìm thấy hóa đơn HD" + String.format("%03d", maHD),
                 "Lỗi", JOptionPane.ERROR_MESSAGE);
-            this.hd = new HoaDon();
+            this.hd = new Invoice();
             dispose();
             return;
         }
@@ -464,7 +464,7 @@ public class BillEditDialog extends JDialog {
             "ORDER BY cd.MaCD ASC";
 
         try (Connection con = DBConnection.getConnection()) {
-            for (HoaDon.ChiTietHoaDon ct : hd.getDanhSachChiTiet()) {
+            for (Invoice.ChiTietHoaDon ct : hd.getDanhSachChiTiet()) {
                 int maCD = -1;
                 if ("CD".equalsIgnoreCase(ct.getLoaiSanPham())) {
                     try (PreparedStatement ps = con.prepareStatement(sqlCD)) {
@@ -506,7 +506,7 @@ public class BillEditDialog extends JDialog {
             setResult(lblKHResult, "⚠  Nhập số điện thoại trước!", MUTED);
             foundKH = null; return;
         }
-        KhachHang kh = khDAO.findBySDT(sdt);
+        Customer kh = khDAO.findBySDT(sdt);
         if (kh == null) {
             setResult(lblKHResult, "✗  Không tìm thấy khách hàng với SĐT: " + sdt, RED);
             foundKH = null;
@@ -529,7 +529,7 @@ public class BillEditDialog extends JDialog {
             setResult(lblNVResult, "✗  Mã NV phải là số (VD: NV001 hoặc 1)", RED);
             foundNV = null; return;
         }
-        NhanVien nv = nvDAO.findById(maNV);
+        Employee nv = nvDAO.findById(maNV);
         if (nv == null) {
             setResult(lblNVResult, "✗  Không tìm thấy nhân viên mã: " + maNV, RED);
             foundNV = null;

@@ -1,7 +1,7 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.model.PhieuThue;
-import otkhongluong.gamestoremanagement.service.ThueService;
+import otkhongluong.gamestoremanagement.model.RentalOrder;
+import otkhongluong.gamestoremanagement.service.RentalService;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -59,17 +59,17 @@ public class RentExtendDialog extends JDialog {
     private static final DateTimeFormatter FMT_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     /* ===== TRẠNG THÁI ===== */
-    private final ThueService service = new ThueService();
+    private final RentalService service = new RentalService();
     private int currentStep = 1;
 
     // Bước 1
     private JTextField txtSDT;
     private JTable tblPhieu;
     private DefaultTableModel tblModel;
-    private List<PhieuThue> searchResults;
+    private List<RentalOrder> searchResults;
 
     // Bước 2
-    private PhieuThue selectedPhieu;
+    private RentalOrder selectedPhieu;
     private JLabel lblInfoNgayThue, lblInfoNgayDK, lblInfoTrangThai;
     private JSpinner spinnerSoNgay;
     private JLabel lblNgayTraMoi;
@@ -111,7 +111,7 @@ public class RentExtendDialog extends JDialog {
 
     /* ══════════════════ PRE-FILL ══════════════════ */
     private void tienDienMaPT(int maPT) {
-        PhieuThue pt = service.getById(maPT);
+        RentalOrder pt = service.getById(maPT);
         if (pt == null || pt.getSoDienThoai() == null) return;
         txtSDT.setText(pt.getSoDienThoai());
         thucHienTimKiem();
@@ -264,7 +264,7 @@ public class RentExtendDialog extends JDialog {
             hienThongBao("Không tìm thấy phiếu thuê đang hoạt động với SDT: " + sdt);
             return;
         }
-        for (PhieuThue pt : searchResults) {
+        for (RentalOrder pt : searchResults) {
             tblModel.addRow(new Object[]{
                 "PT" + pt.getMaPT(),
                 pt.getNgayThue()      != null ? pt.getNgayThue().format(FMT_DATE)      : "—",
@@ -432,16 +432,16 @@ public class RentExtendDialog extends JDialog {
     }
 
     // ✅ SỬA THÀNH
-    private double tinhPhiGiaHan(PhieuThue pt, int soNgay) {
+    private double tinhPhiGiaHan(RentalOrder pt, int soNgay) {
         if (pt.getDanhSachChiTiet() == null) return 0;
         double tong = pt.getDanhSachChiTiet().stream()
-            .mapToDouble(PhieuThue.CTPhieuThue::getGiaThueNgay)  // ← lấy từ SANPHAM
+            .mapToDouble(RentalOrder.CTPhieuThue::getGiaThueNgay)  // ← lấy từ SANPHAM
             .sum();
         return tong * soNgay;
     }
 
     /** Phạt trễ = số ngày quá hạn × 10.000 đ */
-    private double tinhPhatTreHienTai(PhieuThue pt) {
+    private double tinhPhatTreHienTai(RentalOrder pt) {
         if (pt == null || pt.getNgayTraDuKien() == null) return 0;
         LocalDateTime now = LocalDate.now().atStartOfDay();
         if (!now.isAfter(pt.getNgayTraDuKien())) return 0;
@@ -452,7 +452,7 @@ public class RentExtendDialog extends JDialog {
 
     private void nnapDuLieuBuoc2() {
         if (selectedPhieu == null) return;
-        PhieuThue full = service.getById(selectedPhieu.getMaPT());
+        RentalOrder full = service.getById(selectedPhieu.getMaPT());
         if (full == null) { hienThongBao("Không tải được thông tin phiếu thuê!"); return; }
         selectedPhieu = full;
 

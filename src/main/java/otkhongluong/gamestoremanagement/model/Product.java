@@ -1,15 +1,15 @@
 package otkhongluong.gamestoremanagement.model;
 
-public class SanPham {
+public class Product {
 
     private int maSP;
     private int maGame;
     private double giaBan;
     private double giaThueNgay;
 
-    public SanPham() {}
+    public Product() {}
 
-    public SanPham(int maSP, int maGame, double giaBan, double giaThueNgay) {
+    public Product(int maSP, int maGame, double giaBan, double giaThueNgay) {
         this.maSP = maSP;
         this.maGame = maGame;
         this.giaBan = giaBan;

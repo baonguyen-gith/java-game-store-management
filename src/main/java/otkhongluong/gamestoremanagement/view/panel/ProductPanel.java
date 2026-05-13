@@ -1,7 +1,7 @@
 package otkhongluong.gamestoremanagement.view.panel;
 
-import otkhongluong.gamestoremanagement.model.SanPham;
-import otkhongluong.gamestoremanagement.service.SanPhamService;
+import otkhongluong.gamestoremanagement.model.Product;
+import otkhongluong.gamestoremanagement.service.ProductService;
 import otkhongluong.gamestoremanagement.util.IconUtils;
 
 import javax.swing.*;
@@ -48,9 +48,9 @@ public class ProductPanel extends JPanel {
     private boolean isFilterMode = false;   
     private TableRowSorter<DefaultTableModel> rowSorter;
 
-    private SanPhamService service = new SanPhamService();
-    private List<SanPham> allData;
-    private List<SanPham> currentPageData;
+    private ProductService service = new ProductService();
+    private List<Product> allData;
+    private List<Product> currentPageData;
 
     public ProductPanel() {
         setLayout(new BorderLayout(0, 0));
@@ -280,7 +280,7 @@ public class ProductPanel extends JPanel {
             
             // Lấy dữ liệu sản phẩm từ hàng đang chọn (xử lý chính xác cả khi đang lọc/sắp xếp)
             int modelRow = table.convertRowIndexToModel(viewRow);
-            SanPham selected = currentPageData.get(modelRow);
+            Product selected = currentPageData.get(modelRow);
             
             // Gọi hàm mở Dialog sửa
             showEditProductDialog(selected); 
@@ -299,7 +299,7 @@ public class ProductPanel extends JPanel {
             
             // Chuyển đổi chỉ số hàng từ giao diện sang model (quan trọng khi đang lọc/sắp xếp)
             int modelRow = table.convertRowIndexToModel(viewRow);
-            SanPham sp = currentPageData.get(modelRow);
+            Product sp = currentPageData.get(modelRow);
             
             // Hiện hộp thoại xác nhận
             int confirm = JOptionPane.showConfirmDialog(this, 
@@ -326,7 +326,7 @@ public class ProductPanel extends JPanel {
 
     private void rebuildPagination(JPanel panel) {
         panel.removeAll();
-        List<SanPham> filtered = getFilteredData();
+        List<Product> filtered = getFilteredData();
         final int total = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
 
         // Nút Quay lại <
@@ -373,7 +373,7 @@ public class ProductPanel extends JPanel {
         renderPage();
     }
     
-    private List<SanPham> getFilteredData() {
+    private List<Product> getFilteredData() {
         String keyword = txtSearch == null ? "" : txtSearch.getText().trim().toLowerCase();
 
         return allData == null ? java.util.Collections.emptyList() :
@@ -402,7 +402,7 @@ public class ProductPanel extends JPanel {
 
     private void renderPage() {
         tableModel.setRowCount(0);
-        List<SanPham> filtered = getFilteredData();
+        List<Product> filtered = getFilteredData();
 
         int totalPage = (int) Math.ceil((double) filtered.size() / PAGE_SIZE);
         if (currentPage > totalPage) currentPage = totalPage == 0 ? 1 : totalPage;
@@ -412,7 +412,7 @@ public class ProductPanel extends JPanel {
 
         currentPageData = filtered.subList(from, to);
 
-        for (SanPham sp : currentPageData) {
+        for (Product sp : currentPageData) {
             tableModel.addRow(new Object[]{
                 "SP" + String.format("%03d", sp.getMaSP()),
                 "G" + String.format("%03d", sp.getMaGame()),
@@ -476,7 +476,7 @@ public class ProductPanel extends JPanel {
                 }
 
                 // Khởi tạo đối tượng Sản phẩm
-                SanPham sp = new SanPham();
+                Product sp = new Product();
                 sp.setMaGame(Integer.parseInt(txtMaGame.getText().trim()));
                 sp.setGiaBan(Double.parseDouble(txtGiaBan.getText().trim()));
                 sp.setGiaThueNgay(Double.parseDouble(txtGiaThue.getText().trim()));
@@ -496,7 +496,7 @@ public class ProductPanel extends JPanel {
         }
     }
 
-    private void showEditProductDialog(SanPham sp) {
+    private void showEditProductDialog(Product sp) {
         // Tạo Panel chứa các ô nhập liệu và đổ dữ liệu hiện tại vào
         JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
         

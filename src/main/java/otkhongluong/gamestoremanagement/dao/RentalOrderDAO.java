@@ -1,18 +1,18 @@
 package otkhongluong.gamestoremanagement.dao;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import otkhongluong.gamestoremanagement.model.PhieuThue;
+import otkhongluong.gamestoremanagement.model.RentalOrder;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PhieuThueDAO {
+public class RentalOrderDAO {
 
     /* ================= INSERT ================= */
 
-    public boolean insert(PhieuThue pt) {
+    public boolean insert(RentalOrder pt) {
         String sql =
             "INSERT INTO PHIEUTHUE(MaKH, NgayTraDuKien, TienCoc, TrangThai) "
           + "VALUES(?, ?, ?, N'DangThue')";
@@ -41,10 +41,10 @@ public class PhieuThueDAO {
 
     /* ================= INSERT DETAIL ================= */
 
-    private void insertChiTiet(Connection con, PhieuThue pt) throws Exception {
+    private void insertChiTiet(Connection con, RentalOrder pt) throws Exception {
         String sql = "INSERT INTO CTPHIEUTHUE(MaPT, MaCD, MaNV, DonGiaThue) VALUES(?, ?, ?, ?)";
         PreparedStatement ps = con.prepareStatement(sql);
-        for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+        for (RentalOrder.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
             ps.setInt(1, pt.getMaPT());
             ps.setInt(2, ct.getMaCD());
             ps.setInt(3, ct.getMaNV());
@@ -56,8 +56,8 @@ public class PhieuThueDAO {
 
     /* ================= FIND ALL ================= */
 
-    public List<PhieuThue> findAll() {
-        List<PhieuThue> list = new ArrayList<>();
+    public List<RentalOrder> findAll() {
+        List<RentalOrder> list = new ArrayList<>();
         String sql =
             "SELECT pt.MaPT, MIN(ct.MaNV) AS MaNV, pt.NgayThue, " +
             "       kh.HoTen, kh.SDT, pt.NgayTraDuKien, pt.TrangThai " +
@@ -72,7 +72,7 @@ public class PhieuThueDAO {
              ResultSet rs = ps.executeQuery()) {
 
             while (rs.next()) {
-                PhieuThue pt = new PhieuThue();
+                RentalOrder pt = new RentalOrder();
                 pt.setMaPT(rs.getInt("MaPT"));
                 pt.setMaNV(rs.getInt("MaNV"));
                 pt.setTenKhachHang(rs.getString("HoTen"));
@@ -92,7 +92,7 @@ public class PhieuThueDAO {
 
     /* ================= FIND BY ID ================= */
 
-    public PhieuThue findById(int id) {
+    public RentalOrder findById(int id) {
         String sql =
             "SELECT pt.*, kh.HoTen AS TenKH, MIN(nv.HoTen) AS TenNV " +
             "FROM PHIEUTHUE pt " +
@@ -108,7 +108,7 @@ public class PhieuThueDAO {
             ps.setInt(1, id);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
-                PhieuThue pt = map(rs);
+                RentalOrder pt = map(rs);
                 pt.setDanhSachChiTiet(getChiTiet(con, id));
                 return pt;
             }
@@ -121,8 +121,8 @@ public class PhieuThueDAO {
     /* ================= LOAD DETAIL ================= */
 
     // ✅ SỬA THÀNH — thêm sp.GiaThueNgay vào SELECT rồi set vào object
-    private List<PhieuThue.CTPhieuThue> getChiTiet(Connection con, int maPT) {
-        List<PhieuThue.CTPhieuThue> list = new ArrayList<>();
+    private List<RentalOrder.CTPhieuThue> getChiTiet(Connection con, int maPT) {
+        List<RentalOrder.CTPhieuThue> list = new ArrayList<>();
         String sql =
             "SELECT g.TenGame, ct.MaCD, ct.DonGiaThue, cd.TrangThai, sp.GiaThueNgay " + // ← THÊM sp.GiaThueNgay
             "FROM CTPHIEUTHUE ct " +
@@ -135,7 +135,7 @@ public class PhieuThueDAO {
             ps.setInt(1, maPT);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
-                PhieuThue.CTPhieuThue ct = new PhieuThue.CTPhieuThue(
+                RentalOrder.CTPhieuThue ct = new RentalOrder.CTPhieuThue(
                     rs.getInt("MaCD"),
                     rs.getString("TenGame"),
                     rs.getDouble("DonGiaThue"),
@@ -185,7 +185,7 @@ public class PhieuThueDAO {
 
     /* ================= UPDATE ================= */
 
-    public boolean update(PhieuThue pt) {
+    public boolean update(RentalOrder pt) {
         String sql =
             "UPDATE PHIEUTHUE " +
             "SET MaKH = ?, NgayTraDuKien = ?, TienCoc = ?, TrangThai = ? " +
@@ -250,8 +250,8 @@ public class PhieuThueDAO {
         }
     }
     
-    // Thêm vào PhieuThueDAO.java
-    public boolean insertWithConnection(PhieuThue pt, Connection con) throws SQLException {
+    // Thêm vào RentalOrderDAO.java
+    public boolean insertWithConnection(RentalOrder pt, Connection con) throws SQLException {
         // Copy logic của insert() hiện tại nhưng dùng con thay vì tự mở connection
         // KHÔNG gọi con.commit() / con.close() ở đây
         String sql = "INSERT INTO PHIEUTHUE (MaKH, MaNV, NgayThue, NgayTraDuKien, TienCoc, TienPhat, TrangThai) " +
@@ -269,7 +269,7 @@ public class PhieuThueDAO {
             pt.setMaPT(gk.getInt(1)); // lưu lại MaPT để dùng sau
 
             // Insert CTPHIEUTHUE
-            for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+            for (RentalOrder.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
                 String sqlCT = "INSERT INTO CTPHIEUTHUE (MaPT, MaCD, MaNV, DonGiaThue) VALUES (?, ?, ?, ?)";
                 try (PreparedStatement psCT = con.prepareStatement(sqlCT)) {
                     psCT.setInt(1, pt.getMaPT());
@@ -310,7 +310,7 @@ public class PhieuThueDAO {
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
-// Thêm vào class PhieuThueDAO
+// Thêm vào class RentalOrderDAO
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -327,7 +327,7 @@ public class PhieuThueDAO {
  * @param ngayTraMoi Ngày trả dự kiến mới (đã validate > NgayThue)
  * @return true nếu cập nhật thành công toàn bộ, false nếu có lỗi (đã rollback)
  */
-    // ── Trong PhieuThueDAO ──────────────────────────────────────────────────────
+    // ── Trong RentalOrderDAO ──────────────────────────────────────────────────────
 
     public boolean updateNgayTraVaDonGia(int maPT, LocalDateTime ngayTraMoi) {
 
@@ -489,8 +489,8 @@ public class PhieuThueDAO {
 
     /* ================= MAPPER ================= */
 
-    private PhieuThue map(ResultSet rs) throws SQLException {
-        PhieuThue pt = new PhieuThue();
+    private RentalOrder map(ResultSet rs) throws SQLException {
+        RentalOrder pt = new RentalOrder();
         pt.setMaPT(rs.getInt("MaPT"));
         pt.setMaKH(rs.getInt("MaKH")); 
         pt.setTenKhachHang(rs.getString("TenKH"));

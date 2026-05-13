@@ -115,6 +115,19 @@ public class AdminView extends JFrame {
     // ══════════════════════════════════════════════════════════
     // SIDEBAR
     // ══════════════════════════════════════════════════════════
+    
+    private void handleLogout() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+            "Bạn có chắc muốn đăng xuất?", "Đăng xuất",
+            JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        dispose();
+
+        LoginController ctrl = new LoginController();
+        LoginView loginView  = new LoginView(ctrl);  // constructor này gọi ctrl.setView(this) bên trong
+        loginView.setVisible(true);
+    }
 
     private JPanel createSidebar() {
         JPanel sidebar = new JPanel(new BorderLayout());
@@ -167,9 +180,8 @@ public class AdminView extends JFrame {
         JButton btnAdmin     = createMenuButton("Quản trị",       "/icons/manage_icon.png");
         JButton btnSales     = createMenuButton("Bán hàng",       "/icons/sales_icon.png");
         JButton btnReport    = createMenuButton("Thống kê",       "/icons/statistic_icon.png");
-        JButton btnPoint     = createMenuButton("Điểm khách",     "/icons/star_icon.png");
 
-        for (JButton b : new JButton[]{btnHome, btnGame, btnAdmin, btnSales, btnReport, btnPoint}) {
+        for (JButton b : new JButton[]{btnHome, btnGame, btnAdmin, btnSales, btnReport}) {
             b.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
             menu.add(b);
             menu.add(Box.createVerticalStrut(2));
@@ -203,11 +215,7 @@ public class AdminView extends JFrame {
         btnAdmin.addActionListener(e  -> switchTab(btnAdmin,  "ADMIN"));
         btnSales.addActionListener(e  -> switchTab(btnSales,  "SALES"));
         btnReport.addActionListener(e -> switchTab(btnReport, "REPORT"));
-        btnPoint.addActionListener(e  -> switchTab(btnPoint,  "POINT"));
-        btnLogout.addActionListener(e -> {
-            dispose();
-            new LoginView(new LoginController()).setVisible(true);
-        });
+        btnLogout.addActionListener(e -> handleLogout());
 
         return sidebar;
     }

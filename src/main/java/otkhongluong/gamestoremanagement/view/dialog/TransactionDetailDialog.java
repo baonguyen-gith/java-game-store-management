@@ -1,7 +1,7 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.model.HoaDon;
-import otkhongluong.gamestoremanagement.service.HoaDonService;
+import otkhongluong.gamestoremanagement.model.Invoice;
+import otkhongluong.gamestoremanagement.service.InvoiceService;
 import javax.swing.*;
 import java.awt.*;
 
@@ -13,11 +13,11 @@ public class TransactionDetailDialog {
 
         if(type.contains("hóa") || type.contains("hoa")){
 
-            HoaDonService service = new HoaDonService();
-            HoaDon hd = service.getHoaDonById(id);
+            InvoiceService service = new InvoiceService();
+            Invoice hd = service.getHoaDonById(id);
 
             if(hd != null){
-                new BillDetailDialog(parent, id).setVisible(true);
+                new InvoiceDetailDialog(parent, id).setVisible(true);
             }else{
                 JOptionPane.showMessageDialog(parent,"Không tìm thấy hóa đơn!");
             }

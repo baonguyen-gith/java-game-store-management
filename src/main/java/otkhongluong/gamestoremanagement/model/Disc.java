@@ -1,6 +1,6 @@
 package otkhongluong.gamestoremanagement.model;
 
-public class CD {
+public class Disc {
 
     private int maCD;
     private int maSP;
@@ -8,9 +8,9 @@ public class CD {
     private String trangThai; 
     // SAN SANG / DANG THUE / HONG
 
-    public CD() {}
+    public Disc() {}
 
-    public CD(int maCD, int maSP, String tinhTrang, String trangThai) {
+    public Disc(int maCD, int maSP, String tinhTrang, String trangThai) {
         this.maCD = maCD;
         this.maSP = maSP;
         this.tinhTrang = tinhTrang;

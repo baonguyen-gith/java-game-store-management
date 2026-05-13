@@ -18,7 +18,8 @@ public class LoginView extends JFrame {
 
     public LoginView(LoginController controller) {
         this.controller = controller;
-
+        controller.setView(this);
+        
         setTitle("Login");
         setSize(1000, 700);
         setLocationRelativeTo(null);
@@ -230,38 +231,22 @@ public class LoginView extends JFrame {
     }
 
     // ===== Login xử lý =====
+    // ✅ View không biết gì về logic sau login
     private void handleLogin() {
-        try {
-            String username = txtUsername.getText();
-            String password = new String(txtPassword.getPassword());
+        String username = txtUsername.getText();
+        String password = new String(txtPassword.getPassword());
+        if (username.equals("Username")) username = "";
+        if (password.equals("Password")) password = "";
+        controller.handleLogin(username, password);  // Chỉ một dòng
+    }
 
-            if (username.equals("Username")) username = "";
-            if (password.equals("Password")) password = "";
+    // ✅ View chỉ cung cấp method để Controller gọi lại
+    public void showError(String message) {
+        JOptionPane.showMessageDialog(this, message);
+    }
 
-            User user = controller.login(username, password);
-
-            if (user != null) {
-                JOptionPane.showMessageDialog(this, "Login thành công!");
-                
-                Session.setMaNV(user.getMaUser());
-                this.dispose(); // đóng login
-
-                // 👉 PHÂN QUYỀN TẠI ĐÂY
-                if (controller.isAdmin(user)) {
-                    new AdminView(user).setVisible(true);
-                } else if (controller.isStaff(user)) {
-                    new StaffView(user).setVisible(true);
-                } else {
-                    JOptionPane.showMessageDialog(this, "Không xác định role!");
-                }
-
-            } else {
-                JOptionPane.showMessageDialog(this, "Sai tài khoản hoặc mật khẩu!");
-            }
-
-        } catch (IllegalArgumentException e) {
-            JOptionPane.showMessageDialog(this, e.getMessage());
-        }
+    public void showSuccess(String message) {
+        JOptionPane.showMessageDialog(this, message);
     }
 
     // ===== Gradient background =====

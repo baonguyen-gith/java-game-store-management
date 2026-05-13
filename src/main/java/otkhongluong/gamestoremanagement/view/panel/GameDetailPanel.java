@@ -1,7 +1,7 @@
 package otkhongluong.gamestoremanagement.view.panel;
 
 import otkhongluong.gamestoremanagement.model.Game;
-import otkhongluong.gamestoremanagement.view.dialog.BillAddDialog;
+import otkhongluong.gamestoremanagement.view.dialog.InvoiceAddDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentAddDialog;
 
 import javax.swing.*;
@@ -372,8 +372,8 @@ public class GameDetailPanel extends JPanel {
     // ── ACTIONS ─────────────────────────────────────────────────
     private void openBillAdd(String loai) {
         Frame parent = (Frame) SwingUtilities.getWindowAncestor(this);
-        // TODO: truyền game + loai vào BillAddDialog nếu dialog hỗ trợ pre-fill
-        new BillAddDialog(parent).setVisible(true);
+        // TODO: truyền game + loai vào InvoiceAddDialog nếu dialog hỗ trợ pre-fill
+        new InvoiceAddDialog(parent).setVisible(true);
     }
 
     private void openRent() {

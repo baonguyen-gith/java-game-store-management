@@ -1,7 +1,7 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.model.PhieuThue;
-import otkhongluong.gamestoremanagement.service.ThueService;
+import otkhongluong.gamestoremanagement.model.RentalOrder;
+import otkhongluong.gamestoremanagement.service.RentalService;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -63,7 +63,7 @@ public class RentReturnDialog extends JDialog {
     // =========================================================
     // DAO / SERVICE
     // =========================================================
-    private final ThueService service = new ThueService();
+    private final RentalService service = new RentalService();
 
     // =========================================================
     // STATE
@@ -74,10 +74,10 @@ public class RentReturnDialog extends JDialog {
     private JTextField        txtSDT;
     private JTable            tblPhieu;
     private DefaultTableModel tblModel;
-    private List<PhieuThue>   searchResults;
+    private List<RentalOrder>   searchResults;
 
     // Bước 2
-    private PhieuThue         selectedPhieu;
+    private RentalOrder         selectedPhieu;
     private JTable            tblChiTiet;
     private DefaultTableModel tblChiTietModel;
     private JLabel            lblNgayThue, lblNgayDK, lblTrangThai;
@@ -131,7 +131,7 @@ public class RentReturnDialog extends JDialog {
     }
 
     private void prefillFromMaPT(int id) {
-        PhieuThue pt = service.getById(id);
+        RentalOrder pt = service.getById(id);
         if (pt != null && pt.getSoDienThoai() != null) {
             txtSDT.setText(pt.getSoDienThoai());
             doSearch();
@@ -281,7 +281,7 @@ public class RentReturnDialog extends JDialog {
         String sdt = txtSDT.getText().trim();
         if (sdt.isEmpty()) { showMsg("Vui lòng nhập số điện thoại!"); return; }
 
-        List<PhieuThue> all = service.getAll();
+        List<RentalOrder> all = service.getAll();
         searchResults = all.stream()
             .filter(pt -> pt.getSoDienThoai() != null
                        && pt.getSoDienThoai().contains(sdt)
@@ -295,7 +295,7 @@ public class RentReturnDialog extends JDialog {
         }
 
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-        for (PhieuThue pt : searchResults) {
+        for (RentalOrder pt : searchResults) {
             tblModel.addRow(new Object[]{
                 "PT" + pt.getMaPT(),
                 pt.getTenKhachHang() != null ? pt.getTenKhachHang() : "-",
@@ -396,7 +396,7 @@ public class RentReturnDialog extends JDialog {
     private void loadStep2Data() {
         if (selectedPhieu == null) return;
 
-        PhieuThue full = service.getById(selectedPhieu.getMaPT());
+        RentalOrder full = service.getById(selectedPhieu.getMaPT());
         if (full == null) { showMsg("Không tải được thông tin phiếu thuê!"); return; }
         selectedPhieu = full;
 
@@ -421,7 +421,7 @@ public class RentReturnDialog extends JDialog {
         boolean diemHienThi = false;
         if (selectedPhieu.getDanhSachChiTiet() != null) {
             for (int idx = 0; idx < selectedPhieu.getDanhSachChiTiet().size(); idx++) {
-                PhieuThue.CTPhieuThue ct = selectedPhieu.getDanhSachChiTiet().get(idx);
+                RentalOrder.CTPhieuThue ct = selectedPhieu.getDanhSachChiTiet().get(idx);
                 String raw = ct.getTinhTrang() != null ? ct.getTinhTrang() : "";
                 String tinhTrangHienThi = raw.split("\\|")[0];
 
@@ -457,7 +457,7 @@ public class RentReturnDialog extends JDialog {
         txtChiPhiHuHong.setText("0");
     }
 
-    private double tinhPhatTreHan(PhieuThue pt, LocalDateTime ngayTra) {
+    private double tinhPhatTreHan(RentalOrder pt, LocalDateTime ngayTra) {
         if (pt == null || ngayTra == null || pt.getNgayTraDuKien() == null) return 0;
         LocalDateTime ngayDK = pt.getNgayTraDuKien();
         if (!ngayTra.isAfter(ngayDK)) return 0;
@@ -559,7 +559,7 @@ public class RentReturnDialog extends JDialog {
         try {
             double tienThueGoc = 0;
             if (selectedPhieu.getDanhSachChiTiet() != null)
-                for (PhieuThue.CTPhieuThue ct : selectedPhieu.getDanhSachChiTiet())
+                for (RentalOrder.CTPhieuThue ct : selectedPhieu.getDanhSachChiTiet())
                     tienThueGoc += ct.getDonGiaThue();
 
             int diemDaGiam = diemDaTruTheoMaPT; // ✅ lấy từ DIEM_LICHSU
@@ -722,7 +722,7 @@ public class RentReturnDialog extends JDialog {
         try {
             double tienThueGoc = 0;
             if (selectedPhieu.getDanhSachChiTiet() != null)
-                for (PhieuThue.CTPhieuThue ct : selectedPhieu.getDanhSachChiTiet())
+                for (RentalOrder.CTPhieuThue ct : selectedPhieu.getDanhSachChiTiet())
                     tienThueGoc += ct.getDonGiaThue();
 
             int diemDaGiam = diemDaTruTheoMaPT; // ✅ lấy từ DIEM_LICHSU

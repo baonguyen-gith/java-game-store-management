@@ -25,6 +25,12 @@ import java.util.List;
  * Tab 5: Tình trạng CD   — Summary KPI + bảng chi tiết
  * Tab 6: Quá hạn         — Phiếu thuê quá hạn, tiền phạt
  * Tab 7: Khách VIP       — Top khách hàng theo tổng chi tiêu
+ *
+ * FIX:
+ *   - Tất cả query SUM(TienCoc+TienPhat) FROM PHIEUTHUE đều lọc TrangThai='DaTra'
+ *     → chỉ tính phiếu đã hoàn thành, không tính cọc đang giữ
+ *   - Nút Refresh rebuild lại tab đang xem
+ *   - makeTabButton lưu key vào clientProperty để Refresh biết tab nào đang active
  */
 public class ReportPanel extends JPanel {
 
@@ -92,13 +98,14 @@ public class ReportPanel extends JPanel {
         titleWrap.add(sep);
         titleWrap.add(Box.createVerticalStrut(14));
 
+        // ── Tab bar + Refresh ──
         JPanel tabBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         tabBar.setBackground(BG_DARK);
 
-        String[] tabs = {"Tổng quan","Doanh thu tháng","Doanh thu năm",
-                         "Top Game","Tình trạng CD","Quá hạn","Khách VIP"};
-        String[] keys = {"OVERVIEW","MONTHLY","YEARLY",
-                         "TOPGAME","CD_STATUS","OVERDUE","VIP"};
+        String[] tabs = {"Tổng quan", "Doanh thu tháng", "Doanh thu năm",
+                         "Top Game", "Tình trạng CD", "Quá hạn", "Khách VIP"};
+        String[] keys = {"OVERVIEW", "MONTHLY", "YEARLY",
+                         "TOPGAME", "CD_STATUS", "OVERDUE", "VIP"};
 
         for (int i = 0; i < tabs.length; i++) {
             JButton btn = makeTabButton(tabs[i], keys[i]);
@@ -106,9 +113,53 @@ public class ReportPanel extends JPanel {
             if (i == 0) { setActiveTab(btn); activeTab = btn; }
         }
 
+        // ── Nút Refresh ──────────────────────────────────────────────────────
+        tabBar.add(Box.createHorizontalStrut(12));
+        JButton btnRefresh = new JButton("⟳  Làm mới") {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                boolean hov = getModel().isRollover();
+                g2.setColor(hov ? new Color(55, 45, 110) : new Color(38, 32, 80));
+                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
+                g2.dispose();
+                setForeground(ACCENT_LIGHT);
+                super.paintComponent(g);
+            }
+        };
+        btnRefresh.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btnRefresh.setFocusPainted(false);
+        btnRefresh.setBorderPainted(false);
+        btnRefresh.setContentAreaFilled(false);
+        btnRefresh.setOpaque(false);
+        btnRefresh.setBorder(new EmptyBorder(7, 14, 7, 14));
+        btnRefresh.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btnRefresh.addActionListener(e -> doRefresh());
+        tabBar.add(btnRefresh);
+
         titleWrap.add(tabBar);
         wrap.add(titleWrap, BorderLayout.CENTER);
         return wrap;
+    }
+
+    /** Rebuild toàn bộ contentStack, giữ nguyên tab đang active. */
+    private void doRefresh() {
+        String currentKey = activeTab != null
+            ? (String) activeTab.getClientProperty("key")
+            : "OVERVIEW";
+        if (currentKey == null) currentKey = "OVERVIEW";
+
+        contentStack.removeAll();
+        contentStack.add(buildOverview(),  "OVERVIEW");
+        contentStack.add(buildMonthly(),   "MONTHLY");
+        contentStack.add(buildYearly(),    "YEARLY");
+        contentStack.add(buildTopGame(),   "TOPGAME");
+        contentStack.add(buildCDStatus(),  "CD_STATUS");
+        contentStack.add(buildOverdue(),   "OVERDUE");
+        contentStack.add(buildVIP(),       "VIP");
+        cardLayout.show(contentStack, currentKey);
+        contentStack.revalidate();
+        contentStack.repaint();
     }
 
     private JButton makeTabButton(String label, String key) {
@@ -131,7 +182,11 @@ public class ReportPanel extends JPanel {
         btn.setOpaque(false);
         btn.setBorder(new EmptyBorder(7, 14, 7, 14));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.addActionListener(e -> { setActiveTab(btn); cardLayout.show(contentStack, key); });
+        btn.putClientProperty("key", key); // ✅ lưu key để Refresh dùng
+        btn.addActionListener(e -> {
+            setActiveTab(btn);
+            cardLayout.show(contentStack, key);
+        });
         return btn;
     }
 
@@ -167,22 +222,32 @@ public class ReportPanel extends JPanel {
         JPanel root = new JPanel(new BorderLayout(0, 20));
         root.setBackground(BG_DARK);
 
+        // Doanh thu bán: TongTien đã trừ TienGiam → tiền thực thu ✅
         double doanhThuThang = queryDouble(
             "SELECT ISNULL(SUM(TongTien),0) FROM HOADON " +
-            "WHERE MONTH(NgayLap)=MONTH(GETDATE()) AND YEAR(NgayLap)=YEAR(GETDATE()) AND TrangThai='DaThanhToan'");
+            "WHERE MONTH(NgayLap)=MONTH(GETDATE()) AND YEAR(NgayLap)=YEAR(GETDATE()) " +
+            "AND TrangThai='DaThanhToan'");
+
+        // Thu thuê: chỉ tính phiếu DaTra — đã hoàn thành ✅ (FIX: bỏ phiếu DangThue)
         double tienThueThang = queryDouble(
-            "SELECT ISNULL(SUM(TienCoc+TienPhat),0) FROM PHIEUTHUE " +
-            "WHERE MONTH(NgayThue)=MONTH(GETDATE()) AND YEAR(NgayThue)=YEAR(GETDATE())");
+            "SELECT ISNULL(SUM(ct.DonGiaThue),0) + ISNULL(SUM(pt.TienPhat),0) " +
+            "FROM PHIEUTHUE pt " +
+            "JOIN CTPHIEUTHUE ct ON pt.MaPT = ct.MaPT " +
+            "WHERE MONTH(pt.NgayThue)=MONTH(GETDATE()) AND YEAR(pt.NgayThue)=YEAR(GETDATE()) " +
+            "AND pt.TrangThai='DaTra'");
+
         int soPhieuQuaHan = queryInt(
             "SELECT COUNT(*) FROM PHIEUTHUE WHERE TrangThai='DangThue' AND NgayTraDuKien < GETDATE()");
+
         int soKhachHoatDong = queryInt(
             "SELECT COUNT(DISTINCT MaKH) FROM HOADON " +
-            "WHERE MONTH(NgayLap)=MONTH(GETDATE()) AND YEAR(NgayLap)=YEAR(GETDATE())");
+            "WHERE MONTH(NgayLap)=MONTH(GETDATE()) AND YEAR(NgayLap)=YEAR(GETDATE()) " +
+            "AND MaKH IS NOT NULL");
 
         JPanel kpiRow = new JPanel(new GridLayout(1, 4, 16, 0));
         kpiRow.setBackground(BG_DARK);
         kpiRow.add(makeKPICard("Doanh thu tháng",  formatMoney(doanhThuThang), "Bán hàng (đã TT)",       COLOR_REVENUE,  "▲"));
-        kpiRow.add(makeKPICard("Thu thuê tháng",   formatMoney(tienThueThang), "Phiếu thuê CD",          COLOR_RENT,     "▲"));
+        kpiRow.add(makeKPICard("Thu thuê tháng",   formatMoney(tienThueThang), "Phiếu thuê hoàn thành",  COLOR_RENT,     "▲"));
         kpiRow.add(makeKPICard("Phiếu quá hạn",   String.valueOf(soPhieuQuaHan),   "Cần xử lý ngay",    COLOR_OVERDUE,  "⚠"));
         kpiRow.add(makeKPICard("Khách hoạt động",  String.valueOf(soKhachHoatDong), "Có GD tháng này",  COLOR_CUSTOMER, "♦"));
 
@@ -235,7 +300,7 @@ public class ReportPanel extends JPanel {
         JComboBox<Integer> cboMonth = makeCombo(new Integer[]{1,2,3,4,5,6,7,8,9,10,11,12});
         cboMonth.setSelectedItem(nowMonth);
 
-        List<Integer> yearsM = getYearsWithData("HOADON","NgayLap");
+        List<Integer> yearsM = getYearsWithData("HOADON", "NgayLap");
         JComboBox<Integer> cboYear = makeCombo(yearsM.toArray(new Integer[0]));
         if (yearsM.contains(nowYear)) cboYear.setSelectedItem(nowYear);
 
@@ -243,7 +308,6 @@ public class ReportPanel extends JPanel {
         filterBar.add(Box.createHorizontalStrut(8));
         filterBar.add(makeFilterLabel("Năm:"));   filterBar.add(cboYear);
 
-        // Chart
         JLabel chartTitle = new JLabel();
         chartTitle.setFont(new Font("Segoe UI", Font.BOLD, 14));
         chartTitle.setForeground(TEXT_WHITE);
@@ -255,8 +319,7 @@ public class ReportPanel extends JPanel {
         chartCard.add(chartTitle, BorderLayout.NORTH);
         chartCard.add(chartPanel, BorderLayout.CENTER);
 
-        // Table
-        String[] cols = {"Ngày","Số HĐ","Doanh thu bán","Thu thuê","Tổng ngày"};
+        String[] cols = {"Ngày", "Số HĐ", "Doanh thu bán", "Thu thuê (hoàn thành)", "Tổng ngày"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -271,7 +334,7 @@ public class ReportPanel extends JPanel {
             chartPanel.repaint();
             model.setRowCount(0);
             try (Connection con = DBConnection.getConnection()) {
-                // Bán
+                // Bán — TongTien đã trừ giảm giá ✅
                 PreparedStatement ps = con.prepareStatement(
                     "SELECT DAY(NgayLap) as D, COUNT(*) as SoHD, ISNULL(SUM(TongTien),0) as DT " +
                     "FROM HOADON WHERE MONTH(NgayLap)=? AND YEAR(NgayLap)=? AND TrangThai='DaThanhToan' " +
@@ -280,10 +343,15 @@ public class ReportPanel extends JPanel {
                 ResultSet rs = ps.executeQuery();
                 Map<Integer, double[]> dayMap = new TreeMap<>();
                 while (rs.next()) dayMap.put(rs.getInt("D"), new double[]{rs.getInt("SoHD"), rs.getDouble("DT")});
-                // Thuê
+
+                // Thuê — chỉ DaTra ✅ (FIX)
                 PreparedStatement ps2 = con.prepareStatement(
-                    "SELECT DAY(NgayThue) as D, ISNULL(SUM(TienCoc+TienPhat),0) as TT " +
-                    "FROM PHIEUTHUE WHERE MONTH(NgayThue)=? AND YEAR(NgayThue)=? GROUP BY DAY(NgayThue)");
+                    "SELECT DAY(pt.NgayThue) as D, " +
+                    "ISNULL(SUM(ct.DonGiaThue),0) + ISNULL(SUM(pt.TienPhat),0) as TT " +
+                    "FROM PHIEUTHUE pt " +
+                    "JOIN CTPHIEUTHUE ct ON pt.MaPT = ct.MaPT " +
+                    "WHERE MONTH(pt.NgayThue)=? AND YEAR(pt.NgayThue)=? AND pt.TrangThai='DaTra' " +
+                    "GROUP BY DAY(pt.NgayThue)");
                 ps2.setInt(1, m); ps2.setInt(2, y);
                 ResultSet rs2 = ps2.executeQuery();
                 Map<Integer, Double> rentMap = new HashMap<>();
@@ -323,14 +391,13 @@ public class ReportPanel extends JPanel {
         JPanel root = new JPanel(new BorderLayout(0, 16));
         root.setBackground(BG_DARK);
 
-        // Gom năm có dữ liệu từ cả bán lẫn thuê
         List<Integer> years = getYearsWithData("HOADON", "NgayLap");
-        for (int y : getYearsWithData("PHIEUTHUE", "NgayThue")) {
+        // Gom thêm năm từ phiếu thuê đã hoàn thành ✅ (FIX)
+        for (int y : getYearsWithDataFiltered("PHIEUTHUE", "NgayThue", "TrangThai='DaTra'")) {
             if (!years.contains(y)) years.add(y);
         }
         Collections.sort(years, Collections.reverseOrder());
 
-        // ── Filter bar ──
         JPanel filterBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 4));
         filterBar.setBackground(BG_DARK);
 
@@ -339,9 +406,9 @@ public class ReportPanel extends JPanel {
             : years.toArray(new Integer[0]));
         if (!years.isEmpty()) cboYear.setSelectedItem(years.get(0));
 
-        JLabel lblBan  = makeSummaryBadge("Tổng bán: —",   COLOR_REVENUE);
-        JLabel lblThue = makeSummaryBadge("Tổng thuê: —",  COLOR_RENT);
-        JLabel lblAll  = makeSummaryBadge("Tổng cộng: —",  ACCENT_LIGHT);
+        JLabel lblBan  = makeSummaryBadge("Tổng bán: —",  COLOR_REVENUE);
+        JLabel lblThue = makeSummaryBadge("Tổng thuê: —", COLOR_RENT);
+        JLabel lblAll  = makeSummaryBadge("Tổng cộng: —", ACCENT_LIGHT);
 
         filterBar.add(makeFilterLabel("Năm:"));
         filterBar.add(cboYear);
@@ -350,7 +417,6 @@ public class ReportPanel extends JPanel {
         filterBar.add(lblThue);
         filterBar.add(lblAll);
 
-        // ── Chart ──
         YearlyBarChart chartPanel = new YearlyBarChart(
             years.isEmpty() ? LocalDate.now().getYear() : years.get(0));
         chartPanel.setPreferredSize(new Dimension(0, 260));
@@ -364,12 +430,10 @@ public class ReportPanel extends JPanel {
         chartCard.add(chartTitle, BorderLayout.NORTH);
         chartCard.add(chartPanel, BorderLayout.CENTER);
 
-        // ── Table ──
-        String[] cols = {"Tháng","Số HĐ bán","Doanh thu bán","Số PT thuê","Thu thuê","Tổng tháng"};
+        String[] cols = {"Tháng", "Số HĐ bán", "Doanh thu bán", "Số PT thuê", "Thu thuê (hoàn thành)", "Tổng tháng"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
-        // Renderer riêng: highlight cột tổng + dòng TỔNG NĂM
         JTable table = new JTable(model) {
             @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
@@ -377,13 +441,11 @@ public class ReportPanel extends JPanel {
                     c.setBackground(row % 2 == 0 ? TBL_ROW_A : TBL_ROW_B);
                     c.setForeground(TEXT_WHITE);
                     c.setFont(FONT_CELL);
-                    // Dòng tổng
                     String first = model.getValueAt(row, 0).toString();
                     if (first.startsWith("TỔNG")) {
                         c.setFont(new Font("Segoe UI", Font.BOLD, 13));
                         c.setForeground(ACCENT_LIGHT);
                     }
-                    // Cột tổng tháng
                     if (col == 5 && !first.startsWith("TỔNG")) {
                         c.setFont(new Font("Segoe UI", Font.BOLD, 13));
                         c.setForeground(ACCENT_LIGHT);
@@ -398,9 +460,9 @@ public class ReportPanel extends JPanel {
         styleTable(table);
         JScrollPane sp = styledScrollPane(table);
 
-        // ── Load ──
         String[] tenThang = {"Tháng 1","Tháng 2","Tháng 3","Tháng 4","Tháng 5","Tháng 6",
                              "Tháng 7","Tháng 8","Tháng 9","Tháng 10","Tháng 11","Tháng 12"};
+
         Runnable load = () -> {
             int y = cboYear.getSelectedItem() != null
                 ? (Integer) cboYear.getSelectedItem()
@@ -414,6 +476,7 @@ public class ReportPanel extends JPanel {
             int[]    ptArr   = new int[12];
 
             try (Connection con = DBConnection.getConnection()) {
+                // Bán ✅
                 PreparedStatement ps = con.prepareStatement(
                     "SELECT MONTH(NgayLap) as M, COUNT(*) as SoHD, ISNULL(SUM(TongTien),0) as DT " +
                     "FROM HOADON WHERE YEAR(NgayLap)=? AND TrangThai='DaThanhToan' GROUP BY MONTH(NgayLap)");
@@ -424,9 +487,15 @@ public class ReportPanel extends JPanel {
                     banArr[m] = rs.getDouble("DT");
                     hdArr[m]  = rs.getInt("SoHD");
                 }
+
+                // Thuê — chỉ DaTra ✅ (FIX)
                 PreparedStatement ps2 = con.prepareStatement(
-                    "SELECT MONTH(NgayThue) as M, COUNT(*) as SoPT, ISNULL(SUM(TienCoc+TienPhat),0) as TT " +
-                    "FROM PHIEUTHUE WHERE YEAR(NgayThue)=? GROUP BY MONTH(NgayThue)");
+                    "SELECT MONTH(pt.NgayThue) as M, COUNT(DISTINCT pt.MaPT) as SoPT, " +
+                    "ISNULL(SUM(ct.DonGiaThue),0) + ISNULL(SUM(pt.TienPhat),0) as TT " +
+                    "FROM PHIEUTHUE pt " +
+                    "JOIN CTPHIEUTHUE ct ON pt.MaPT = ct.MaPT " +
+                    "WHERE YEAR(pt.NgayThue)=? AND pt.TrangThai='DaTra' " +
+                    "GROUP BY MONTH(pt.NgayThue)");
                 ps2.setInt(1, y);
                 ResultSet rs2 = ps2.executeQuery();
                 while (rs2.next()) {
@@ -451,9 +520,12 @@ public class ReportPanel extends JPanel {
                 tongBan  += banArr[i];
                 tongThue += thueArr[i];
             }
-            model.addRow(new Object[]{"TỔNG NĂM " + y, "", formatMoney(tongBan), "", formatMoney(tongThue), formatMoney(tongBan + tongThue)});
+            model.addRow(new Object[]{
+                "TỔNG NĂM " + y, "", formatMoney(tongBan),
+                "", formatMoney(tongThue), formatMoney(tongBan + tongThue)
+            });
 
-            lblBan.setText("  Bán: "  + formatMoney(tongBan)  + "  ");
+            lblBan.setText("  Bán: "   + formatMoney(tongBan)  + "  ");
             lblThue.setText("  Thuê: " + formatMoney(tongThue) + "  ");
             lblAll.setText("  Tổng: "  + formatMoney(tongBan + tongThue) + "  ");
         };
@@ -478,8 +550,8 @@ public class ReportPanel extends JPanel {
         JPanel root = new JPanel(new GridLayout(1, 2, 16, 0));
         root.setBackground(BG_DARK);
 
-        // Top bán
-        String[] colsBan = {"#","Tên Game","Thể loại","Lượt bán","Doanh thu"};
+        // Top bán ✅
+        String[] colsBan = {"#", "Tên Game", "Thể loại", "Lượt bán", "Doanh thu"};
         DefaultTableModel mBan = new DefaultTableModel(colsBan, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -497,8 +569,8 @@ public class ReportPanel extends JPanel {
                 rs.getInt("LuotBan"), formatMoney(rs.getDouble("DT"))});
         } catch (Exception ex) { ex.printStackTrace(); }
 
-        // Top thuê
-        String[] colsThue = {"#","Tên Game","Thể loại","Lượt thuê"};
+        // Top thuê ✅ (thống kê lượt, không lọc trạng thái — hợp lý)
+        String[] colsThue = {"#", "Tên Game", "Thể loại", "Lượt thuê"};
         DefaultTableModel mThue = new DefaultTableModel(colsThue, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -544,16 +616,17 @@ public class ReportPanel extends JPanel {
 
         int sanSang  = queryInt("SELECT COUNT(*) FROM CD WHERE TrangThai='SanSang'");
         int dangThue = queryInt("SELECT COUNT(*) FROM CD WHERE TrangThai='DangThue'");
+        int daBan    = queryInt("SELECT COUNT(*) FROM CD WHERE TrangThai='DaBan'");
         int hong     = queryInt("SELECT COUNT(*) FROM CD WHERE TrangThai='Hong'");
 
         JPanel kpiRow = new JPanel(new GridLayout(1, 4, 14, 0));
         kpiRow.setBackground(BG_DARK);
-        kpiRow.add(makeKPICard("Tổng CD",     String.valueOf(sanSang+dangThue+hong), "Toàn bộ đĩa",    ACCENT,         "📀"));
-        kpiRow.add(makeKPICard("Sẵn sàng",   String.valueOf(sanSang),               "Có thể cho thuê", COLOR_CUSTOMER, "✔"));
-        kpiRow.add(makeKPICard("Đang thuê",  String.valueOf(dangThue),              "Khách đang giữ",   COLOR_RENT,     "↗"));
-        kpiRow.add(makeKPICard("Hỏng / Mất", String.valueOf(hong),                 "Cần xử lý",        COLOR_OVERDUE,  "✖"));
+        kpiRow.add(makeKPICard("Tổng CD",     String.valueOf(sanSang+dangThue+daBan+hong), "Toàn bộ đĩa",    ACCENT,         "📀"));
+        kpiRow.add(makeKPICard("Sẵn sàng",   String.valueOf(sanSang),                      "Có thể cho thuê", COLOR_CUSTOMER, "✔"));
+        kpiRow.add(makeKPICard("Đang thuê",  String.valueOf(dangThue),                    "Khách đang giữ",   COLOR_RENT,     "↗"));
+        kpiRow.add(makeKPICard("Đã bán / Hỏng", String.valueOf(daBan + hong),             "Không còn dùng",  COLOR_OVERDUE,  "✖"));
 
-        String[] cols = {"Mã CD","Game","Thể loại","Tình trạng","Trạng thái"};
+        String[] cols = {"Mã CD", "Game", "Thể loại", "Tình trạng", "Trạng thái"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -576,22 +649,13 @@ public class ReportPanel extends JPanel {
                 String val = v == null ? "" : v.toString();
                 setBackground(row % 2 == 0 ? TBL_ROW_A : TBL_ROW_B);
                 Color fg;
-
                 switch (val) {
-                    case "SanSang":
-                        fg = COLOR_CUSTOMER;
-                        break;
-                    case "DangThue":
-                        fg = COLOR_RENT;
-                        break;
-                    case "Hong":
-                        fg = COLOR_OVERDUE;
-                        break;
-                    default:
-                        fg = TEXT_MUTED;
-                        break;
+                    case "SanSang":  fg = COLOR_CUSTOMER; break;
+                    case "DangThue": fg = COLOR_RENT;     break;
+                    case "DaBan":    fg = TEXT_MUTED;     break;
+                    case "Hong":     fg = COLOR_OVERDUE;  break;
+                    default:         fg = TEXT_MUTED;     break;
                 }
-
                 setForeground(fg);
                 setFont(new Font("Segoe UI", Font.BOLD, 12));
                 setBorder(new EmptyBorder(0, 12, 0, 12));
@@ -612,17 +676,17 @@ public class ReportPanel extends JPanel {
         JPanel root = new JPanel(new BorderLayout(0, 16));
         root.setBackground(BG_DARK);
 
-        int    tongQH  = queryInt("SELECT COUNT(*) FROM PHIEUTHUE WHERE TrangThai='DangThue' AND NgayTraDuKien < GETDATE()");
-        double tongPhat = queryDouble("SELECT ISNULL(SUM(TienPhat),0) FROM PHIEUTHUE WHERE TrangThai='DangThue' AND NgayTraDuKien < GETDATE()");
-        int    maxNgay  = queryInt("SELECT ISNULL(MAX(DATEDIFF(day,NgayTraDuKien,GETDATE())),0) FROM PHIEUTHUE WHERE TrangThai='DangThue' AND NgayTraDuKien < GETDATE()");
+        int    tongQH   = queryInt("SELECT COUNT(*) FROM PHIEUTHUE WHERE TrangThai='DangThue' AND NgayTraDuKien < GETDATE()");
+        double tongPhat  = queryDouble("SELECT ISNULL(SUM(TienPhat),0) FROM PHIEUTHUE WHERE TrangThai='DangThue' AND NgayTraDuKien < GETDATE()");
+        int    maxNgay   = queryInt("SELECT ISNULL(MAX(DATEDIFF(day,NgayTraDuKien,GETDATE())),0) FROM PHIEUTHUE WHERE TrangThai='DangThue' AND NgayTraDuKien < GETDATE()");
 
         JPanel kpiRow = new JPanel(new GridLayout(1, 3, 16, 0));
         kpiRow.setBackground(BG_DARK);
-        kpiRow.add(makeKPICard("Phiếu quá hạn",    String.valueOf(tongQH),  "Cần liên hệ khách",  COLOR_OVERDUE, "⚠"));
-        kpiRow.add(makeKPICard("Tiền phạt dự kiến", formatMoney(tongPhat), "Chưa thu",             COLOR_ROM,     "₫"));
-        kpiRow.add(makeKPICard("Quá hạn lâu nhất",  maxNgay + " ngày",    "Phiếu lâu nhất",      COLOR_OVERDUE, "⏰"));
+        kpiRow.add(makeKPICard("Phiếu quá hạn",     String.valueOf(tongQH),  "Cần liên hệ khách",  COLOR_OVERDUE, "⚠"));
+        kpiRow.add(makeKPICard("Tiền phạt dự kiến", formatMoney(tongPhat),  "Chưa thu",             COLOR_ROM,     "₫"));
+        kpiRow.add(makeKPICard("Quá hạn lâu nhất",  maxNgay + " ngày",     "Phiếu lâu nhất",       COLOR_OVERDUE, "⏰"));
 
-        String[] cols = {"Mã PT","Khách hàng","SĐT","Ngày thuê","Hạn trả","Quá hạn (ngày)","Tiền phạt"};
+        String[] cols = {"Mã PT", "Khách hàng", "SĐT", "Ngày thuê", "Hạn trả", "Quá hạn (ngày)", "Tiền phạt"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -672,21 +736,30 @@ public class ReportPanel extends JPanel {
     // TAB 7 — KHÁCH VIP
     // ═════════════════════════════════════════════════════════════════════════
     private JPanel buildVIP() {
-        String[] cols = {"#","Khách hàng","SĐT","Email","Điểm tích lũy","Tổng mua","Tổng thuê","Tổng cộng"};
+        String[] cols = {"#", "Khách hàng", "SĐT", "Email", "Điểm tích lũy", "Tổng mua", "Tổng thuê (hoàn thành)", "Tổng cộng"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
         try (Connection con = DBConnection.getConnection()) {
+            // TongMua: TongTien đã trừ giảm giá ✅
+            // TongThue: chỉ DaTra ✅ (FIX)
             ResultSet rs = con.createStatement().executeQuery(
                 "SELECT kh.HoTen, kh.SDT, kh.Email, kh.DiemTichLuy, " +
                 "ISNULL(b.TongMua,0) as TongMua, ISNULL(r.TongThue,0) as TongThue " +
                 "FROM KHACHHANG kh " +
-                "LEFT JOIN (SELECT MaKH, SUM(TongTien) as TongMua FROM HOADON WHERE TrangThai='DaThanhToan' GROUP BY MaKH) b ON kh.MaKH=b.MaKH " +
-                "LEFT JOIN (SELECT MaKH, SUM(TienCoc+TienPhat) as TongThue FROM PHIEUTHUE GROUP BY MaKH) r ON kh.MaKH=r.MaKH " +
+                "LEFT JOIN (SELECT MaKH, SUM(TongTien) as TongMua FROM HOADON " +
+                "           WHERE TrangThai='DaThanhToan' GROUP BY MaKH) b ON kh.MaKH=b.MaKH " +
+                "LEFT JOIN (SELECT pt.MaKH, " +
+                "           ISNULL(SUM(ct.DonGiaThue),0) + ISNULL(SUM(pt.TienPhat),0) as TongThue " +
+                "           FROM PHIEUTHUE pt " +
+                "           JOIN CTPHIEUTHUE ct ON pt.MaPT = ct.MaPT " +
+                "           WHERE pt.TrangThai='DaTra' GROUP BY pt.MaKH) r ON kh.MaKH=r.MaKH " +
+                "WHERE kh.HoTen IS NOT NULL " +
                 "ORDER BY (ISNULL(b.TongMua,0)+ISNULL(r.TongThue,0)) DESC");
             int rank = 1;
             while (rs.next()) {
                 double mua = rs.getDouble("TongMua"), thue = rs.getDouble("TongThue");
+                if (mua == 0 && thue == 0) continue; // bỏ qua khách chưa có GD
                 String medal = rank == 1 ? "🥇" : rank == 2 ? "🥈" : rank == 3 ? "🥉" : String.valueOf(rank);
                 model.addRow(new Object[]{medal, rs.getString("HoTen"), rs.getString("SDT"),
                     rs.getString("Email"), rs.getInt("DiemTichLuy"),
@@ -701,22 +774,12 @@ public class ReportPanel extends JPanel {
                 if (!isRowSelected(row)) {
                     c.setBackground(row % 2 == 0 ? TBL_ROW_A : TBL_ROW_B);
                     Color fg;
-
                     switch (row) {
-                        case 0:
-                            fg = new Color(255, 215, 0);
-                            break;
-                        case 1:
-                            fg = new Color(192, 192, 192);
-                            break;
-                        case 2:
-                            fg = new Color(205, 127, 50);
-                            break;
-                        default:
-                            fg = TEXT_WHITE;
-                            break;
+                        case 0: fg = new Color(255, 215,   0); break;
+                        case 1: fg = new Color(192, 192, 192); break;
+                        case 2: fg = new Color(205, 127,  50); break;
+                        default: fg = TEXT_WHITE;               break;
                     }
-
                     c.setForeground(fg);
                     c.setFont(FONT_CELL);
                     if (col == 7) {
@@ -795,7 +858,7 @@ public class ReportPanel extends JPanel {
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    // INNER: MonthlyBarChart — grouped bars Bán + Thuê theo ngày
+    // INNER: MonthlyBarChart
     // ═════════════════════════════════════════════════════════════════════════
     class MonthlyBarChart extends JPanel {
         private int month, year;
@@ -812,19 +875,25 @@ public class ReportPanel extends JPanel {
                 ps.setInt(1,month); ps.setInt(2,year);
                 ResultSet rs=ps.executeQuery();
                 while(rs.next()) ban[rs.getInt("D")-1]=rs.getDouble("V");
-                PreparedStatement ps2=con.prepareStatement(
-                    "SELECT DAY(NgayThue) as D, ISNULL(SUM(TienCoc+TienPhat),0) as V FROM PHIEUTHUE " +
-                    "WHERE MONTH(NgayThue)=? AND YEAR(NgayThue)=? GROUP BY DAY(NgayThue)");
-                ps2.setInt(1,month); ps2.setInt(2,year);
-                ResultSet rs2=ps2.executeQuery();
-                while(rs2.next()) thue[rs2.getInt("D")-1]=rs2.getDouble("V");
+
+                // FIX: chỉ DaTra ✅
+                PreparedStatement ps2 = con.prepareStatement(
+                    "SELECT DAY(pt.NgayThue) as D, " +
+                    "ISNULL(SUM(ct.DonGiaThue),0) + ISNULL(SUM(pt.TienPhat),0) as V " +
+                    "FROM PHIEUTHUE pt " +
+                    "JOIN CTPHIEUTHUE ct ON pt.MaPT = ct.MaPT " +
+                    "WHERE MONTH(pt.NgayThue)=? AND YEAR(pt.NgayThue)=? AND pt.TrangThai='DaTra' " +
+                    "GROUP BY DAY(pt.NgayThue)");
+                ps2.setInt(1, month); ps2.setInt(2, year);
+                ResultSet rs2 = ps2.executeQuery();
+                while (rs2.next()) thue[rs2.getInt("D") - 1] = rs2.getDouble("V");
             } catch(Exception ex) { ex.printStackTrace(); }
 
             int days = java.time.YearMonth.of(year,month).lengthOfMonth();
             Graphics2D g2=(Graphics2D)g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
             drawGrouped(g2, ban, thue, days,
-                buildDayLabels(days), new Color[]{COLOR_REVENUE,COLOR_RENT}, new String[]{"Bán","Thuê"});
+                buildDayLabels(days), new Color[]{COLOR_REVENUE,COLOR_RENT}, new String[]{"Bán","Thuê (hoàn thành)"});
             g2.dispose();
         }
         private String[] buildDayLabels(int days) {
@@ -835,7 +904,7 @@ public class ReportPanel extends JPanel {
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    // INNER: YearlyBarChart — grouped bars 12 tháng
+    // INNER: YearlyBarChart
     // ═════════════════════════════════════════════════════════════════════════
     class YearlyBarChart extends JPanel {
         private int year;
@@ -850,7 +919,7 @@ public class ReportPanel extends JPanel {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
             String[] lbl={"T1","T2","T3","T4","T5","T6","T7","T8","T9","T10","T11","T12"};
             drawGrouped(g2, banData, thueData, 12, lbl,
-                new Color[]{COLOR_REVENUE,COLOR_RENT}, new String[]{"Bán","Thuê"});
+                new Color[]{COLOR_REVENUE,COLOR_RENT}, new String[]{"Bán","Thuê (hoàn thành)"});
             g2.dispose();
         }
     }
@@ -868,7 +937,6 @@ public class ReportPanel extends JPanel {
         int groupW=cW/n;
         int barW=Math.max(3, groupW/3);
 
-        // Grid
         for (int i=0;i<=4;i++) {
             int y=padT+cH-(int)(cH*i/4.0);
             g2.setColor(new Color(255,255,255,18)); g2.drawLine(padL,y,w-padR,y);
@@ -876,7 +944,6 @@ public class ReportPanel extends JPanel {
             g2.drawString(MiniBarChart.moneyShort(max*i/4), 2, y+4);
         }
 
-        // Bars
         for (int i=0;i<n;i++) {
             double[] vals={a[i],b[i]};
             int gx=padL+i*groupW;
@@ -888,7 +955,6 @@ public class ReportPanel extends JPanel {
                 g2.setPaint(new GradientPaint(bx,by,colors[s].brighter(),bx,padT+cH,colors[s].darker()));
                 g2.fill(new RoundRectangle2D.Float(bx,by,barW,bh,4,4));
             }
-            // Label
             if (labels!=null&&i<labels.length) {
                 g2.setColor(TEXT_MUTED); g2.setFont(new Font("Segoe UI",Font.PLAIN,9));
                 FontMetrics fm=g2.getFontMetrics();
@@ -896,14 +962,13 @@ public class ReportPanel extends JPanel {
             }
         }
 
-        // Legend
         int lx=padL;
         for (int s=0;s<seriesNames.length;s++) {
             g2.setColor(colors[s]);
             g2.fillRoundRect(lx, h-padB+24, 10, 10, 3, 3);
             g2.setColor(TEXT_MUTED); g2.setFont(new Font("Segoe UI",Font.PLAIN,10));
             g2.drawString(seriesNames[s], lx+14, h-padB+33);
-            lx+=60;
+            lx+=100;
         }
     }
 
@@ -1069,14 +1134,26 @@ public class ReportPanel extends JPanel {
         return 0;
     }
 
-    /**
-     * Lấy danh sách năm có dữ liệu thực tế — chỉ trả về năm có ít nhất 1 bản ghi.
-     * Dùng cho combobox tab Doanh thu năm.
-     */
+    /** Lấy danh sách năm có dữ liệu từ bảng bất kỳ. */
     private List<Integer> getYearsWithData(String table, String dateCol) {
         List<Integer> years=new ArrayList<>();
         String sql="SELECT DISTINCT YEAR("+dateCol+") as Y FROM "+table+
                    " WHERE "+dateCol+" IS NOT NULL ORDER BY Y DESC";
+        try (Connection con=DBConnection.getConnection();
+             ResultSet rs=con.createStatement().executeQuery(sql)) {
+            while (rs.next()) years.add(rs.getInt("Y"));
+        } catch (Exception ex) { ex.printStackTrace(); }
+        return years;
+    }
+
+    /**
+     * Lấy danh sách năm có dữ liệu với điều kiện WHERE bổ sung.
+     * Dùng cho PHIEUTHUE chỉ lấy năm có phiếu DaTra.
+     */
+    private List<Integer> getYearsWithDataFiltered(String table, String dateCol, String whereExtra) {
+        List<Integer> years=new ArrayList<>();
+        String sql="SELECT DISTINCT YEAR("+dateCol+") as Y FROM "+table+
+                   " WHERE "+dateCol+" IS NOT NULL AND "+whereExtra+" ORDER BY Y DESC";
         try (Connection con=DBConnection.getConnection();
              ResultSet rs=con.createStatement().executeQuery(sql)) {
             while (rs.next()) years.add(rs.getInt("Y"));

@@ -1,25 +1,25 @@
 package otkhongluong.gamestoremanagement.service;
 
-import otkhongluong.gamestoremanagement.dao.KhachHangDAO;
-import otkhongluong.gamestoremanagement.model.KhachHang;
+import otkhongluong.gamestoremanagement.dao.CustomerDAO;
+import otkhongluong.gamestoremanagement.model.Customer;
 
 import java.util.List;
 
-public class KhachHangService {
+public class CustomerService {
 
-    private final KhachHangDAO khachHangDAO;
+    private final CustomerDAO khachHangDAO;
 
-    public KhachHangService() {
-        this.khachHangDAO = new KhachHangDAO();
+    public CustomerService() {
+        this.khachHangDAO = new CustomerDAO();
     }
 
     // ================= GET ALL =================
-    public List<KhachHang> getAllKhachHang() {
+    public List<Customer> getAllKhachHang() {
         return khachHangDAO.findAll();
     }
 
     // ================= GET BY ID =================
-    public KhachHang getKhachHangById(int id) {
+    public Customer getKhachHangById(int id) {
 
         if (id <= 0) {
             throw new IllegalArgumentException("Mã khách hàng không hợp lệ");
@@ -29,17 +29,17 @@ public class KhachHangService {
     }
 
     // ================= ADD =================
-    public boolean addKhachHang(KhachHang kh) {
+    public boolean addKhachHang(Customer kh) {
     // 1. Kiểm tra dữ liệu trước khi thêm
     validateKhachHang(kh);
 
     // 2. Gọi DAO để chèn vào Database
-    // Sử dụng hàm insert(kh) đã có sẵn trong KhachHangDAO của bạn
+    // Sử dụng hàm insert(kh) đã có sẵn trong CustomerDAO của bạn
     return khachHangDAO.insert(kh);
 }
 
     // ================= UPDATE =================
-    public boolean updateKhachHang(KhachHang kh) {
+    public boolean updateKhachHang(Customer kh) {
 
         if (kh == null || kh.getMaKH() <= 0) {
             throw new IllegalArgumentException("Khách hàng không hợp lệ");
@@ -61,7 +61,7 @@ public class KhachHangService {
     }
 
     // ================= VALIDATION =================
-    private void validateKhachHang(KhachHang kh) {
+    private void validateKhachHang(Customer kh) {
 
         if (kh == null) {
             throw new IllegalArgumentException("Khách hàng không được null");

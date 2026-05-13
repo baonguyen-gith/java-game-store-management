@@ -2,7 +2,7 @@ package otkhongluong.gamestoremanagement.model;
 
 import java.time.LocalDateTime;
 
-public class DiemLichSu {
+public class PointHistory {
 
     private int maLS;
     private int maKH;
@@ -11,9 +11,9 @@ public class DiemLichSu {
     private LocalDateTime ngay;
     private String ghiChu;
 
-    public DiemLichSu() {}
+    public PointHistory() {}
 
-    public DiemLichSu(int maLS, int maKH, String loai,
+    public PointHistory(int maLS, int maKH, String loai,
                       int soDiem, LocalDateTime ngay, String ghiChu) {
         this.maLS = maLS;
         this.maKH = maKH;

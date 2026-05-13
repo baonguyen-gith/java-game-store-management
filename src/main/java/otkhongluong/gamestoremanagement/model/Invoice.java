@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-public class HoaDon {
+public class Invoice {
 
     private int maHD;
     private int maKH;

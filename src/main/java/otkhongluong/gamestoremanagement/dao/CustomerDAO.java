@@ -1,16 +1,16 @@
 package otkhongluong.gamestoremanagement.dao;
 
-import otkhongluong.gamestoremanagement.model.KhachHang;
+import otkhongluong.gamestoremanagement.model.Customer;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class KhachHangDAO {
+public class CustomerDAO {
 
     // ================= INSERT =================
-    public boolean insert(KhachHang kh) {
+    public boolean insert(Customer kh) {
 
         String sql = "INSERT INTO KHACHHANG (HoTen, SDT, CCCD, Email, DiaChi, DiemTichLuy) " +
                      "VALUES (?, ?, ?, ?, ?, 0)";
@@ -35,7 +35,7 @@ public class KhachHangDAO {
     }
 
     // ================= UPDATE =================
-    public boolean update(KhachHang kh) {
+    public boolean update(Customer kh) {
 
         String sql = "UPDATE KHACHHANG SET HoTen=?, SDT=?, CCCD=?, Email=?, DiaChi=?, DiemTichLuy=? " +
                      "WHERE MaKH=?";
@@ -80,7 +80,7 @@ public class KhachHangDAO {
     }
 
     // ================= FIND BY ID =================
-    public KhachHang findById(int maKH) {
+    public Customer findById(int maKH) {
 
         String sql = "SELECT * FROM KHACHHANG WHERE MaKH = ?";
 
@@ -103,9 +103,9 @@ public class KhachHangDAO {
     }
 
     // ================= FIND ALL =================
-    public List<KhachHang> findAll() {
+    public List<Customer> findAll() {
 
-        List<KhachHang> list = new ArrayList<>();
+        List<Customer> list = new ArrayList<>();
         String sql = "SELECT * FROM KHACHHANG ORDER BY MaKH DESC";
 
         try (Connection conn = DBConnection.getConnection();
@@ -145,7 +145,7 @@ public class KhachHangDAO {
     }
        
        // ================= FIND BY SDT =================
-    public KhachHang findBySDT(String sdt) {
+    public Customer findBySDT(String sdt) {
 
         String sql = "SELECT * FROM KHACHHANG WHERE SDT = ?";
 
@@ -157,7 +157,7 @@ public class KhachHangDAO {
             ResultSet rs = ps.executeQuery();
 
             if (rs.next()) {    
-                KhachHang kh = new KhachHang();
+                Customer kh = new Customer();
                 kh.setMaKH(rs.getInt("MaKH"));
                 kh.setHoTen(rs.getString("HoTen"));
                 kh.setSdt(rs.getString("SDT"));
@@ -195,9 +195,9 @@ public class KhachHangDAO {
     }
 
     // ================= SEARCH =================
-    public List<KhachHang> search(String keyword) {
+    public List<Customer> search(String keyword) {
 
-        List<KhachHang> list = new ArrayList<>();
+        List<Customer> list = new ArrayList<>();
 
         String sql = "SELECT * FROM KHACHHANG " +
                      "WHERE LOWER(HoTen) LIKE ? " +
@@ -241,14 +241,14 @@ public class KhachHangDAO {
         }
     }
     public void congDiem(int maKH, int diem) {
-        updatePoint(maKH, diem); // hàm updatePoint đã có sẵn trong KhachHangDAO
+        updatePoint(maKH, diem); // hàm updatePoint đã có sẵn trong CustomerDAO
     }
 
 
     // ================= MAPPER =================
-    private KhachHang map(ResultSet rs) throws SQLException {
+    private Customer map(ResultSet rs) throws SQLException {
 
-        KhachHang kh = new KhachHang();
+        Customer kh = new Customer();
 
         kh.setMaKH(rs.getInt("MaKH"));
         kh.setHoTen(rs.getString("HoTen"));

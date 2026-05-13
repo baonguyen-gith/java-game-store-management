@@ -1,7 +1,7 @@
 package otkhongluong.gamestoremanagement.view.panel;
 
 import otkhongluong.gamestoremanagement.dao.TransactionDAO;
-import otkhongluong.gamestoremanagement.view.dialog.BillDetailDialog;
+import otkhongluong.gamestoremanagement.view.dialog.InvoiceDetailDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentDetailDialog;
 
 import javax.swing.*;
@@ -506,7 +506,7 @@ public class TransactionPanel extends JPanel {
         Window parent = SwingUtilities.getWindowAncestor(this);
 
         if (loai != null && loai.contains("Hóa")) {
-            BillDetailDialog d = new BillDetailDialog((Frame) parent, numId);
+            InvoiceDetailDialog d = new InvoiceDetailDialog((Frame) parent, numId);
             d.pack();
             d.setLocationRelativeTo(parent);
             d.setVisible(true);

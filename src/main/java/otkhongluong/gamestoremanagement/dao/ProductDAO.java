@@ -1,16 +1,16 @@
 package otkhongluong.gamestoremanagement.dao;
 
-import otkhongluong.gamestoremanagement.model.SanPham;
+import otkhongluong.gamestoremanagement.model.Product;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SanPhamDAO {
+public class ProductDAO {
 
     // ================= INSERT =================
-    public boolean insert(SanPham sp) {
+    public boolean insert(Product sp) {
 
         String sql =
                 "INSERT INTO SANPHAM (MaGame, GiaBan, GiaThueNgay) VALUES (?, ?, ?)";
@@ -32,7 +32,7 @@ public class SanPhamDAO {
     }
 
     // ================= UPDATE =================
-    public boolean update(SanPham sp) {
+    public boolean update(Product sp) {
 
         String sql =
                 "UPDATE SANPHAM SET MaGame = ?, GiaBan = ?, GiaThueNgay = ? WHERE MaSP = ?";
@@ -73,7 +73,7 @@ public class SanPhamDAO {
     }
 
     // ================= FIND BY ID =================
-    public SanPham findById(int maSP) {
+    public Product findById(int maSP) {
 
         String sql = "SELECT * FROM SANPHAM WHERE MaSP = ?";
 
@@ -96,9 +96,9 @@ public class SanPhamDAO {
     }
 
     // ================= FIND ALL =================
-    public List<SanPham> findAll() {
+    public List<Product> findAll() {
 
-        List<SanPham> list = new ArrayList<>();
+        List<Product> list = new ArrayList<>();
         String sql = "SELECT * FROM SANPHAM ORDER BY MaSP DESC";
 
         try (Connection conn = DBConnection.getConnection();
@@ -117,9 +117,9 @@ public class SanPhamDAO {
     }
 
     // ================= FIND BY GAME =================
-    public List<SanPham> findByMaGame(int maGame) {
+    public List<Product> findByMaGame(int maGame) {
 
-        List<SanPham> list = new ArrayList<>();
+        List<Product> list = new ArrayList<>();
         String sql = "SELECT * FROM SANPHAM WHERE MaGame = ?";
 
         try (Connection conn = DBConnection.getConnection();
@@ -141,9 +141,9 @@ public class SanPhamDAO {
     }
 
     // ================= MAPPER =================
-    private SanPham map(ResultSet rs) throws SQLException {
+    private Product map(ResultSet rs) throws SQLException {
 
-        SanPham sp = new SanPham();
+        Product sp = new Product();
 
         sp.setMaSP(rs.getInt("MaSP"));
         sp.setMaGame(rs.getInt("MaGame"));

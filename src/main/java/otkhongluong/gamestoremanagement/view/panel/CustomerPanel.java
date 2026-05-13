@@ -1,7 +1,7 @@
 package otkhongluong.gamestoremanagement.view.panel;
 
-import otkhongluong.gamestoremanagement.model.KhachHang;
-import otkhongluong.gamestoremanagement.service.KhachHangService;
+import otkhongluong.gamestoremanagement.model.Customer;
+import otkhongluong.gamestoremanagement.controller.CustomerController;
 import otkhongluong.gamestoremanagement.util.IconUtils;
 
 import javax.swing.*;
@@ -54,9 +54,9 @@ public class CustomerPanel extends JPanel {
     private TableRowSorter<DefaultTableModel> rowSorter;
     
 
-    private KhachHangService service = new KhachHangService();
-    private List<KhachHang> allData;
-    private List<KhachHang> currentPageData;
+    private CustomerController controller;
+    private List<Customer> allData;
+    private List<Customer> currentPageData;
 
     public CustomerPanel() {
         setLayout(new BorderLayout(0, 0));
@@ -66,7 +66,7 @@ public class CustomerPanel extends JPanel {
         add(buildTopBar(),    BorderLayout.NORTH);
         add(buildTable(),     BorderLayout.CENTER);
         add(buildBottomBar(), BorderLayout.SOUTH);
-
+        controller = new CustomerController(this);
         loadData();
     }
 
@@ -309,16 +309,9 @@ public class CustomerPanel extends JPanel {
                 JOptionPane.showMessageDialog(this, "Vui lòng chọn khách hàng để xóa!");
                 return;
             }
-            KhachHang kh = currentPageData.get(row);
-            int confirm = JOptionPane.showConfirmDialog(this, 
-                "Xác nhận xóa khách hàng: " + kh.getHoTen() + "?", "Xác nhận", JOptionPane.YES_NO_OPTION);
-            if (confirm == JOptionPane.YES_OPTION) {
-                if (service.deleteKhachHang(kh.getMaKH())) {
-                    JOptionPane.showMessageDialog(this, "Xóa thành công!");
-                    loadData();
-                } else {
-                    JOptionPane.showMessageDialog(this, "Lỗi khi xóa!");
-                }
+            Customer kh = currentPageData.get(row);
+            if (controller.handleDelete(kh)) { // ← confirm dialog + xóa + thông báo nằm trong controller
+                loadData();
             }
         });
 
@@ -331,7 +324,7 @@ public class CustomerPanel extends JPanel {
 
     private void rebuildPagination(JPanel panel) {
         panel.removeAll();
-        List<KhachHang> filtered = getFilteredData();
+        List<Customer> filtered = getFilteredData();
         final int total = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
 
         // Nút Quay lại <
@@ -368,34 +361,18 @@ public class CustomerPanel extends JPanel {
         DATA
     ====================================================== */
     private void loadData() {
-        allData = service.getAllKhachHang();
+        allData = controller.loadAll();
         renderPage();
     }
     
-    private List<KhachHang> getFilteredData() {
-        String keyword = txtSearch == null ? "" : txtSearch.getText().trim().toLowerCase();
-
-        return allData == null ? java.util.Collections.emptyList() :
-            allData.stream()
-                .filter(kh -> {
-                    if (keyword.isEmpty()) return true;
-                    
-                    // Tạo chuỗi mã để so sánh (cả số và định dạng KH00x)
-                    String maKHStr = String.valueOf(kh.getMaKH());
-                    String maKHFull = "kh" + String.format("%03d", kh.getMaKH());
-                    
-                    return kh.getHoTen().toLowerCase().contains(keyword)
-                        || (kh.getSdt() != null && kh.getSdt().contains(keyword))
-                        || (kh.getCccd() != null && kh.getCccd().contains(keyword))
-                        || maKHStr.contains(keyword) // Tìm theo số: "1"
-                        || maKHFull.contains(keyword); // Tìm theo mã: "kh001"
-                })
-                .collect(java.util.stream.Collectors.toList());
+    private List<Customer> getFilteredData() {
+        String keyword = txtSearch == null ? "" : txtSearch.getText().trim();
+        return controller.filter(allData, keyword);
     }
 
     private void renderPage() {
         tableModel.setRowCount(0);
-        List<KhachHang> filtered = getFilteredData();
+        List<Customer> filtered = getFilteredData();
 
         int totalPage = (int) Math.ceil((double) filtered.size() / PAGE_SIZE);
         if (currentPage > totalPage) currentPage = totalPage == 0 ? 1 : totalPage;
@@ -405,7 +382,7 @@ public class CustomerPanel extends JPanel {
 
         currentPageData = filtered.subList(from, to);
 
-        for (KhachHang kh : currentPageData) {
+        for (Customer kh : currentPageData) {
             tableModel.addRow(new Object[]{
                 "KH" + String.format("%03d", kh.getMaKH()),
                 kh.getHoTen(),
@@ -444,63 +421,41 @@ public class CustomerPanel extends JPanel {
         }
     }
 
+    // ✅ SAU — chỉ giữ phần UI, bỏ toàn bộ khối try-catch và new Customer()
     private void showAddCustomerDialog() {
-        // Tạo Panel chứa form nhập liệu
         JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
-        JTextField txtHoTen = new JTextField();
-        JTextField txtSdt = new JTextField();
-        JTextField txtCccd = new JTextField();
-        JTextField txtEmail = new JTextField();
+        JTextField txtHoTen  = new JTextField();
+        JTextField txtSdt    = new JTextField();
+        JTextField txtCccd   = new JTextField();
+        JTextField txtEmail  = new JTextField();
         JTextField txtDiaChi = new JTextField();
 
-        panel.add(new JLabel("Họ tên (*):"));
-        panel.add(txtHoTen);
-        panel.add(new JLabel("Số điện thoại (*):"));
-        panel.add(txtSdt);
-        panel.add(new JLabel("CCCD (*):"));
-        panel.add(txtCccd);
-        panel.add(new JLabel("Email:"));
-        panel.add(txtEmail);
-        panel.add(new JLabel("Địa chỉ:"));
-        panel.add(txtDiaChi);
+        panel.add(new JLabel("Họ tên (*):")); panel.add(txtHoTen);
+        panel.add(new JLabel("Số điện thoại (*):")); panel.add(txtSdt);
+        panel.add(new JLabel("CCCD (*):")); panel.add(txtCccd);
+        panel.add(new JLabel("Email:")); panel.add(txtEmail);
+        panel.add(new JLabel("Địa chỉ:")); panel.add(txtDiaChi);
 
-        int result = JOptionPane.showConfirmDialog(this, panel, 
+        int result = JOptionPane.showConfirmDialog(this, panel,
                 "Thêm Khách Hàng Mới", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 
         if (result == JOptionPane.OK_OPTION) {
-            try {
-                // Khởi tạo đối tượng từ dữ liệu nhập vào
-                KhachHang kh = new KhachHang();
-                kh.setHoTen(txtHoTen.getText().trim());
-                kh.setSdt(txtSdt.getText().trim());
-                kh.setCccd(txtCccd.getText().trim());
-                kh.setEmail(txtEmail.getText().trim());
-                kh.setDiaChi(txtDiaChi.getText().trim());
-                kh.setDiemTichLuy(0);
-
-                // Gọi Service xử lý (Service sẽ tự gọi Validation và DAO)
-                if (service.addKhachHang(kh)) {
-                    JOptionPane.showMessageDialog(this, "Thêm khách hàng thành công!");
-                    loadData(); // Load lại bảng để cập nhật dữ liệu mới
-                } else {
-                    JOptionPane.showMessageDialog(this, "Thêm thất bại! Vui lòng kiểm tra lại kết nối Database.");
-                }
-            } catch (IllegalArgumentException ex) {
-                // Bắt lỗi từ ValidationService (ví dụ: SDT không đúng định dạng)
-                JOptionPane.showMessageDialog(this, ex.getMessage(), "Lỗi nhập liệu", JOptionPane.ERROR_MESSAGE);
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Lỗi hệ thống: " + ex.getMessage());
-                ex.printStackTrace();
+            // ← toàn bộ validation + new Customer() + gọi service chuyển vào controller
+            if (controller.handleAdd(
+                    txtHoTen.getText(), txtSdt.getText(),
+                    txtCccd.getText(), txtEmail.getText(), txtDiaChi.getText())) {
+                loadData();
             }
         }
     }
 
-    private void showEditCustomerDialog(KhachHang kh) {
+    // ✅ SAU
+    private void showEditCustomerDialog(Customer kh) {
         JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
-        JTextField txtHoTen = new JTextField(kh.getHoTen());
-        JTextField txtSdt = new JTextField(kh.getSdt());
-        JTextField txtCccd = new JTextField(kh.getCccd());
-        JTextField txtEmail = new JTextField(kh.getEmail());
+        JTextField txtHoTen  = new JTextField(kh.getHoTen());
+        JTextField txtSdt    = new JTextField(kh.getSdt());
+        JTextField txtCccd   = new JTextField(kh.getCccd());
+        JTextField txtEmail  = new JTextField(kh.getEmail());
         JTextField txtDiaChi = new JTextField(kh.getDiaChi());
 
         panel.add(new JLabel("Họ tên (*):")); panel.add(txtHoTen);
@@ -509,27 +464,14 @@ public class CustomerPanel extends JPanel {
         panel.add(new JLabel("Email:")); panel.add(txtEmail);
         panel.add(new JLabel("Địa chỉ:")); panel.add(txtDiaChi);
 
-        int result = JOptionPane.showConfirmDialog(this, panel, 
+        int result = JOptionPane.showConfirmDialog(this, panel,
                 "Cập Nhật Thông Tin Khách Hàng", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 
         if (result == JOptionPane.OK_OPTION) {
-            try {
-                // Cập nhật thông tin mới vào đối tượng hiện tại
-                kh.setHoTen(txtHoTen.getText().trim());
-                kh.setSdt(txtSdt.getText().trim());
-                kh.setCccd(txtCccd.getText().trim());
-                kh.setEmail(txtEmail.getText().trim());
-                kh.setDiaChi(txtDiaChi.getText().trim());
-
-                // Gọi Service để update xuống DB
-                if (service.updateKhachHang(kh)) {
-                    JOptionPane.showMessageDialog(this, "Cập nhật thành công!");
-                    loadData();
-                } else {
-                    JOptionPane.showMessageDialog(this, "Cập nhật thất bại!");
-                }
-            } catch (IllegalArgumentException ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage(), "Lỗi dữ liệu", JOptionPane.ERROR_MESSAGE);
+            if (controller.handleUpdate(kh,
+                    txtHoTen.getText(), txtSdt.getText(),
+                    txtCccd.getText(), txtEmail.getText(), txtDiaChi.getText())) {
+                loadData();
             }
         }
     }
@@ -558,18 +500,8 @@ public class CustomerPanel extends JPanel {
 
     private void executeSort(String type, boolean ascending) {
         if (allData == null) return;
-        
-        allData.sort((kh1, kh2) -> {
-            int res = 0;
-            if (type.equals("MaKH")) {
-                res = Integer.compare(kh1.getMaKH(), kh2.getMaKH());
-            } else {
-                res = Integer.compare(kh1.getDiemTichLuy(), kh2.getDiemTichLuy());
-            }
-            return ascending ? res : -res;
-        });
-        
-        currentPage = 1; // Về trang đầu sau khi sắp xếp
+        controller.sort(allData, type, ascending); // ← sort in-place, Panel không cần biết logic
+        currentPage = 1;
         renderPage();
     }
 
@@ -597,26 +529,20 @@ public class CustomerPanel extends JPanel {
         renderPage();
     }
 
+    // ✅ SAU
     private void showSimpleFilterDialog() {
         String[] options = {"Tất cả", "Khách hàng thân thiết (>= 100 điểm)", "Khách hàng mới (< 100 điểm)"};
-        String selection = (String) JOptionPane.showInputDialog(this, 
-                "Chọn chế độ lọc nhanh:", "Bộ lọc", 
+        String selection = (String) JOptionPane.showInputDialog(this,
+                "Chọn chế độ lọc nhanh:", "Bộ lọc",
                 JOptionPane.PLAIN_MESSAGE, null, options, options[0]);
-
         if (selection == null) return;
 
-        if (selection.equals("Tất cả")) {
-            loadData(); // Load lại toàn bộ từ DB
-        } else {
-            // Lọc trực tiếp trên allData hiện có
-            allData = service.getAllKhachHang(); // Đảm bảo lấy data mới nhất
-            if (selection.contains(">= 100")) {
-                allData.removeIf(kh -> kh.getDiemTichLuy() < 100);
-            } else {
-                allData.removeIf(kh -> kh.getDiemTichLuy() >= 100);
-            }
-            currentPage = 1;
-            renderPage();
-        }
+        List<Customer> base = controller.loadAll(); // luôn lấy data mới nhất từ DB
+        String mode = selection.contains(">= 100") ? "loyal"
+                    : selection.contains("< 100")  ? "new"
+                    : "all";
+        allData = controller.filterByPointMode(base, mode);
+        currentPage = 1;
+        renderPage();
     }
 }

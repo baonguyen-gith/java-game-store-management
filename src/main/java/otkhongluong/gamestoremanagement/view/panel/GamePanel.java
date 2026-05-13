@@ -2,7 +2,7 @@ package otkhongluong.gamestoremanagement.view.panel;
 
 import otkhongluong.gamestoremanagement.model.Game;
 import otkhongluong.gamestoremanagement.service.GameService;
-import otkhongluong.gamestoremanagement.view.dialog.BillAddDialog;
+import otkhongluong.gamestoremanagement.view.dialog.InvoiceAddDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentAddDialog;
 
 import javax.swing.*;
@@ -11,7 +11,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.RoundRectangle2D;
 import java.util.List;
-
+import java.util.ArrayList;
 /**
  * GamePanel — danh sách game + điều hướng sang GameDetailPanel.
  *
@@ -48,6 +48,7 @@ public class GamePanel extends JPanel {
     private final CardLayout   cardLayout  = new CardLayout();
     private JPanel             listPanel;
     private GameDetailPanel    detailPanel;
+    private List<Game> allGames = new ArrayList<>();
 
     // ═══════════════════════════════════════════════════════════
     public GamePanel() {
@@ -127,8 +128,8 @@ public class GamePanel extends JPanel {
 
     private void loadGames() {
         listPanel.removeAll();
-        List<Game> games = gameService.getAllGames();
-        for (Game g : games) {
+        allGames = gameService.getAllGames(); // ✅ lưu vào field thay vì biến local
+        for (Game g : allGames) {
             listPanel.add(Box.createVerticalStrut(10));
             listPanel.add(createGameCard(g));
         }
@@ -139,7 +140,14 @@ public class GamePanel extends JPanel {
 
     // ── GAME CARD ───────────────────────────────────────────────
     private JPanel createGameCard(Game game) {
-        final int cardH = 145;
+
+        // Tính chiều cao card theo số nút thực tế
+        // ── Tính chiều cao card theo số nút thực tế ───────────────
+        int btnCount = 0;
+        if (game.getGiaCD()       != null && game.getGiaCD()       > 0) btnCount++; // Mua CD
+        if (game.getGiaROM()      != null && game.getGiaROM()      > 0) btnCount++; // Mua ROM
+        if (game.getGiaThueNgay() != null && game.getGiaThueNgay() > 0) btnCount++; // Thuê CD  ← đúng điều kiện
+        final int cardH = Math.max(130, 56 + btnCount * 48 + Math.max(0, btnCount - 1) * 6);
 
         JPanel card = new JPanel(new BorderLayout()) {
             private boolean hovered = false;
@@ -226,42 +234,42 @@ public class GamePanel extends JPanel {
         right.setOpaque(false);
         right.setBorder(new EmptyBorder(14, 8, 14, 14));
 
-        // boolean hasAnyBtn = false;
+        boolean hasAnyBtn = false;
 
-        // // ── Mua CD — chỉ hiện khi GiaCD > 0 ──────────────────────
-        // if (game.getGiaCD() != null && game.getGiaCD() > 0) {
-        //     JButton btnCD = makeActionButton("Mua CD", game.getGiaCDText(), BTN_CD);
-        //     btnCD.addActionListener(e -> {
-        //         Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
-        //         BillAddDialog.openAndPreselectGame(f, game.getMaGame(), "CD");
-        //     });
-        //     right.add(btnCD);
-        //     hasAnyBtn = true;
-        // }
+        // ── Mua CD — chỉ hiện khi GiaCD > 0 ──────────────────────
+        if (game.getGiaCD() != null && game.getGiaCD() > 0) {
+            JButton btnCD = makeActionButton("Mua CD", game.getGiaCDText(), BTN_CD);
+            btnCD.addActionListener(e -> {
+                Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
+                InvoiceAddDialog.openAndPreselectGame(f, game.getMaGame(), "CD");
+            });
+            right.add(btnCD);
+            hasAnyBtn = true;
+        }
 
-        // // ── Mua ROM — chỉ hiện khi GiaROM > 0 ────────────────────
-        // if (game.getGiaROM() != null && game.getGiaROM() > 0) {
-        //     if (hasAnyBtn) right.add(Box.createVerticalStrut(6));
-        //     JButton btnROM = makeActionButton("Mua ROM", game.getGiaROMText(), BTN_ROM);
-        //     btnROM.addActionListener(e -> {
-        //         Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
-        //         BillAddDialog.openAndPreselectGame(f, game.getMaGame(), "ROM");
-        //     });
-        //     right.add(btnROM);
-        //     hasAnyBtn = true;
-        // }
+        // ── Mua ROM — chỉ hiện khi GiaROM > 0 ────────────────────
+        if (game.getGiaROM() != null && game.getGiaROM() > 0) {
+            if (hasAnyBtn) right.add(Box.createVerticalStrut(6));
+            JButton btnROM = makeActionButton("Mua ROM", game.getGiaROMText(), BTN_ROM);
+            btnROM.addActionListener(e -> {
+                Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
+                InvoiceAddDialog.openAndPreselectGame(f, game.getMaGame(), "ROM");
+            });
+            right.add(btnROM);
+            hasAnyBtn = true;
+        }
 
-        // // ── Thuê CD — chỉ hiện khi GiaThueNgay > 0 (TÁCH RIÊNG, KHÔNG dùng GiaCD) ──
-        // if (game.getGiaThueNgay() != null && game.getGiaThueNgay() > 0) {
-        //     if (hasAnyBtn) right.add(Box.createVerticalStrut(6));
-        //     JButton btnRent = makeActionButton("Thuê CD", game.getGiaThueText(), BTN_RENT);
-        //     btnRent.addActionListener(e -> {
-        //         Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
-        //         RentAddDialog.openAndPreselectByGameName(f, game.getTenGame());
-        //     });
-        //     right.add(btnRent);
-        //     hasAnyBtn = true;
-        // }
+        // ── Thuê CD — chỉ hiện khi GiaThueNgay > 0 (TÁCH RIÊNG, KHÔNG dùng GiaCD) ──
+        if (game.getGiaThueNgay() != null && game.getGiaThueNgay() > 0) {
+            if (hasAnyBtn) right.add(Box.createVerticalStrut(6));
+            JButton btnRent = makeActionButton("Thuê CD", game.getGiaThueText(), BTN_RENT);
+            btnRent.addActionListener(e -> {
+                Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
+                RentAddDialog.openAndPreselectByGameName(f, game.getTenGame());
+            });
+            right.add(btnRent);
+            hasAnyBtn = true;
+        }
 
         card.add(imgLabel, BorderLayout.WEST);
         card.add(center,   BorderLayout.CENTER);
@@ -349,4 +357,32 @@ public class GamePanel extends JPanel {
     }
 
     private String nvl(String s) { return s == null ? "" : s; }
+    
+        public void filterGames(String keyword) {
+        listPanel.removeAll();
+        String kw = keyword.toLowerCase().trim();
+
+        List<Game> filtered = kw.isEmpty()
+            ? allGames
+            : allGames.stream().filter(g ->
+                nvl(g.getTenGame()).toLowerCase().contains(kw) ||
+                String.valueOf(g.getMaGame()).contains(kw)
+              ).collect(java.util.stream.Collectors.toList());
+
+        if (filtered.isEmpty()) {
+            JLabel none = new JLabel("Không tìm thấy game nào phù hợp");
+            none.setFont(F_DESC);
+            none.setForeground(TEXT_MUTED);
+            none.setBorder(new EmptyBorder(30, 20, 0, 0));
+            listPanel.add(none);
+        } else {
+            for (Game g : filtered) {
+                listPanel.add(Box.createVerticalStrut(10));
+                listPanel.add(createGameCard(g));
+            }
+        }
+        listPanel.add(Box.createVerticalStrut(10));
+        listPanel.revalidate();
+        listPanel.repaint();
+    }
 }

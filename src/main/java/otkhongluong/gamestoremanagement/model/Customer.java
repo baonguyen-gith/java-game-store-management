@@ -1,6 +1,6 @@
 package otkhongluong.gamestoremanagement.model;
 
-public class KhachHang {
+public class Customer {
 
     private int maKH;
     private String hoTen;
@@ -10,9 +10,9 @@ public class KhachHang {
     private String diaChi;
     private int diemTichLuy;
 
-    public KhachHang() {}
+    public Customer() {}
 
-    public KhachHang(int maKH, String hoTen, String sdt,
+    public Customer(int maKH, String hoTen, String sdt,
                      String cccd, String email,
                      String diaChi, int diemTichLuy) {
 

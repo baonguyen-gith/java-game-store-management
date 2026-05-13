@@ -1,6 +1,5 @@
 package otkhongluong.gamestoremanagement.view.panel;
 
-
 import javax.swing.*;
 import java.awt.*;
 
@@ -18,7 +17,7 @@ public class SalesPanel extends JPanel {
         tab.setUI(new CustomTabbedPaneUI());
 
         tab.addTab("Lịch sử giao dịch", new TransactionPanel());
-        tab.addTab("Quản lý hóa đơn", new BillPanel());
+        tab.addTab("Quản lý hóa đơn", new InvoicePanel());
         tab.addTab("Quản lý phiếu thuê", new RentPanel());
 
         add(tab, BorderLayout.CENTER);
