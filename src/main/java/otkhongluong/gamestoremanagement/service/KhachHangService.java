@@ -30,14 +30,13 @@ public class KhachHangService {
 
     // ================= ADD =================
     public boolean addKhachHang(KhachHang kh) {
+    // 1. Kiểm tra dữ liệu trước khi thêm
+    validateKhachHang(kh);
 
-        validateKhachHang(kh);
-
-        // mặc định điểm = 0 khi tạo mới
-        kh.setDiemTichLuy(0);
-
-        return khachHangDAO.insert(kh);
-    }
+    // 2. Gọi DAO để chèn vào Database
+    // Sử dụng hàm insert(kh) đã có sẵn trong KhachHangDAO của bạn
+    return khachHangDAO.insert(kh);
+}
 
     // ================= UPDATE =================
     public boolean updateKhachHang(KhachHang kh) {

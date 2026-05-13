@@ -1,80 +1,52 @@
--- Sequence cho các bảng chính
+/* 1. TẠO SEQUENCE CHO CÁC BẢNG 
+   (SQL Server dùng NEXT VALUE FOR thay vì .NEXTVAL)
+*/
 CREATE SEQUENCE SEQ_KHACHHANG START WITH 1 INCREMENT BY 1;
-CREATE SEQUENCE SEQ_GAME      START WITH 1 INCREMENT BY 1;
-CREATE SEQUENCE SEQ_SANPHAM   START WITH 1 INCREMENT BY 1;
-CREATE SEQUENCE SEQ_HOADON    START WITH 1 INCREMENT BY 1;
-CREATE SEQUENCE SEQ_PHIEUTHUE START WITH 1 INCREMENT BY 1;
-CREATE SEQUENCE SEQ_USERS     START WITH 1 INCREMENT BY 1;
-CREATE SEQUENCE SEQ_ROLE      START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE SEQ_GAME       START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE SEQ_SANPHAM    START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE SEQ_HOADON      START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE SEQ_PHIEUTHUE   START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE SEQ_USERS       START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE SEQ_ROLE        START WITH 1 INCREMENT BY 1;
+GO
 
--- Tự động tăng cho KHACHHANG
-CREATE OR REPLACE TRIGGER TRG_ID_KHACHHANG
-BEFORE INSERT ON KHACHHANG FOR EACH ROW
-BEGIN
-    IF :NEW.MaKH IS NULL THEN
-        SELECT SEQ_KHACHHANG.NEXTVAL INTO :NEW.MaKH FROM DUAL;
-    END IF;
-END;
-/
+/* 2. CÁCH GÁN ID TỰ ĐỘNG (THAY THẾ CHO TRIGGER INSERT)
+   Trong SQL Server, bạn nên dùng DEFAULT để gán Sequence. 
+   Ví dụ khi bạn tạo bảng:
+   MaKH INT PRIMARY KEY CONSTRAINT DF_MaKH DEFAULT (NEXT VALUE FOR SEQ_KHACHHANG),
+*/
 
--- Tự động tăng cho GAME
-CREATE OR REPLACE TRIGGER TRG_ID_GAME
-BEFORE INSERT ON GAME FOR EACH ROW
-BEGIN
-    IF :NEW.MaGame IS NULL THEN
-        SELECT SEQ_GAME.NEXTVAL INTO :NEW.MaGame FROM DUAL;
-    END IF;
-END;
-/
+-- Nếu bảng đã tồn tại, bạn có thể chạy lệnh này để gán tự động tăng mà không cần Trigger:
+-- ALTER TABLE KHACHHANG ADD CONSTRAINT DF_KH DEFAULT (NEXT VALUE FOR SEQ_KHACHHANG) FOR MaKH;
+-- ALTER TABLE GAME ADD CONSTRAINT DF_GAME DEFAULT (NEXT VALUE FOR SEQ_GAME) FOR MaGame;
+-- ... tương tự cho các bảng khác.
 
--- Tự động tăng cho HOADON
-CREATE OR REPLACE TRIGGER TRG_ID_HOADON
-BEFORE INSERT ON HOADON FOR EACH ROW
-BEGIN
-    IF :NEW.MaHD IS NULL THEN
-        SELECT SEQ_HOADON.NEXTVAL INTO :NEW.MaHD FROM DUAL;
-    END IF;
-END;
-/
+GO
 
--- Tự động tăng cho PHIEUTHUE
-CREATE OR REPLACE TRIGGER TRG_ID_PHIEUTHUE
-BEFORE INSERT ON PHIEUTHUE FOR EACH ROW
+/* 3. TRIGGER TỰ ĐỘNG TÍNH TIỀN PHẠT
+   Lưu ý: SQL Server dùng bảng ảo 'inserted' và 'deleted' thay vì :NEW và :OLD
+*/
+CREATE OR ALTER TRIGGER TRG_TINH_TIEN_PHAT
+ON PHIEUTHUE
+AFTER UPDATE
+AS
 BEGIN
-    IF :NEW.MaPT IS NULL THEN
-        SELECT SEQ_PHIEUTHUE.NEXTVAL INTO :NEW.MaPT FROM DUAL;
-    END IF;
+    -- Kiểm tra nếu cột NgayTraThucTe được cập nhật thì mới tính toán
+    IF UPDATE(NgayTraThucTe)
+    BEGIN
+        SET NOCOUNT ON;
+
+        UPDATE PHIEUTHUE
+        SET TienPhat = CASE 
+            -- Nếu ngày trả thực tế lớn hơn ngày trả dự kiến
+            WHEN i.NgayTraThucTe > i.NgayTraDuKien 
+            THEN DATEDIFF(DAY, i.NgayTraDuKien, i.NgayTraThucTe) * 20000
+            -- Nếu trả đúng hạn hoặc sớm hơn
+            ELSE 0 
+        END
+        FROM PHIEUTHUE p
+        INNER JOIN inserted i ON p.MaPT = i.MaPT
+        WHERE i.NgayTraThucTe IS NOT NULL;
+    END
 END;
-/
--- Tự động tính tiền phạt
--- Tự động tăng cho USERS
-CREATE OR REPLACE TRIGGER TRG_ID_USERS
-BEFORE INSERT ON USERS FOR EACH ROW
-BEGIN
-    IF :NEW.MaUser IS NULL THEN
-        SELECT SEQ_USERS.NEXTVAL INTO :NEW.MaUser FROM DUAL;
-    END IF;
-END;
-/
-CREATE OR REPLACE TRIGGER TRG_TINH_TIEN_PHAT
-BEFORE UPDATE OF NgayTraThucTe ON PHIEUTHUE
-FOR EACH ROW
-DECLARE
-    v_so_ngay_tre NUMBER;
-BEGIN
-    -- Chỉ tính khi khách mang máy/đĩa đến trả (có NgayTraThucTe)
-    IF :NEW.NgayTraThucTe IS NOT NULL THEN
-        -- So sánh ngày trả thực tế với ngày trả dự kiến
-        IF :NEW.NgayTraThucTe > :OLD.NgayTraDuKien THEN
-            -- Tính số ngày chênh lệch (Làm tròn lên bằng CEIL)
-            v_so_ngay_tre := CEIL(CAST(:NEW.NgayTraThucTe AS DATE) - CAST(:OLD.NgayTraDuKien AS DATE));
-            
-            -- Gán số tiền phạt (Ví dụ phạt 20.000đ mỗi ngày trễ)
-            :NEW.TienPhat := v_so_ngay_tre * 20000;
-        ELSE
-            -- Nếu trả đúng hạn hoặc sớm hơn thì tiền phạt bằng 0
-            :NEW.TienPhat := 0;
-        END IF;
-    END IF;
-END;
-/
+GO

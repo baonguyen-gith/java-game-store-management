@@ -11,33 +11,47 @@ public class GameDAO {
 
     // ================= INSERT =================
     public boolean insert(Game game) {
+    String sqlGame = "INSERT INTO GAME (TenGame, TheLoai, NenTang, GhiChu, HinhAnh) VALUES (?, ?, ?, ?, ?)";
+    String sqlDetail = "INSERT INTO GAME_CHITIET (MaGame, MoTa, Rating, Genre, DeliveryMethod, ReleaseDate, Region, Features, Language, Currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-        String sql = "INSERT INTO GAME (TenGame, TheLoai, NenTang, GhiChu, HinhAnh) " +
-                     "VALUES (?, ?, ?, ?, ?)";
+    try (Connection conn = DBConnection.getConnection()) {
+        conn.setAutoCommit(false); // Bắt đầu Transaction
+        try (PreparedStatement ps1 = conn.prepareStatement(sqlGame, Statement.RETURN_GENERATED_KEYS)) {
+            ps1.setString(1, game.getTenGame());
+            ps1.setString(2, game.getTheLoai());
+            ps1.setString(3, game.getNenTang());
+            ps1.setString(4, game.getGhiChu());
+            ps1.setString(5, game.getHinhAnh());
+            ps1.executeUpdate();
 
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ResultSet rs = ps1.getGeneratedKeys();
+            int newId = rs.next() ? rs.getInt(1) : 0;
 
-            ps.setString(1, game.getTenGame());
-            ps.setString(2, game.getTheLoai());
-            ps.setString(3, game.getNenTang());
-            ps.setString(4, game.getGhiChu());
-            ps.setString(5, game.getHinhAnh());
-
-            return ps.executeUpdate() > 0;
-
-        } catch (SQLException e) {
-            e.printStackTrace();
+            try (PreparedStatement ps2 = conn.prepareStatement(sqlDetail)) {
+                ps2.setInt(1, newId);
+                ps2.setString(2, game.getMoTa());
+                ps2.setString(3, game.getRating());
+                ps2.setString(4, game.getGenre());
+                ps2.setString(5, game.getDeliveryMethod());
+                ps2.setDate(6, game.getReleaseDate() != null ? java.sql.Date.valueOf(game.getReleaseDate()) : null);
+                ps2.setString(7, game.getRegion());
+                ps2.setString(8, game.getFeatures());
+                ps2.setString(9, game.getLanguage());
+                ps2.setString(10, game.getCurrency());
+                ps2.executeUpdate();
+            }
+            conn.commit();
+            return true;
+        } catch (SQLException ex) {
+            conn.rollback();
+            throw ex;
         }
-
-        return false;
-    }
-
+    } catch (Exception e) { e.printStackTrace(); }
+    return false;
+}
     // ================= UPDATE =================
     public boolean update(Game game) {
-
-        String sql = "UPDATE GAME SET TenGame = ?, TheLoai = ?, NenTang = ?, " +
-                     "GhiChu = ?, HinhAnh = ? WHERE MaGame = ?";
+        String sql = "UPDATE GAME SET TenGame=?, TheLoai=?, NenTang=?, GhiChu=?, HinhAnh=? WHERE MaGame=?";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -50,60 +64,44 @@ public class GameDAO {
             ps.setInt(6, game.getMaGame());
 
             return ps.executeUpdate() > 0;
-
-        } catch (SQLException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
-
         return false;
     }
 
     // ================= DELETE =================
-    public boolean delete(int maGame) {
-
+    public boolean delete(int id) {
         String sql = "DELETE FROM GAME WHERE MaGame = ?";
-
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-
-            ps.setInt(1, maGame);
+            
+            ps.setInt(1, id);
             return ps.executeUpdate() > 0;
 
         } catch (SQLException e) {
-            System.err.println("Không thể xóa Game (đang có SANPHAM/CD/ROM liên kết)");
+            // In lỗi ra Console để kiểm tra nếu bị vướng Khóa ngoại (Foreign Key)
             e.printStackTrace();
         }
-
         return false;
     }
     
     // ================= getAllGames =================
     public List<Game> getAllGames() {
         List<Game> list = new ArrayList<>();
-
-        String sql = "SELECT * FROM GAME";
+        String sql = "SELECT * FROM GAME ORDER BY TenGame"; // Lấy tất cả cột (*)
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 
             while (rs.next()) {
-                Game g = new Game();
-
-                g.setMaGame(rs.getInt("MaGame"));
-                g.setTenGame(rs.getString("TenGame"));
-                g.setTheLoai(rs.getString("TheLoai"));
-                g.setNenTang(rs.getString("NenTang"));
-                g.setGhiChu(rs.getString("GhiChu"));
-                g.setHinhAnh(rs.getString("HinhAnh"));
-
-                list.add(g);
+                // Dùng hàm map(rs) đã viết ở dưới để lấy đầy đủ các cột giá
+                list.add(map(rs)); 
             }
-
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         return list;
     }
 
@@ -132,22 +130,19 @@ public class GameDAO {
 
     // ================= FIND ALL =================
     public List<Game> findAll() {
-
         List<Game> list = new ArrayList<>();
-        String sql = "SELECT * FROM GAME ORDER BY MaGame DESC";
+        // Tốt nhất là liệt kê tên cột rõ ràng
+        String sql = "SELECT MaGame, TenGame, TheLoai, NenTang, GhiChu, HinhAnh FROM GAME ORDER BY MaGame DESC";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-
             while (rs.next()) {
                 list.add(map(rs));
             }
-
-        } catch (SQLException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
-
         return list;
     }
 
@@ -215,16 +210,13 @@ public class GameDAO {
 
     // ================= MAP RESULT =================
     private Game map(ResultSet rs) throws SQLException {
-
-        Game g = new Game();
-
-        g.setMaGame(rs.getInt("MaGame"));
-        g.setTenGame(rs.getString("TenGame"));
-        g.setTheLoai(rs.getString("TheLoai"));
-        g.setNenTang(rs.getString("NenTang"));
-        g.setGhiChu(rs.getString("GhiChu"));
-        g.setHinhAnh(rs.getString("HinhAnh"));
-
-        return g;
-    }
+    Game g = new Game();
+    g.setMaGame(rs.getInt("MaGame"));
+    g.setTenGame(rs.getString("TenGame"));
+    g.setTheLoai(rs.getString("TheLoai"));
+    g.setNenTang(rs.getString("NenTang"));
+    g.setGhiChu(rs.getString("GhiChu"));
+    g.setHinhAnh(rs.getString("HinhAnh"));
+    return g;
+}
 }

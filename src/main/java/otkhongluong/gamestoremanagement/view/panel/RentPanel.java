@@ -5,29 +5,6 @@ import otkhongluong.gamestoremanagement.view.dialog.RentReturnDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentAddDialog;
 import otkhongluong.gamestoremanagement.dao.PhieuThueDAO;
 import otkhongluong.gamestoremanagement.model.PhieuThue;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.geom.RoundRectangle2D;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JTable;
-import javax.swing.table.TableCellRenderer;
-import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.border.EmptyBorder;
-import javax.swing.border.LineBorder;
-import java.util.function.IntConsumer;
-import javax.swing.JOptionPane;
-import javax.swing.JCheckBox;
-import javax.swing.table.TableCellEditor;
-import javax.swing.BorderFactory;
-import javax.swing.border.CompoundBorder;
-import javax.swing.BorderFactory;
-import javax.swing.*;
 
 import javax.swing.table.*;
 import java.awt.*;
@@ -115,10 +92,14 @@ public class RentPanel extends JPanel {
                 g2.setColor(INPUT_BG);
                 g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
                 super.paintComponent(g);
-                // calendar icon
+                if (getText().trim().isEmpty()) {
+                    g2.setColor(TEXT_MUTED);
+                    g2.setFont(FONT_CELL);
+                    g2.drawString("dd/MM/yyyy", 10, getHeight() / 2 + 5);
+                }
                 g2.setColor(TEXT_MUTED);
-                g2.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 14));
-                g2.drawString("📅", getWidth() - 28, getHeight() / 2 + 5);
+                g2.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 13));
+                g2.drawString("📅", getWidth() - 26, getHeight() / 2 + 5);
                 g2.dispose();
             }
         };
@@ -146,8 +127,8 @@ public class RentPanel extends JPanel {
                 super.paintComponent(g);
                 if (getText().isEmpty()) {
                     g2.setColor(TEXT_MUTED);
-                    g2.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 14));
-                    g2.drawString("🔍", 8, getHeight() / 2 + 5);
+                    g2.setFont(FONT_CELL);
+                    g2.drawString("Tìm kiếm theo từ khóa", 10, getHeight() / 2 + 5);
                 }
                 g2.dispose();
             }
@@ -157,19 +138,7 @@ public class RentPanel extends JPanel {
             public void keyReleased(KeyEvent e) { currentPage = 1; renderPage(); }
         });
 
-        RoundButton btnAdd = new RoundButton("+", BTN_ADD, Color.WHITE);
-        btnAdd.setPreferredSize(new Dimension(40, 40));
-        btnAdd.addActionListener(e -> {
-            Window parent = SwingUtilities.getWindowAncestor(this);
-            RentAddDialog dialog = new RentAddDialog((Frame) parent);
-            dialog.setVisible(true);
-
-            loadData();
-        });
-
-        row.add(txtSearch, BorderLayout.CENTER);
-        row.add(btnAdd, BorderLayout.EAST);
-        p.add(row, BorderLayout.CENTER);
+        p.add(txtSearch, BorderLayout.CENTER);
         return p;
     }
 
@@ -285,8 +254,8 @@ public class RentPanel extends JPanel {
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         btnPanel.setBackground(BG_DARK);
 
-        RoundButton btnEdit = new RoundButton("✏  Sửa", BTN_EDIT, BG_DARK);
-        btnEdit.setPreferredSize(new Dimension(110, 40));
+        RoundButton btnEdit = new RoundButton("Sửa", BTN_EDIT, Color.WHITE);
+        btnEdit.setPreferredSize(new Dimension(105, 38));
         btnEdit.addActionListener(e -> {
             int row = table.getSelectedRow();
             if (row < 0) {
@@ -303,9 +272,6 @@ public class RentPanel extends JPanel {
 
             loadData(); // refresh
         });
-        
-        RoundButton btnReturn = new RoundButton("↩  Trả CD", new Color(255, 165, 0), BG_DARK);
-        btnReturn.setPreferredSize(new Dimension(130, 40));
 
         btnReturn.addActionListener(e -> {
             int row = table.getSelectedRow();
@@ -314,22 +280,6 @@ public class RentPanel extends JPanel {
                 return;
             }
 
-            int id = Integer.parseInt(
-                tableModel.getValueAt(row, 0).toString().replaceAll("\\D", "")
-            );
-
-            Window parent = SwingUtilities.getWindowAncestor(this);
-            RentReturnDialog dialog = new RentReturnDialog((Frame) parent, id);
-            dialog.setVisible(true);
-
-            loadData(); // refresh
-        });
-
-        RoundButton btnDelete = new RoundButton("🗑  Xóa", BTN_DELETE, BG_DARK);
-        btnDelete.setPreferredSize(new Dimension(110, 40));
-        btnDelete.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn phiếu thuê để xóa!"); return; }
             int confirm = JOptionPane.showConfirmDialog(this,
                 "Xác nhận xóa phiếu thuê " + tableModel.getValueAt(row, 0) + "?",
                 "Xác nhận", JOptionPane.YES_NO_OPTION);
@@ -347,31 +297,31 @@ public class RentPanel extends JPanel {
         return bar;
     }
 
-    private void rebuildPagination(JPanel panel) {
-        panel.removeAll();
-        List<PhieuThue> filtered = getFilteredData(); // Giữ nguyên phương thức lọc dữ liệu
-        final int total = Math.max(1,
-            (int) Math.ceil((double) filtered.size() / PAGE_SIZE)
-        );
+    // ══════════════════════════════════════════════════════════
+    // PAGINATION rebuild
+    // ══════════════════════════════════════════════════════════
+    private void rebuildPagination(int totalPages) {
+        paginationPanel.removeAll();
 
-        for (int i = 1; i <= Math.min(total, 4); i++) {
-            final int pg = i;
-            RoundButton btn = new RoundButton(String.valueOf(i),
-                pg == currentPage ? ACCENT : INPUT_BG, TEXT_WHITE);
-            btn.setPreferredSize(new Dimension(36, 36));
-            btn.addActionListener(e -> { currentPage = pg; renderPage(); });
-            panel.add(btn);
-        }
-        if (total > 4) {
-            RoundButton btnNext = new RoundButton(">>", INPUT_BG, TEXT_WHITE);
-            btnNext.setPreferredSize(new Dimension(44, 36));
-            btnNext.addActionListener(e -> {
-                if (currentPage < total) { currentPage++; renderPage(); }
-            });
-            panel.add(btnNext);
-        }
-        panel.revalidate();
-        panel.repaint();
+        // Nút "<" — về trang trước
+        RoundButton btnPrev = new RoundButton("<", INPUT_BG, new Color(80, 80, 80));
+        btnPrev.setPreferredSize(new Dimension(34, 34));
+        btnPrev.setEnabled(currentPage > 1);
+        btnPrev.addActionListener(e -> { if (currentPage > 1) { currentPage--; renderPage(); } });
+        paginationPanel.add(btnPrev);
+
+        // Nút ">" — sang trang sau
+        RoundButton btnNext = new RoundButton(">", INPUT_BG, new Color(80, 80, 80));
+        btnNext.setPreferredSize(new Dimension(34, 34));
+        btnNext.setEnabled(currentPage < totalPages);
+        btnNext.addActionListener(e -> { if (currentPage < totalPages) { currentPage++; renderPage(); } });
+        paginationPanel.add(btnNext);
+
+        // Label "Trang X / Y"
+        lblPageInfo.setText("Trang " + currentPage + " / " + Math.max(1, totalPages));
+
+        paginationPanel.revalidate();
+        paginationPanel.repaint();
     }
 
     private void loadData() {

@@ -1,5 +1,5 @@
 package otkhongluong.gamestoremanagement.view;
-
+import otkhongluong.gamestoremanagement.util.Session;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -242,7 +242,8 @@ public class LoginView extends JFrame {
 
             if (user != null) {
                 JOptionPane.showMessageDialog(this, "Login thành công!");
-
+                
+                Session.setMaNV(user.getMaUser());
                 this.dispose(); // đóng login
 
                 // 👉 PHÂN QUYỀN TẠI ĐÂY

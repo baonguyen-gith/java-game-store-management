@@ -1,13 +1,13 @@
 package otkhongluong.gamestoremanagement.dao;
 
 import otkhongluong.gamestoremanagement.util.DBConnection;
-import java.sql.ResultSet;
-import java.util.ArrayList;
-import java.util.List;
-import java.sql.ResultSet;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class CDDAO {
 
@@ -63,7 +63,10 @@ public class CDDAO {
             "FROM CD cd " +
             "JOIN SANPHAM sp ON cd.MaSP = sp.MaSP " +
             "JOIN GAME g ON sp.MaGame = g.MaGame " +
-            "WHERE cd.TrangThai = N'SanSang'";
+            "WHERE cd.TrangThai = N'SanSang' " +         // ✅ đã có
+            "  AND sp.GiaThueNgay IS NOT NULL " +          // ✅ thêm
+            "  AND sp.GiaThueNgay > 0 " +                  // ✅ thêm
+            "ORDER BY g.TenGame"; 
 
         List<Object[]> list = new ArrayList<>();
 
