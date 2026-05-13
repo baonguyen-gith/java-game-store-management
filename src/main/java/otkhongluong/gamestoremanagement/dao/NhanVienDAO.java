@@ -54,8 +54,6 @@ public class NhanVienDAO {
         return -1; // không tìm thấy
     }
     
-    // ================= FIND BY ID =================
-    
 
     // ================= OPTIONAL: SEARCH LIKE (nâng cấp autocomplete) =================
     public List<String> searchByName(String keyword) {
