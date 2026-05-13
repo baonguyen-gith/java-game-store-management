@@ -11,64 +11,51 @@ import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.RoundRectangle2D;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.*;
+import java.text.SimpleDateFormat;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class BillPanel extends JPanel {
 
-    /* ── Colors ── */
-    private static final Color BG_DARK       = new Color(35, 20, 85);
+    /* ============ COLORS ============ */
+    private static final Color BG_DARK       = new Color(35, 20, 85); // nền trắng xám nhẹ
     private static final Color BG_CARD       = Color.WHITE;
-    private static final Color PURPLE_HEADER = new Color(155, 135, 245);
-    private static final Color PURPLE_ROW    = new Color(245, 242, 255);
+
+    private static final Color PURPLE_HEADER = new Color(155, 135, 245); // tím nhạt header
+    private static final Color PURPLE_ROW    = new Color(245, 242, 255); // tím cực nhạt
     private static final Color PURPLE_ALT    = Color.WHITE;
-    private static final Color ACCENT        = new Color(130, 90, 230);
+
+    private static final Color ACCENT        = new Color(130, 90, 230); // giữ tím chính
+
     private static final Color TEXT_WHITE    = Color.WHITE;
     private static final Color TEXT_MUTED    = new Color(120, 120, 140);
+
     private static final Color INPUT_BG      = Color.WHITE;
-    private static final Color INPUT_ERROR   = new Color(255, 200, 200);
     private static final Color BTN_EDIT      = new Color(99, 179, 237);
     private static final Color BTN_DELETE    = new Color(252, 129, 129);
     private static final Color BTN_ADD       = new Color(104, 211, 145);
 
-    /* ── Fonts ── */
+    /* ============ FONTS ============ */
     private static final Font FONT_HEADER = new Font("Segoe UI", Font.BOLD, 13);
     private static final Font FONT_CELL   = new Font("Segoe UI", Font.PLAIN, 13);
     private static final Font FONT_LABEL  = new Font("Segoe UI", Font.BOLD, 12);
+    private static final Font FONT_BTN    = new Font("Segoe UI", Font.BOLD, 13);
 
-    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-
-    /* ── Column names ── */
-    private static final String[] COLS = {
-        "Mã HĐ", "Mã NV", "Khách hàng", "SĐT",
-        "Ngày lập", "Tổng tiền", "Chi tiết"
-    };
-
-    /* ── Sorting ── */
-    private final int[] sortState = new int[COLS.length];
-    private int sortCol = -1;
-
-    /* ── Pagination ── */
-    private static final int PAGE_SIZE = 10;
-    private int currentPage = 1;
-
-    /* ── Data ── */
-    private List<HoaDon> allData = new ArrayList<>();
-    private List<HoaDon> currentPageData = new ArrayList<>();
-    private final HoaDonService service = new HoaDonService();
-
-    /* ── Components ── */
-    private JTextField txtFrom, txtTo, txtSearch;
+    /* ============ COMPONENTS ============ */
     private JTable table;
     private DefaultTableModel tableModel;
+    private JTextField txtFrom, txtTo, txtSearch;
+    private JLabel lblPage;
     private JPanel paginationPanel;
-    private JLabel lblPageInfo;
+    private int currentPage = 1;
+    private static final int PAGE_SIZE = 8;
 
-    // ═══════════════════════════════════════════════════════════
+    private HoaDonService service = new HoaDonService();
+    private List<HoaDon> allData;
+    private List<HoaDon> currentPageData;
+
+    /* ======================================================
+        CONSTRUCTOR
+    ====================================================== */
     public BillPanel() {
         setLayout(new BorderLayout(0, 0));
         setBackground(BG_DARK);
@@ -81,53 +68,23 @@ public class BillPanel extends JPanel {
         loadData();
     }
 
-    // ══════════════════════════════════════════════════════════
-    // TOP BAR
-    // ══════════════════════════════════════════════════════════
+    /* ======================================================
+        TOP BAR — date pickers + search
+    ====================================================== */
     private JPanel buildTopBar() {
-        JPanel bar = new JPanel(new BorderLayout());
+        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 10));
         bar.setBackground(BG_DARK);
         bar.setBorder(new EmptyBorder(0, 0, 12, 0));
 
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 4));
-        left.setBackground(BG_DARK);
+        bar.add(labeledField("Từ ngày",  txtFrom  = datePicker()));
+        bar.add(labeledField("Đến ngày", txtTo    = datePicker()));
+        bar.add(labeledSearch());
 
-        txtFrom = datePicker();
-        txtTo   = datePicker();
-
-        KeyAdapter dateListener = new KeyAdapter() {
-            public void keyReleased(KeyEvent e) {
-                currentPage = 1;
-                validateDates();
-                renderPage();
-            }
-        };
-        txtFrom.addKeyListener(dateListener);
-        txtTo.addKeyListener(dateListener);
-
-        left.add(labeledField("Từ ngày (Ngày lập)", txtFrom));
-        left.add(labeledField("Đến ngày (Ngày lập)", txtTo));
-        left.add(buildSearchField());
-
-        // RIGHT: nút Thêm
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
-        right.setBackground(BG_DARK);
-
-        RoundButton btnAdd = new RoundButton("+  Thêm", BTN_ADD, new Color(30, 30, 30));
-        btnAdd.setPreferredSize(new Dimension(105, 38));
-        btnAdd.addActionListener(e -> {
-            new BillAddDialog((Frame) SwingUtilities.getWindowAncestor(this)).setVisible(true);
-            loadData();
-        });
-
-        right.add(btnAdd);
-        bar.add(left,  BorderLayout.WEST);
-        bar.add(right, BorderLayout.EAST);
         return bar;
     }
 
     private JPanel labeledField(String label, JComponent field) {
-        JPanel p = new JPanel(new BorderLayout(0, 4));
+        JPanel p = new JPanel(new BorderLayout(0, 6));
         p.setBackground(BG_DARK);
         JLabel lbl = new JLabel(label);
         lbl.setFont(FONT_LABEL);
@@ -138,11 +95,11 @@ public class BillPanel extends JPanel {
     }
 
     private JTextField datePicker() {
-        JTextField tf = new JTextField(11) {
+        JTextField tf = new JTextField("dd/mm/yyyy", 11) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(getBackground());
+                g2.setColor(INPUT_BG);
                 g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
                 super.paintComponent(g);
                 if (getText().trim().isEmpty()) {
@@ -156,26 +113,20 @@ public class BillPanel extends JPanel {
                 g2.dispose();
             }
         };
-        tf.setBackground(INPUT_BG);
-        tf.setForeground(new Color(40, 40, 40));
-        tf.setCaretColor(ACCENT);
-        tf.setFont(FONT_CELL);
-        tf.setBorder(new CompoundBorder(
-            new LineBorder(ACCENT, 1, true),
-            new EmptyBorder(6, 10, 6, 30)
-        ));
-        tf.setOpaque(false);
-        tf.setPreferredSize(new Dimension(0, 38));
+        styleTextField(tf);
         return tf;
     }
 
-    private JPanel buildSearchField() {
-        JPanel p = new JPanel(new BorderLayout(0, 4));
+    private JPanel labeledSearch() {
+        JPanel p = new JPanel(new BorderLayout(0, 6));
         p.setBackground(BG_DARK);
         JLabel lbl = new JLabel("Tìm kiếm từ khóa");
         lbl.setFont(FONT_LABEL);
         lbl.setForeground(TEXT_WHITE);
         p.add(lbl, BorderLayout.NORTH);
+
+        JPanel row = new JPanel(new BorderLayout(8, 0));
+        row.setBackground(BG_DARK);
 
         txtSearch = new JTextField(22) {
             @Override protected void paintComponent(Graphics g) {
@@ -192,16 +143,7 @@ public class BillPanel extends JPanel {
                 g2.dispose();
             }
         };
-        txtSearch.setBackground(INPUT_BG);
-        txtSearch.setForeground(new Color(40, 40, 40));
-        txtSearch.setCaretColor(ACCENT);
-        txtSearch.setFont(FONT_CELL);
-        txtSearch.setBorder(new CompoundBorder(
-            new LineBorder(ACCENT, 1, true),
-            new EmptyBorder(6, 10, 6, 10)
-        ));
-        txtSearch.setOpaque(false);
-        txtSearch.setPreferredSize(new Dimension(0, 38));
+        styleTextField(txtSearch);
         txtSearch.addKeyListener(new KeyAdapter() {
             public void keyReleased(KeyEvent e) { currentPage = 1; renderPage(); }
         });
@@ -210,12 +152,26 @@ public class BillPanel extends JPanel {
         return p;
     }
 
-    // ══════════════════════════════════════════════════════════
-    // TABLE with sort headers
-    // ══════════════════════════════════════════════════════════
+    private void styleTextField(JTextField tf) {
+        tf.setBackground(INPUT_BG);
+        tf.setForeground(TEXT_MUTED);
+        tf.setCaretColor(TEXT_WHITE);
+        tf.setFont(FONT_CELL);
+        tf.setBorder(new CompoundBorder(
+            new LineBorder(ACCENT, 1, true),
+            new EmptyBorder(6, 10, 6, 32)
+        ));
+        tf.setOpaque(false);
+        tf.setPreferredSize(new Dimension(0, 40));
+    }
+
+    /* ======================================================
+        TABLE
+    ====================================================== */
     private JScrollPane buildTable() {
-        tableModel = new DefaultTableModel(COLS, 0) {
-            public boolean isCellEditable(int r, int c) { return c == 6; }
+        String[] cols = {"Mã hóa đơn", "Mã nhân viên lập HĐ", "Khách hàng", "Số điện thoại", "Ngày hóa đơn", "Tổng tiền", "Chi tiết hóa đơn"};
+        tableModel = new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
         };
 
         table = new JTable(tableModel) {
@@ -226,7 +182,7 @@ public class BillPanel extends JPanel {
                     c.setForeground(Color.WHITE);
                 } else {
                     c.setBackground(row % 2 == 0 ? PURPLE_ROW : PURPLE_ALT);
-                    c.setForeground(new Color(40, 40, 40));
+                    c.setForeground(new Color(40, 40, 40)); // chữ đen cho bảng
                 }
                 return c;
             }
@@ -239,67 +195,64 @@ public class BillPanel extends JPanel {
         table.setSelectionBackground(ACCENT);
         table.setSelectionForeground(Color.WHITE);
         table.setBackground(PURPLE_ALT);
+        table.setForeground(TEXT_WHITE);
 
-        // ── Sort header renderer ──
+        // Header style
         JTableHeader header = table.getTableHeader();
         header.setDefaultRenderer(new DefaultTableCellRenderer() {
             @Override public Component getTableCellRendererComponent(
                     JTable t, Object v, boolean sel, boolean foc, int r, int c) {
-                String arrow = "";
-                if (sortCol == c) {
-                    arrow = sortState[c] == 1 ? "  ▲" : sortState[c] == 2 ? "  ▼" : "";
-                } else {
-                    if (c < COLS.length - 1) arrow = "  ⇅";
-                }
-                JLabel lbl = new JLabel((v == null ? "" : v.toString()) + arrow);
+                JLabel lbl = new JLabel(v == null ? "" : v.toString());
                 lbl.setFont(FONT_HEADER);
                 lbl.setForeground(Color.WHITE);
                 lbl.setBackground(PURPLE_HEADER);
                 lbl.setOpaque(true);
                 lbl.setBorder(new EmptyBorder(10, 12, 10, 12));
-                lbl.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                 return lbl;
             }
         });
         header.setBackground(PURPLE_HEADER);
         header.setPreferredSize(new Dimension(0, 42));
         header.setBorder(BorderFactory.createEmptyBorder());
-        header.setReorderingAllowed(false);
-
-        // Click header → sort (trừ cột "Chi tiết")
-        header.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) {
-                int col = header.columnAtPoint(e.getPoint());
-                if (col < 0 || col == COLS.length - 1) return;
-                sortState[col] = (sortState[col] + 1) % 3;
-                sortCol = sortState[col] == 0 ? -1 : col;
-                for (int i = 0; i < sortState.length; i++)
-                    if (i != col) sortState[i] = 0;
-                currentPage = 1;
-                renderPage();
-                header.repaint();
-            }
-        });
 
         // Column widths
-        int[] widths = {75, 75, 160, 115, 115, 130, 75};
+        int[] widths = {80, 80, 160, 120, 130, 120, 80};
         for (int i = 0; i < widths.length; i++)
             table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
 
-        // "Chi tiết" button column
+        // "Xem" button column
         table.getColumnModel().getColumn(6).setCellRenderer(new ButtonRenderer("Xem", ACCENT));
-        table.getColumnModel().getColumn(6).setCellEditor(new ButtonEditor(new JCheckBox(), table));
+        table.getColumnModel().getColumn(6).setCellEditor(
+            new ButtonEditor("Xem", ACCENT, row -> {
 
-        // Double click → detail
+                String maHD = table.getValueAt(row, 0).toString();
+                int id = Integer.parseInt(maHD.replaceAll("\\D", ""));
+
+                new BillDetailDialog(
+                    (Frame) SwingUtilities.getWindowAncestor(BillPanel.this),
+                    id
+                ).setVisible(true);
+
+            })
+        );
+
+        // Double click row
         table.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) {
-                    int row = table.getSelectedRow();
-                    if (row < 0) return;
-                    openDetail(parseMa(tableModel.getValueAt(row, 0).toString()));
-                }
+        public void mouseClicked(MouseEvent e) {
+            if (e.getClickCount() == 2 && table.getSelectedRow() >= 0) {
+
+                int row = table.getSelectedRow();
+                String maHD = table.getValueAt(row, 0).toString();
+            int id = Integer.parseInt(maHD.replaceAll("\\D", ""));
+
+            new BillDetailDialog(
+                (Frame) SwingUtilities.getWindowAncestor(BillPanel.this),
+                id
+            ).setVisible(true);
+
             }
-        });
+        }
+    });
 
         JScrollPane sp = new JScrollPane(table);
         sp.setBorder(new LineBorder(PURPLE_HEADER, 1, true));
@@ -308,29 +261,21 @@ public class BillPanel extends JPanel {
         return sp;
     }
 
-    // ══════════════════════════════════════════════════════════
-    // BOTTOM BAR: pagination (left) + Sửa / Xóa (right)
-    // ══════════════════════════════════════════════════════════
+    /* ======================================================
+        BOTTOM BAR — pagination + buttons
+    ====================================================== */
     private JPanel buildBottomBar() {
         JPanel bar = new JPanel(new BorderLayout());
         bar.setBackground(BG_DARK);
-        bar.setBorder(new EmptyBorder(12, 0, 0, 0));
+        bar.setBorder(new EmptyBorder(14, 0, 0, 0));
 
-        // LEFT: pagination
+        // Pagination (left)
         paginationPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         paginationPanel.setBackground(BG_DARK);
+        rebuildPagination(paginationPanel);
+        bar.add(paginationPanel, BorderLayout.WEST);
 
-        lblPageInfo = new JLabel();
-        lblPageInfo.setFont(FONT_LABEL);
-        lblPageInfo.setForeground(TEXT_WHITE);
-
-        JPanel leftSide = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        leftSide.setBackground(BG_DARK);
-        leftSide.add(paginationPanel);
-        leftSide.add(lblPageInfo);
-        bar.add(leftSide, BorderLayout.WEST);
-
-        // RIGHT: Sửa + Xóa
+        // Sửa / Xóa (right)
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         btnPanel.setBackground(BG_DARK);
 
@@ -339,9 +284,7 @@ public class BillPanel extends JPanel {
         btnEdit.addActionListener(e -> {
             int row = table.getSelectedRow();
             if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn hóa đơn để sửa!"); return; }
-            int maHD = parseMa(tableModel.getValueAt(row, 0).toString());
-            new BillEditDialog((Frame) SwingUtilities.getWindowAncestor(this), maHD).setVisible(true);
-            loadData();
+            JOptionPane.showMessageDialog(this, "Sửa: " + tableModel.getValueAt(row, 0));
         });
 
         RoundButton btnDelete = new RoundButton("Xóa", BTN_DELETE, Color.WHITE);
@@ -349,47 +292,20 @@ public class BillPanel extends JPanel {
         // ✅ MỚI
         btnDelete.addActionListener(e -> {
             int row = table.getSelectedRow();
-            if (row < 0) {
-                JOptionPane.showMessageDialog(this, "Chọn hóa đơn để xóa!"); return;
-            }
-
-            String maHDStr = tableModel.getValueAt(row, 0).toString();
-            HoaDon hd = currentPageData.get(row);
-
-            // Hiển thị cảnh báo rõ ràng
+            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn hóa đơn để xóa!"); return; }
             int confirm = JOptionPane.showConfirmDialog(this,
-                "⚠ Xác nhận xóa " + maHDStr + "?\n\n" +
-                "  Khách hàng : " + hd.getTenKhachHang() + "\n" +
-                "  Tổng tiền  : " + String.format("%,.0f đ", hd.getTongTien()) + "\n\n" +
-                "Hệ thống sẽ tự động:\n" +
-                "  • Hoàn lại trạng thái CD về Sẵn sàng\n" +
-                "  • Trừ lượt bán ROM\n" +
-                "  • Hoàn/rút lại điểm tích lũy của khách\n\n" +
-                "Thao tác này KHÔNG THỂ hoàn tác!",
-                "Xác nhận xóa hóa đơn",
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.WARNING_MESSAGE);
-
-            if (confirm != JOptionPane.YES_OPTION) return;
-
-            int maHD = Integer.parseInt(maHDStr.replaceAll("\\D", ""));
-            boolean ok = service.deleteHoaDon(maHD);
-
-            if (ok) {
-                JOptionPane.showMessageDialog(this,
-                    "✅ Đã xóa " + maHDStr + " và rollback toàn bộ dữ liệu liên quan.",
-                    "Xóa thành công", JOptionPane.INFORMATION_MESSAGE);
-                loadData();
-            } else {
-                JOptionPane.showMessageDialog(this,
-                    "❌ Xóa thất bại!\nVui lòng thử lại hoặc kiểm tra log.",
-                    "Lỗi", JOptionPane.ERROR_MESSAGE);
+                "Xác nhận xóa hóa đơn " + tableModel.getValueAt(row, 0) + "?",
+                "Xác nhận", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                tableModel.removeRow(row);
+                JOptionPane.showMessageDialog(this, "Đã xóa!");
             }
         });
 
         btnPanel.add(btnEdit);
         btnPanel.add(btnDelete);
         bar.add(btnPanel, BorderLayout.EAST);
+
         return bar;
     }
 
@@ -417,106 +333,39 @@ public class BillPanel extends JPanel {
         paginationPanel.repaint();
     }
 
-    // ══════════════════════════════════════════════════════════
-    // DATA PIPELINE
-    // ══════════════════════════════════════════════════════════
+    /* ======================================================
+        DATA
+    ====================================================== */
     private void loadData() {
         allData = service.getAllHoaDon();
-        currentPage = 1;
-        Arrays.fill(sortState, 0);
-        sortCol = -1;
         renderPage();
     }
-
-    private LocalDate parseDate(String text) {
-        if (text == null || text.trim().isEmpty()) return null;
-        return LocalDate.parse(text.trim(), FMT);
-    }
-
-    private boolean validateDates() {
-        boolean ok = true;
-        for (JTextField tf : new JTextField[]{txtFrom, txtTo}) {
-            String txt = tf.getText().trim();
-            if (txt.isEmpty()) { tf.setBackground(INPUT_BG); continue; }
-            try {
-                LocalDate.parse(txt, FMT);
-                tf.setBackground(INPUT_BG);
-            } catch (DateTimeParseException ex) {
-                tf.setBackground(INPUT_ERROR);
-                ok = false;
-            }
-        }
-        return ok;
-    }
-
+    
     private List<HoaDon> getFilteredData() {
-        if (allData == null) return Collections.emptyList();
+        String keyword = txtSearch == null ? "" : txtSearch.getText().trim().toLowerCase();
 
-        LocalDate from = null, to = null;
-        try { from = parseDate(txtFrom == null ? null : txtFrom.getText()); } catch (Exception ignored) {}
-        try { to   = parseDate(txtTo   == null ? null : txtTo.getText());   } catch (Exception ignored) {}
-
-        final LocalDate fFrom = from, fTo = to;
-        String kw = txtSearch == null ? "" : txtSearch.getText().trim().toLowerCase();
-
-        List<HoaDon> result = allData.stream().filter(hd -> {
-            // date filter
-            if (fFrom != null || fTo != null) {
-                if (hd.getNgayLap() == null) return false;
-                LocalDate ngayLap = hd.getNgayLap().toLocalDate();
-                if (fFrom != null && ngayLap.isBefore(fFrom)) return false;
-                if (fTo   != null && ngayLap.isAfter(fTo))   return false;
-            }
-            // keyword filter
-            if (!kw.isEmpty()) {
-                String row = String.join(" ",
-                    nvl(hd.getMaHDFormatted()),
-                    nvl(hd.getMaNVFormatted()),
-                    nvl(hd.getTenKhachHang()),
-                    nvl(hd.getSoDienThoai()),
-                    hd.getNgayLap() != null ? hd.getNgayLap().format(FMT) : ""
-                ).toLowerCase();
-                if (!row.contains(kw)) return false;
-            }
-            return true;
-        }).collect(Collectors.toList());
-
-        // sort
-        if (sortCol >= 0) {
-            Comparator<HoaDon> cmp = buildComparator(sortCol);
-            if (sortState[sortCol] == 2) cmp = cmp.reversed();
-            result.sort(cmp);
-        }
-
-        return result;
-    }
-
-    private Comparator<HoaDon> buildComparator(int col) {
-        switch (col) {
-            case 0: return Comparator.comparingInt(HoaDon::getMaHD);
-            case 1: return Comparator.comparingInt(HoaDon::getMaNV);
-            case 2: return Comparator.comparing(hd -> nvl(hd.getTenKhachHang()));
-            case 3: return Comparator.comparing(hd -> nvl(hd.getSoDienThoai()));
-            case 4: return Comparator.comparing(hd -> hd.getNgayLap() != null ? hd.getNgayLap() : java.time.LocalDateTime.MIN);
-            case 5: return Comparator.comparingDouble(HoaDon::getTongTien);
-            default: return Comparator.comparingInt(HoaDon::getMaHD);
-        }
+        return allData == null ? java.util.Collections.emptyList() :
+            allData.stream()
+                .filter(hd -> keyword.isEmpty()
+                    || hd.getTenKhachHang().toLowerCase().contains(keyword)
+                    || hd.getMaHDFormatted().toLowerCase().contains(keyword)
+                    || hd.getSoDienThoai().toLowerCase().contains(keyword))
+                .collect(java.util.stream.Collectors.toList());
     }
 
     private void renderPage() {
-        if (!validateDates()) return;
-
         tableModel.setRowCount(0);
 
         List<HoaDon> filtered = getFilteredData();
 
-        int totalPages = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
-        if (currentPage > totalPages) currentPage = totalPages;
+        int totalPage = (int) Math.ceil((double) filtered.size() / PAGE_SIZE);
+        if (currentPage > totalPage) currentPage = totalPage == 0 ? 1 : totalPage;
 
         int from = (currentPage - 1) * PAGE_SIZE;
         int to   = Math.min(from + PAGE_SIZE, filtered.size());
 
-        currentPageData = new ArrayList<>(filtered.subList(from, to));
+        // 🔥 CHỈ LƯU DATA TRANG HIỆN TẠI
+        currentPageData = filtered.subList(from, to);
 
         for (HoaDon hd : currentPageData) {
             tableModel.addRow(new Object[]{
@@ -524,34 +373,20 @@ public class BillPanel extends JPanel {
                 hd.getMaNVFormatted(),
                 hd.getTenKhachHang(),
                 hd.getSoDienThoai(),
-                hd.getNgayLap() != null ? hd.getNgayLap().format(FMT) : "",
+                hd.getNgayLap() != null
+                    ? hd.getNgayLap().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                    : "",
                 String.format("%,.0f đ", hd.getTongTien()),
                 "Xem"
             });
         }
 
-        rebuildPagination(totalPages);
-        table.getTableHeader().repaint();
+        rebuildPagination(paginationPanel);
     }
 
-    // ── Helpers ────────────────────────────────────────────────
-    private int parseMa(String formatted) {
-        return Integer.parseInt(formatted.replaceAll("\\D", ""));
-    }
-
-    private String nvl(String s) { return s == null ? "" : s; }
-
-    private void openDetail(int id) {
-        Window parent = SwingUtilities.getWindowAncestor(table);
-        BillDetailDialog d = new BillDetailDialog((Frame) parent, id);
-        d.pack();
-        d.setLocationRelativeTo(parent);
-        d.setVisible(true);
-    }
-
-    // ══════════════════════════════════════════════════════════
-    // INNER CLASSES
-    // ══════════════════════════════════════════════════════════
+    /* ======================================================
+        INNER: RoundButton
+    ====================================================== */
     static class RoundButton extends JButton {
         private final Color bg, fg;
         RoundButton(String text, Color bg, Color fg) {
@@ -567,13 +402,16 @@ public class BillPanel extends JPanel {
         @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(!isEnabled() ? bg.darker() : getModel().isRollover() ? bg.brighter() : bg);
+            g2.setColor(getModel().isRollover() ? bg.brighter() : bg);
             g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 12, 12));
             super.paintComponent(g2);
             g2.dispose();
         }
     }
 
+    /* ======================================================
+        INNER: ButtonRenderer (for "Xem" column)
+    ====================================================== */
     static class ButtonRenderer extends JButton implements TableCellRenderer {
         ButtonRenderer(String text, Color bg) {
             super(text);
@@ -590,31 +428,27 @@ public class BillPanel extends JPanel {
         }
     }
 
+    /* ======================================================
+        INNER: ButtonEditor (for "Xem" column click)
+    ====================================================== */
     static class ButtonEditor extends DefaultCellEditor {
+        private final java.util.function.IntConsumer onClick;
         private int currentRow;
-
-        ButtonEditor(JCheckBox checkBox, JTable table) {
-            super(checkBox);
-            JButton btn = new JButton("Xem");
-            btn.setBackground(new Color(130, 90, 230));
+        ButtonEditor(String text, Color bg, java.util.function.IntConsumer onClick) {
+            super(new JCheckBox());
+            this.onClick = onClick;
+            JButton btn = new JButton(text);
+            btn.setBackground(bg);
             btn.setForeground(Color.WHITE);
             btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
             btn.setFocusPainted(false);
             btn.addActionListener(e -> {
                 fireEditingStopped();
-                String maHD = table.getValueAt(currentRow, 0).toString();
-                int id = Integer.parseInt(maHD.replaceAll("\\D", ""));
-                Window parent = SwingUtilities.getWindowAncestor(table);
-                BillDetailDialog d = new BillDetailDialog((Frame) parent, id);
-                d.pack();
-                d.setLocationRelativeTo(parent);
-                d.setVisible(true);
+                onClick.accept(currentRow);
             });
             editorComponent = btn;
         }
-
         public Object getCellEditorValue() { return "Xem"; }
-
         public Component getTableCellEditorComponent(
                 JTable t, Object v, boolean sel, int r, int c) {
             currentRow = r;

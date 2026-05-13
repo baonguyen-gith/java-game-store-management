@@ -24,9 +24,6 @@ public class Game {
     private String    currency;
 
     // ── SANPHAM (giá) ─────────────────────────────────────
-    private Double giaCD;
-    private Double giaROM;
-    private Double giaThueNgay;
 
     // ── Constructors ──────────────────────────────────────
     public Game() {}
@@ -89,19 +86,8 @@ public class Game {
     public void      setCurrency(String v)       { this.currency = v; }
 
     // ── Giá getters/setters ───────────────────────────────
-    public Double getGiaCD()              { return giaCD; }
-    public void   setGiaCD(Double v)      { this.giaCD = v; }
-
-    public Double getGiaROM()             { return giaROM; }
-    public void   setGiaROM(Double v)     { this.giaROM = v; }
-
-    public Double getGiaThueNgay()        { return giaThueNgay; }
-    public void   setGiaThueNgay(Double v){ this.giaThueNgay = v; }
 
     // ── Format helpers ────────────────────────────────────
-    public String getGiaCDText()      { return giaCD      == null ? "" : String.format("%,.0f đ", giaCD); }
-    public String getGiaROMText()     { return giaROM     == null ? "" : String.format("%,.0f đ", giaROM); }
-    public String getGiaThueText()    { return giaThueNgay== null ? "" : String.format("%,.0f đ/ngày", giaThueNgay); }
 
     @Override
     public String toString() {

@@ -4,6 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 
 public class EmployeeDashboardPanel extends JPanel {
+    
 
     public EmployeeDashboardPanel() {
 
