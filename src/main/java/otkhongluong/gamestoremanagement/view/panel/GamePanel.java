@@ -1,7 +1,7 @@
 package otkhongluong.gamestoremanagement.view.panel;
 
 import otkhongluong.gamestoremanagement.model.Game;
-import otkhongluong.gamestoremanagement.service.GameService;
+import otkhongluong.gamestoremanagement.controller.GameController;
 import otkhongluong.gamestoremanagement.view.dialog.InvoiceAddDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentAddDialog;
 
@@ -44,7 +44,7 @@ public class GamePanel extends JPanel {
     private static final String CARD_LIST   = "LIST";
     private static final String CARD_DETAIL = "DETAIL";
 
-    private final GameService  gameService = new GameService();
+    private final GameController gameController = new GameController();
     private final CardLayout   cardLayout  = new CardLayout();
     private JPanel             listPanel;
     private GameDetailPanel    detailPanel;
@@ -128,7 +128,7 @@ public class GamePanel extends JPanel {
 
     private void loadGames() {
         listPanel.removeAll();
-        allGames = gameService.getAllGames(); // ✅ lưu vào field thay vì biến local
+        allGames = gameController.loadAllGames();
         for (Game g : allGames) {
             listPanel.add(Box.createVerticalStrut(10));
             listPanel.add(createGameCard(g));
@@ -360,14 +360,8 @@ public class GamePanel extends JPanel {
     
         public void filterGames(String keyword) {
         listPanel.removeAll();
-        String kw = keyword.toLowerCase().trim();
 
-        List<Game> filtered = kw.isEmpty()
-            ? allGames
-            : allGames.stream().filter(g ->
-                nvl(g.getTenGame()).toLowerCase().contains(kw) ||
-                String.valueOf(g.getMaGame()).contains(kw)
-              ).collect(java.util.stream.Collectors.toList());
+        List<Game> filtered = gameController.filterByKeyword(keyword);
 
         if (filtered.isEmpty()) {
             JLabel none = new JLabel("Không tìm thấy game nào phù hợp");

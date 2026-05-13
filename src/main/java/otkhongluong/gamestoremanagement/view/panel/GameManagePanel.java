@@ -1,9 +1,9 @@
 package otkhongluong.gamestoremanagement.view.panel;
 
 import otkhongluong.gamestoremanagement.model.Game;
-import otkhongluong.gamestoremanagement.service.GameService;
+import otkhongluong.gamestoremanagement.controller.GameController;
 import otkhongluong.gamestoremanagement.util.IconUtils;
-
+import java.util.ArrayList;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -42,7 +42,7 @@ public class GameManagePanel extends JPanel {
     private boolean isFilterMode = false;
     private TableRowSorter<DefaultTableModel> rowSorter;
 
-    private GameService service = new GameService();
+    private final GameController controller = new GameController();
     private List<Game> allData;
     private List<Game> currentPageData;
 
@@ -252,7 +252,7 @@ public class GameManagePanel extends JPanel {
             if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn game để xóa!"); return; }
             Game g = currentPageData.get(table.convertRowIndexToModel(row));
             if (JOptionPane.showConfirmDialog(this, "Xóa game: " + g.getTenGame() + "?", "Xác nhận", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
-                if (service.deleteGame(g.getMaGame())) { loadData(); JOptionPane.showMessageDialog(this, "Đã xóa!"); }
+                if (controller.deleteGame(g.getMaGame())) { loadData(); JOptionPane.showMessageDialog(this, "Đã xóa!"); }
             }
         });
 
@@ -325,7 +325,7 @@ public class GameManagePanel extends JPanel {
             target.setMoTa(txtMoTa.getText().trim());
             try { target.setReleaseDate(LocalDate.parse(txtRelease.getText().trim())); } catch (Exception ignored) {}
 
-            boolean success = isEdit ? service.updateGame(target) : service.addGame(target);
+            boolean success = isEdit ? controller.updateGame(target) : controller.addGame(target);
             if (success) { loadData(); JOptionPane.showMessageDialog(this, "Thành công!"); }
         }
     }
@@ -346,20 +346,21 @@ public class GameManagePanel extends JPanel {
         panel.revalidate(); panel.repaint();
     }
 
-    private void loadData() { allData = service.getAllGames(); renderPage(); }
+    private void loadData() { allData = controller.loadAllGames(); renderPage(); }
     
     private List<Game> getFilteredData() {
-        String kw = txtSearch == null ? "" : txtSearch.getText().trim().toLowerCase();
-        return allData == null ? java.util.Collections.emptyList() : allData.stream().filter(g -> kw.isEmpty() || g.getTenGame().toLowerCase().contains(kw) || g.getTheLoai().toLowerCase().contains(kw)).collect(java.util.stream.Collectors.toList());
+        String kw = txtSearch == null ? "" : txtSearch.getText().trim();
+        return controller.filterForManage(kw);
     }
 
     private void renderPage() {
         tableModel.setRowCount(0);
         List<Game> filtered = getFilteredData();
+        int totalPages = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
+        if (currentPage > totalPages) currentPage = 1;
         int from = (currentPage - 1) * PAGE_SIZE;
         int to   = Math.min(from + PAGE_SIZE, filtered.size());
-        if (from >= filtered.size() && !filtered.isEmpty()) { currentPage = 1; from = 0; to = Math.min(PAGE_SIZE, filtered.size()); }
-        currentPageData = filtered.subList(from, to);
+        currentPageData = new ArrayList<>(filtered.subList(from, to));
         // --- HIỆN THỊ ĐỦ 6 CỘT TRONG BẢNG ---
         for (Game g : currentPageData) tableModel.addRow(new Object[]{
             "G" + String.format("%03d", g.getMaGame()), 
@@ -393,10 +394,8 @@ public class GameManagePanel extends JPanel {
     }
 
     private void executeSort(String type, boolean asc) {
-        allData.sort((g1, g2) -> {
-            int res = type.equals("MaGame") ? Integer.compare(g1.getMaGame(), g2.getMaGame()) : g1.getTenGame().compareToIgnoreCase(g2.getTenGame());
-            return asc ? res : -res;
-        });
+        controller.sortCache(type, asc);
+        allData = controller.loadAllGames(); // lấy lại cache đã sort
         currentPage = 1; renderPage();
     }
 

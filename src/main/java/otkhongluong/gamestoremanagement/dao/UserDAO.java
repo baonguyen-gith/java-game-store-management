@@ -3,28 +3,23 @@ package otkhongluong.gamestoremanagement.dao;
 import otkhongluong.gamestoremanagement.model.User;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.swing.JOptionPane; // nếu bạn có bắt lỗi hiển thị
 public class UserDAO {
+
     public boolean insert(User user) {
         String sql = "INSERT INTO USERS (Username, Password, MaRole) VALUES (?, ?, ?)";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            
+
             ps.setString(1, user.getUsername());
             ps.setString(2, user.getPassword());
             ps.setInt(3, user.getMaRole());
-            
             return ps.executeUpdate() > 0;
+
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(null, "Lỗi kết nối database!");
             e.printStackTrace();
         }
         return false;
@@ -34,15 +29,14 @@ public class UserDAO {
         String sql = "UPDATE USERS SET Username = ?, Password = ?, MaRole = ? WHERE MaUser = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            
+
             ps.setString(1, user.getUsername());
             ps.setString(2, user.getPassword());
             ps.setInt(3, user.getMaRole());
             ps.setInt(4, user.getMaUser());
-            
             return ps.executeUpdate() > 0;
+
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(null, "Lỗi kết nối database!");
             e.printStackTrace();
         }
         return false;
@@ -52,11 +46,11 @@ public class UserDAO {
         String sql = "DELETE FROM USERS WHERE MaUser = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            
+
             ps.setInt(1, maUser);
             return ps.executeUpdate() > 0;
+
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(null, "Lỗi kết nối database!");
             e.printStackTrace();
         }
         return false;
@@ -66,15 +60,29 @@ public class UserDAO {
         String sql = "SELECT * FROM USERS WHERE MaUser = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            
+
             ps.setInt(1, maUser);
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return mapResultSetToUser(rs);
-                }
+                if (rs.next()) return mapRow(rs);
             }
+
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(null, "Lỗi kết nối database!");
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public User findByUsername(String username) {
+        String sql = "SELECT * FROM USERS WHERE Username = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, username);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return mapRow(rs);
+            }
+
+        } catch (SQLException e) {
             e.printStackTrace();
         }
         return null;
@@ -86,41 +94,21 @@ public class UserDAO {
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-            
-            while (rs.next()) {
-                list.add(mapResultSetToUser(rs));
-            }
+
+            while (rs.next()) list.add(mapRow(rs));
+
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(null, "Lỗi kết nối database!");
             e.printStackTrace();
         }
         return list;
     }
 
-    public User findByUsername(String username) {
-        String sql = "SELECT * FROM USERS WHERE Username = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
-            ps.setString(1, username);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return mapResultSetToUser(rs);
-                }
-            }
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(null, "Lỗi kết nối database!");
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    private User mapResultSetToUser(ResultSet rs) throws SQLException {
-        User user = new User();
-        user.setMaUser(rs.getInt("MaUser"));
-        user.setUsername(rs.getString("Username"));
-        user.setPassword(rs.getString("Password"));
-        user.setMaRole(rs.getInt("MaRole"));
-        return user;
+    private User mapRow(ResultSet rs) throws SQLException {
+        return new User(
+            rs.getInt("MaUser"),
+            rs.getString("Username"),
+            rs.getString("Password"),
+            rs.getInt("MaRole")
+        );
     }
 }
