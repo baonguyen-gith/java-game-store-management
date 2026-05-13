@@ -5,147 +5,198 @@ import otkhongluong.gamestoremanagement.dao.PhieuThueDAO;
 import otkhongluong.gamestoremanagement.dao.KhachHangDAO;
 import otkhongluong.gamestoremanagement.dao.NhanVienDAO;
 import otkhongluong.gamestoremanagement.model.PhieuThue;
-import otkhongluong.gamestoremanagement.model.CD;
-import java.time.temporal.ChronoUnit;
+import otkhongluong.gamestoremanagement.util.DBConnection;  // ✅ THÊM
+
+import java.sql.Connection;        // ✅ THÊM
+import java.sql.PreparedStatement; // ✅ THÊM
+import java.sql.ResultSet;         // ✅ THÊM
+import java.sql.SQLException;      // ✅ THÊM
 import java.sql.Timestamp;
-import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 public class ThueService {
 
     private final PhieuThueDAO phieuThueDAO;
     private final CDDAO cdDAO;
-    
     private final KhachHangDAO khachHangDAO = new KhachHangDAO();
-    private final NhanVienDAO nhanVienDAO = new NhanVienDAO();
+    private final NhanVienDAO nhanVienDAO   = new NhanVienDAO();
 
     public ThueService() {
-
         phieuThueDAO = new PhieuThueDAO();
-        cdDAO = new CDDAO();
+        cdDAO        = new CDDAO();
     }
 
-    // ================= CREATE RENT =================
+    /* ================= CREATE ================= */
+
     public boolean createPhieuThue(PhieuThue pt) {
-
         if (pt == null || pt.getDanhSachChiTiet() == null) return false;
-
         pt.setTrangThai("DangThue");
 
-        boolean ok = phieuThueDAO.insert(pt);
+        // Dùng 1 connection duy nhất để transaction an toàn
+        try (Connection con = DBConnection.getConnection()) {
+            con.setAutoCommit(false);
+            try {
+                // ✅ CHECK RACE CONDITION trước khi insert
+                for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+                    String chk = "SELECT TrangThai FROM CD WHERE MaCD = ?";
+                    try (PreparedStatement ps = con.prepareStatement(chk)) {
+                        ps.setInt(1, ct.getMaCD());
+                        ResultSet rs = ps.executeQuery();
+                        if (!rs.next()) {
+                            con.rollback();
+                            return false; // CD không tồn tại
+                        }
+                        String trangThai = rs.getString("TrangThai");
+                        if (!"SanSang".equals(trangThai)) {
+                            con.rollback();
+                            return false; // CD đã bị thuê/bán bởi giao dịch khác
+                        }
+                    }
+                }
 
-        if (!ok) return false;
+                // Insert phiếu thuê
+                boolean ok = phieuThueDAO.insertWithConnection(pt, con); // ⚠ xem vấn đề 2
+                if (!ok) { con.rollback(); return false; }
 
-        // update CD status
-        for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
-            cdDAO.updateTrangThai(ct.getMaCD(), "DangThue");
+                // Cập nhật TrangThai CD
+                for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+                    String upd = "UPDATE CD SET TrangThai = N'DangThue' WHERE MaCD = ?";
+                    try (PreparedStatement ps = con.prepareStatement(upd)) {
+                        ps.setInt(1, ct.getMaCD());
+                        ps.executeUpdate();
+                    }
+                }
+
+                con.commit();
+                return true;
+
+            } catch (Exception ex) {
+                con.rollback();
+                ex.printStackTrace();
+                return false;
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            return false;
         }
-
-        return true;
     }
 
-    // ================= RETURN =================
-    public boolean returnCD(int maPT, LocalDateTime ngayTraThucTe){
+    /* ================= RETURN ================= */
 
-        // 1. lấy phiếu thuê
+    /** @deprecated dùng returnCD(maPT, ngayTra, chiPhiHuHong) */
+    @Deprecated
+    public boolean returnCD(int maPT, LocalDateTime ngayTraThucTe) {
+        return returnCD(maPT, ngayTraThucTe, 0);
+    }
+
+    public boolean returnCD(int maPT, LocalDateTime ngayTraThucTe, double chiPhiHuHong) {
         PhieuThue pt = phieuThueDAO.findById(maPT);
-        if(pt == null) return false;
+        if (pt == null) return false;
 
-        // 2. lấy danh sách CD trước
-        List<PhieuThue.CTPhieuThue> listCD = pt.getDanhSachChiTiet();
+        double phatTreHan   = tinhPhatTreHanOnly(pt, ngayTraThucTe);
+        double tienPhatChot = pt.getTienPhat() + phatTreHan + chiPhiHuHong;
 
-        // 3. tính tiền phạt
-        double tienPhat =
-        tinhTienPhat(pt, ngayTraThucTe, pt.getDanhSachChiTiet());
+        try (Connection con = DBConnection.getConnection()) {
+            con.setAutoCommit(false);
+            try {
+                // Update phiếu thuê
+                String sqlPT = "UPDATE PHIEUTHUE SET NgayTraThucTe = ?, TienPhat = ?, TrangThai = N'DaTra' WHERE MaPT = ?";
+                try (PreparedStatement ps = con.prepareStatement(sqlPT)) {
+                    ps.setTimestamp(1, Timestamp.valueOf(ngayTraThucTe));
+                    ps.setDouble(2, tienPhatChot);
+                    ps.setInt(3, maPT);
+                    if (ps.executeUpdate() == 0) { con.rollback(); return false; }
+                }
 
-        // 4. update phiếu thuê
-        boolean ok = phieuThueDAO.updateReturn(
-                maPT,
-                Timestamp.valueOf(ngayTraThucTe),
-                tienPhat
-        );
+                // Update TrangThai tất cả CD về SanSang
+                String sqlCD = "UPDATE CD SET TrangThai = N'SanSang' WHERE MaCD = ?";
+                for (PhieuThue.CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+                    try (PreparedStatement ps = con.prepareStatement(sqlCD)) {
+                        ps.setInt(1, ct.getMaCD());
+                        ps.executeUpdate();
+                    }
+                }
 
-        if(!ok) return false;
+                con.commit();
+                return true;
 
-        // 5. update CD status
-        for(PhieuThue.CTPhieuThue ct : listCD){
-            cdDAO.updateTrangThai(ct.getMaCD(), "SanSang");
+            } catch (Exception ex) {
+                con.rollback();
+                ex.printStackTrace();
+                return false;
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            return false;
         }
-
-        // 6. update trạng thái phiếu thuê (nếu cần riêng)
-        pt.setTrangThai("DaTra");
-        phieuThueDAO.update(pt);
-
-        return true;
     }
-    
-    // ================= PENALTY =================
-    public  double tinhTienPhat(PhieuThue pt,
-                             LocalDateTime ngayTra,
-                             List<PhieuThue.CTPhieuThue> cds){
 
-        double phat = 0;
-
-        if(pt == null || ngayTra == null) return 0;
-
+    /** Tính riêng phạt trễ hạn (không cộng phạt hư hỏng) */
+    private double tinhPhatTreHanOnly(PhieuThue pt, LocalDateTime ngayTra) {
+        if (pt == null || ngayTra == null || pt.getNgayTraDuKien() == null) return 0;
         LocalDateTime ngayDK = pt.getNgayTraDuKien();
+        if (!ngayTra.isAfter(ngayDK)) return 0;
+        long days = ChronoUnit.DAYS.between(ngayDK.toLocalDate(), ngayTra.toLocalDate());
+        if (days <= 0) days = 1;
+        return days * 10_000;
+    }
 
-        if(ngayDK == null) return 0;
+    /* ================= PENALTY (ước tính hiển thị) ================= */
 
-        // 🔴 1. PHẠT TRỄ HẠN
-        if(ngayTra.isAfter(ngayDK)){
-
-            long days = java.time.temporal.ChronoUnit.DAYS.between(
-                    ngayDK.toLocalDate(),
-                    ngayTra.toLocalDate()
-            );
-
-            if(days <= 0) days = 1; // quá ngày nhưng lệch giờ
-
-            phat += days * 10000;
+    /**
+     * Chỉ dùng để hiển thị ước tính — KHÔNG dùng ghi DB.
+     * Tính: trễ hạn + phạt hỏng cố định 50k/CD.
+     */
+    public double tinhTienPhat(PhieuThue pt,
+                               LocalDateTime ngayTra,
+                               List<PhieuThue.CTPhieuThue> cds) {
+        if (pt == null || ngayTra == null || pt.getNgayTraDuKien() == null) return 0;
+        double phat = 0;
+        LocalDateTime ngayDK = pt.getNgayTraDuKien();
+        if (ngayTra.isAfter(ngayDK)) {
+            long days = ChronoUnit.DAYS.between(ngayDK.toLocalDate(), ngayTra.toLocalDate());
+            if (days <= 0) days = 1;
+            phat += days * 10_000;
         }
-
-        // 🔴 2. PHẠT THEO CD
-        if(cds != null){
-            for(PhieuThue.CTPhieuThue ct : cds){
-
-                if(ct != null &&
-                   ct.getTinhTrang() != null &&
-                   ct.getTinhTrang().equalsIgnoreCase("HONG")){
-
-                    phat += 50000;
+        if (cds != null) {
+            for (PhieuThue.CTPhieuThue ct : cds) {
+                if (ct != null && "HONG".equalsIgnoreCase(ct.getTinhTrang())) {
+                    phat += 50_000;
                 }
             }
         }
-
         return phat;
     }
-    
-    public List<String> getAllKhachHangNames() {
-        return khachHangDAO.getAllTenKhachHang();
-    }
-    
-    public List<String> getAllNhanVienNames() {
-        return nhanVienDAO.getAllTenNhanVien();
+
+    /* ================= EXTEND ================= */
+
+    /**
+     * Gia hạn phiếu thuê.
+     *
+     * Gọi DAO với 4 tham số — TienCoc KHÔNG được chạm vào.
+     *
+     *   NgayTraDuKien += soNgay
+     *   TienPhat      += phatTre + phiGiaHan
+     *   TienCoc       = giữ nguyên (quyết toán khi trả CD)
+     *
+     * @param maPT       mã phiếu thuê
+     * @param soNgay     số ngày gia hạn thêm
+     * @param phatTre    phí phạt trễ (0 nếu chưa trễ)
+     * @param phiGiaHan  phí gia hạn = tổng đơn giá × soNgay
+     */
+    public boolean extendRental(int maPT, int soNgay, double phatTre, double phiGiaHan) {
+        return phieuThueDAO.extendRental(maPT, soNgay, phatTre, phiGiaHan);
     }
 
-    // ================= UPDATE =================
-    public boolean updatePhieuThue(PhieuThue pt){
-        return phieuThueDAO.update(pt);
-    }
+    /* ================= CRUD ================= */
 
-    // ================= DELETE =================
-    public boolean deletePhieuThue(int maPT){
-        return phieuThueDAO.delete(maPT);
-    }
+    public boolean updatePhieuThue(PhieuThue pt) { return phieuThueDAO.update(pt); }
+    public boolean deletePhieuThue(int maPT)     { return phieuThueDAO.delete(maPT); }
+    public List<PhieuThue> getAll()              { return phieuThueDAO.findAll(); }
+    public PhieuThue getById(int id)             { return phieuThueDAO.findById(id); }
 
-    // ================= READ =================
-    public List<PhieuThue> getAll(){
-        return phieuThueDAO.findAll();
-    }
-
-    public PhieuThue getById(int id){
-        return phieuThueDAO.findById(id);
-    }
+    public List<String> getAllKhachHangNames()   { return khachHangDAO.getAllTenKhachHang(); }
+    public List<String> getAllNhanVienNames()    { return nhanVienDAO.getAllTenNhanVien(); }
 }

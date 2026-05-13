@@ -68,8 +68,8 @@ public class HoaDonService {
     }
 
     // ================= DELETE =================
-    public boolean deleteHoaDon(int maHD){
-        return hoaDonDAO.delete(maHD);
+    public boolean deleteHoaDon(int maHD) {
+        return hoaDonDAO.deleteWithRollback(maHD);
     }
 
     // ================= READ =================

@@ -84,6 +84,7 @@ public class PhieuThue {
         private String tenGame;
         private String tinhTrang;
         private double donGiaThue;
+        private double giaThueNgay;
         
         public CTPhieuThue(int maCD, String tenGame, double donGiaThue, String tinhTrang) {
             this.maCD = maCD;
@@ -108,5 +109,7 @@ public class PhieuThue {
         public void setDonGiaThue(double donGiaThue) {
             this.donGiaThue = donGiaThue;
         }
+        public double getGiaThueNgay() { return giaThueNgay; }
+        public void setGiaThueNgay(double giaThueNgay) { this.giaThueNgay = giaThueNgay; }
     }
 }
