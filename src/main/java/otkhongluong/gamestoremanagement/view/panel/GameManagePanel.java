@@ -3,6 +3,12 @@ package otkhongluong.gamestoremanagement.view.panel;
 import otkhongluong.gamestoremanagement.model.Game;
 import otkhongluong.gamestoremanagement.controller.GameController;
 import otkhongluong.gamestoremanagement.util.IconUtils;
+import otkhongluong.gamestoremanagement.controller.GameController.SaveResult;
+import otkhongluong.gamestoremanagement.controller.GameController.PageResult;
+import otkhongluong.gamestoremanagement.util.RoundButton;
+import java.util.Map;
+import java.util.HashMap;
+
 import java.util.ArrayList;
 import javax.swing.*;
 import javax.swing.border.*;
@@ -270,31 +276,31 @@ public class GameManagePanel extends JPanel {
         JTextField txtNenTang = new JTextField(isEdit ? g.getNenTang() : "");
         JTextField txtGhiChu = new JTextField(isEdit ? g.getGhiChu() : "");
         // 1. Khai báo ô nhập và nút chọn ảnh
-    JTextField txtHinh = new JTextField(isEdit ? g.getHinhAnh() : "");
-    RoundButton btnBrowse = new RoundButton("...", INPUT_BG, BG_DARK);
-    btnBrowse.setPreferredSize(new Dimension(40, 30));
+        JTextField txtHinh = new JTextField(isEdit ? g.getHinhAnh() : "");
+        RoundButton btnBrowse = new RoundButton("...", INPUT_BG, BG_DARK);
+        btnBrowse.setPreferredSize(new Dimension(40, 30));
 
-    // 2. Tạo một Panel phụ để xếp ô nhập và nút nằm cạnh nhau
-    JPanel imgRow = new JPanel(new BorderLayout(5, 0));
-    imgRow.setOpaque(false);
-    imgRow.add(txtHinh, BorderLayout.CENTER);
-    imgRow.add(btnBrowse, BorderLayout.EAST);
+        // 2. Tạo một Panel phụ để xếp ô nhập và nút nằm cạnh nhau
+        JPanel imgRow = new JPanel(new BorderLayout(5, 0));
+        imgRow.setOpaque(false);
+        imgRow.add(txtHinh, BorderLayout.CENTER);
+        imgRow.add(btnBrowse, BorderLayout.EAST);
 
-    // 3. Viết sự kiện khi bấm nút "..."
-    btnBrowse.addActionListener(e -> {
-        JFileChooser fileChooser = new JFileChooser();
-        
-        // Chỉ hiện các file là hình ảnh (tùy chọn)
-        fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
-            "Hình ảnh (jpg, png, webp)", "jpg", "png", "jpeg", "webp"));
-            
-        int result = fileChooser.showOpenDialog(this);
-        if (result == JFileChooser.APPROVE_OPTION) {
-            // Lấy đường dẫn tuyệt đối của file đã chọn và đưa vào ô text
-            String path = fileChooser.getSelectedFile().getAbsolutePath();
-            txtHinh.setText(path);
-        }
-    });
+        // 3. Viết sự kiện khi bấm nút "..."
+        btnBrowse.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+
+            // Chỉ hiện các file là hình ảnh (tùy chọn)
+            fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                "Hình ảnh (jpg, png, webp)", "jpg", "png", "jpeg", "webp"));
+
+            int result = fileChooser.showOpenDialog(this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                // Lấy đường dẫn tuyệt đối của file đã chọn và đưa vào ô text
+                String path = fileChooser.getSelectedFile().getAbsolutePath();
+                txtHinh.setText(path);
+            }
+        });
 
         JTextField txtRating = new JTextField(isEdit ? g.getRating() : "");
         JTextField txtGenre = new JTextField(isEdit ? g.getGenre() : "");
@@ -306,7 +312,6 @@ public class GameManagePanel extends JPanel {
         mainPanel.add(new JLabel("Thể Loại (*):")); mainPanel.add(txtTheLoai);
         mainPanel.add(new JLabel("Nền Tảng (*):")); mainPanel.add(txtNenTang);
         mainPanel.add(new JLabel("Ghi Chú:")); mainPanel.add(txtGhiChu);
-        mainPanel.add(new JLabel("Link Ảnh:")); mainPanel.add(txtHinh);
         mainPanel.add(new JLabel("--- Chi tiết ---")); mainPanel.add(new JLabel(""));
         mainPanel.add(new JLabel("Rating:")); mainPanel.add(txtRating);
         mainPanel.add(new JLabel("Genre:")); mainPanel.add(txtGenre);
@@ -317,23 +322,33 @@ public class GameManagePanel extends JPanel {
 
         int res = JOptionPane.showConfirmDialog(this, new JScrollPane(mainPanel), isEdit ? "Sửa Game" : "Thêm Game", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (res == JOptionPane.OK_OPTION) {
-            Game target = isEdit ? g : new Game();
-            target.setTenGame(txtTen.getText().trim()); target.setTheLoai(txtTheLoai.getText().trim());
-            target.setNenTang(txtNenTang.getText().trim()); target.setGhiChu(txtGhiChu.getText().trim());
-            target.setHinhAnh(txtHinh.getText().trim()); target.setRating(txtRating.getText().trim());
-            target.setGenre(txtGenre.getText().trim()); target.setRegion(txtRegion.getText().trim());
-            target.setMoTa(txtMoTa.getText().trim());
-            try { target.setReleaseDate(LocalDate.parse(txtRelease.getText().trim())); } catch (Exception ignored) {}
+            Map<String, String> form = new HashMap<>();
+                form.put("tenGame", txtTen.getText());
+                form.put("theLoai", txtTheLoai.getText());
+                form.put("nenTang", txtNenTang.getText());
+                form.put("ghiChu", txtGhiChu.getText());
+                form.put("hinhAnh", txtHinh.getText());
+                form.put("rating", txtRating.getText());
+                form.put("genre", txtGenre.getText());
+                form.put("region", txtRegion.getText());
+                form.put("releaseDate", txtRelease.getText());
+                form.put("moTa", txtMoTa.getText());
 
-            boolean success = isEdit ? controller.updateGame(target) : controller.addGame(target);
-            if (success) { loadData(); JOptionPane.showMessageDialog(this, "Thành công!"); }
+                SaveResult r = controller.handleSave(g, form);
+
+                JOptionPane.showMessageDialog(this, r.message);
+
+                if (r.success) {
+                    loadData();
+                }
         }
     }
 
     private void rebuildPagination(JPanel panel) {
         panel.removeAll();
-        List<Game> filtered = getFilteredData();
-        int total = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
+        String kw = txtSearch == null ? "" : txtSearch.getText().trim();
+        PageResult<Game> result = controller.getPage(kw, currentPage, PAGE_SIZE);
+        int total = result.totalPages;
         RoundButton prev = new RoundButton("<", INPUT_BG, BG_DARK);
         prev.setEnabled(currentPage > 1);
         prev.addActionListener(e -> { if (currentPage > 1) { currentPage--; renderPage(); } });
@@ -355,21 +370,26 @@ public class GameManagePanel extends JPanel {
 
     private void renderPage() {
         tableModel.setRowCount(0);
-        List<Game> filtered = getFilteredData();
-        int totalPages = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
-        if (currentPage > totalPages) currentPage = 1;
-        int from = (currentPage - 1) * PAGE_SIZE;
-        int to   = Math.min(from + PAGE_SIZE, filtered.size());
-        currentPageData = new ArrayList<>(filtered.subList(from, to));
-        // --- HIỆN THỊ ĐỦ 6 CỘT TRONG BẢNG ---
-        for (Game g : currentPageData) tableModel.addRow(new Object[]{
-            "G" + String.format("%03d", g.getMaGame()), 
-            g.getTenGame(), 
-            g.getTheLoai(), 
-            g.getNenTang(), 
-            g.getGhiChu(),
-            g.getHinhAnh()
-        });
+
+        String kw = txtSearch == null ? "" : txtSearch.getText().trim();
+
+        PageResult<Game> result =
+                controller.getPage(kw, currentPage, PAGE_SIZE);
+
+        currentPage = result.currentPage;
+        currentPageData = result.data;
+
+        for (Game g : currentPageData) {
+            tableModel.addRow(new Object[]{
+                "G" + String.format("%03d", g.getMaGame()),
+                g.getTenGame(),
+                g.getTheLoai(),
+                g.getNenTang(),
+                g.getGhiChu(),
+                g.getHinhAnh()
+            });
+        }
+
         rebuildPagination(paginationPanel);
     }
 
@@ -397,12 +417,6 @@ public class GameManagePanel extends JPanel {
         controller.sortCache(type, asc);
         allData = controller.loadAllGames(); // lấy lại cache đã sort
         currentPage = 1; renderPage();
-    }
-
-    static class RoundButton extends JButton {
-        private final Color bg, fg;
-        RoundButton(String t, Color b, Color f) { super(t); this.bg = b; this.fg = f; setFocusPainted(false); setContentAreaFilled(false); setBorderPainted(false); setForeground(fg); setFont(new Font("Segoe UI", Font.BOLD, 13)); setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)); }
-        @Override protected void paintComponent(Graphics g) { Graphics2D g2 = (Graphics2D) g.create(); g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON); g2.setColor(getModel().isRollover() ? bg.brighter() : bg); g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 12, 12)); super.paintComponent(g2); g2.dispose(); }
     }
 
     // ── HÀM HIỂN THỊ CHI TIẾT GAME (CHỈ ĐỌC) ──────────────────────

@@ -47,16 +47,10 @@ public class RentPanel extends JPanel {
         "Ngày thuê", "Ngày trả DK", "Trạng thái", "Chi tiết"
     };
 
-    /* ── Sorting: 0=none, 1=asc, 2=desc per column ── */
-    private final int[] sortState = new int[COLS.length];
-    private int sortCol = -1;
-
     /* ── Pagination ── */
-    private static final int PAGE_SIZE = 10;
     private int currentPage = 1;
 
     /* ── Data ── */
-    private List<RentalOrder> allData = new ArrayList<>();
     private List<RentalOrder> currentPageData = new ArrayList<>();
     private final RentController controller = new RentController();
 
@@ -98,8 +92,7 @@ public class RentPanel extends JPanel {
         KeyAdapter dateListener = new KeyAdapter() {
             public void keyReleased(KeyEvent e) {
                 currentPage = 1;
-                validateDates();
-                renderPage();
+                fireFilter();
             }
         };
         txtFrom.addKeyListener(dateListener);
@@ -226,7 +219,7 @@ public class RentPanel extends JPanel {
         txtSearch.setOpaque(false);
         txtSearch.setPreferredSize(new Dimension(0, 38));
         txtSearch.addKeyListener(new KeyAdapter() {
-            public void keyReleased(KeyEvent e) { currentPage = 1; renderPage(); }
+            public void keyReleased(KeyEvent e) { currentPage = 1; fireFilter(); }
         });
 
         p.add(txtSearch, BorderLayout.CENTER);
@@ -269,6 +262,9 @@ public class RentPanel extends JPanel {
             @Override public Component getTableCellRendererComponent(
                     JTable t, Object v, boolean sel, boolean foc, int r, int c) {
                 String arrow = "";
+                int sortCol = controller.getSortCol();
+                int[] sortState = controller.getSortState();
+
                 if (sortCol == c) {
                     arrow = sortState[c] == 1 ? "  ▲" : sortState[c] == 2 ? "  ▼" : "";
                 } else {
@@ -292,18 +288,19 @@ public class RentPanel extends JPanel {
 
         // Click header → sort (trừ cột "Chi tiết")
         header.addMouseListener(new MouseAdapter() {
+            @Override
             public void mouseClicked(MouseEvent e) {
                 int col = header.columnAtPoint(e.getPoint());
-                if (col < 0 || col == COLS.length - 1) return; // bỏ qua cột Chi tiết
-                // 3-state cycle: 0→1→2→0
-                sortState[col] = (sortState[col] + 1) % 3;
-                sortCol = sortState[col] == 0 ? -1 : col;
-                // reset các cột khác
-                for (int i = 0; i < sortState.length; i++)
-                    if (i != col) sortState[i] = 0;
+                if (col < 0 || col == COLS.length - 1) return;
+
                 currentPage = 1;
-                renderPage();
-                header.repaint();
+
+                render(controller.onSortChanged(
+                    col,
+                    txtFrom.getText(),
+                    txtTo.getText(),
+                    txtSearch.getText()
+                ));
             }
         });
 
@@ -419,14 +416,14 @@ public class RentPanel extends JPanel {
         RoundButton btnPrev = new RoundButton("<", INPUT_BG, new Color(80, 80, 80));
         btnPrev.setPreferredSize(new Dimension(34, 34));
         btnPrev.setEnabled(currentPage > 1);
-        btnPrev.addActionListener(e -> { if (currentPage > 1) { currentPage--; renderPage(); } });
+        btnPrev.addActionListener(e -> { if (currentPage > 1) { currentPage--; fireFilter(); } });
         paginationPanel.add(btnPrev);
 
         // Nút ">" — sang trang sau
         RoundButton btnNext = new RoundButton(">", INPUT_BG, new Color(80, 80, 80));
         btnNext.setPreferredSize(new Dimension(34, 34));
         btnNext.setEnabled(currentPage < totalPages);
-        btnNext.addActionListener(e -> { if (currentPage < totalPages) { currentPage++; renderPage(); } });
+        btnNext.addActionListener(e -> { if (currentPage < totalPages) { currentPage++; fireFilter(); } });
         paginationPanel.add(btnNext);
 
         // Label "Trang X / Y"
@@ -440,93 +437,56 @@ public class RentPanel extends JPanel {
     // DATA PIPELINE: load → filter → sort → page → render
     // ══════════════════════════════════════════════════════════
     private void loadData() {
-        allData = controller.getAllRentals();
         currentPage = 1;
-        Arrays.fill(sortState, 0);
-        sortCol = -1;
-        renderPage();
+        fireFilter();
     }
+    
+    private void render(RentController.RentPageResult result) {
+        txtFrom.setBackground(result.fromDateError ? INPUT_ERROR : INPUT_BG);
+        txtTo.setBackground(result.toDateError ? INPUT_ERROR : INPUT_BG);
 
-    /** Parse LocalDate từ ô nhập, trả null nếu rỗng, throw nếu sai định dạng */
-    private LocalDate parseDate(String text) {
-        if (text == null || text.trim().isEmpty()) return null;
-        return LocalDate.parse(text.trim(), FMT); // throws DateTimeParseException nếu sai
-    }
-
-    /** Validate 2 ô ngày, highlight đỏ nếu sai, trả false nếu có lỗi */
-    private boolean validateDates() {
-        boolean ok = true;
-        for (JTextField tf : new JTextField[]{txtFrom, txtTo}) {
-            String txt = tf.getText().trim();
-            if (txt.isEmpty()) {
-                tf.setBackground(INPUT_BG);
-                continue;
-            }
-            try {
-                LocalDate.parse(txt, FMT);
-                tf.setBackground(INPUT_BG);
-            } catch (DateTimeParseException ex) {
-                tf.setBackground(INPUT_ERROR);
-                ok = false;
-            }
-        }
-        return ok;
-    }
-
-    private List<RentalOrder> getFilteredData() {
-        LocalDate from = null, to = null;
-        try { from = parseDate(txtFrom.getText()); } catch (Exception ignored) {}
-        try { to   = parseDate(txtTo.getText());   } catch (Exception ignored) {}
-        String kw  = txtSearch.getText().trim().toLowerCase();
-        boolean asc = sortCol < 0 || sortState[sortCol] == 1;
-        return controller.getFilteredRentals(from, to, kw, sortCol, asc);
-    }
-
-    private void renderPage() {
-        // Không render nếu có ô ngày lỗi
-        if (!validateDates()) return;
+        if (result.hasDateError()) return;
 
         tableModel.setRowCount(0);
+        currentPageData = new ArrayList<>(result.rows);
 
-        List<RentalOrder> filtered = getFilteredData();
-
-        int totalPages = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
-        if (currentPage > totalPages) currentPage = totalPages;
-
-        int from = (currentPage - 1) * PAGE_SIZE;
-        int to   = Math.min(from + PAGE_SIZE, filtered.size());
-
-        currentPageData = new ArrayList<>(filtered.subList(from, to));
-
-        for (RentalOrder pt : currentPageData) {
+        for (RentalOrder pt : result.rows) {
             tableModel.addRow(new Object[]{
                 pt.getMaPTFormatted(),
                 pt.getMaNVFormatted(),
                 pt.getTenKhachHang(),
                 pt.getSoDienThoai(),
-                pt.getNgayThue()      != null ? pt.getNgayThue().format(FMT)      : "",
-                pt.getNgayTraDuKien() != null ? pt.getNgayTraDuKien().format(FMT) : "",
+                fmt(pt.getNgayThue()),
+                fmt(pt.getNgayTraDuKien()),
                 pt.getTrangThai(),
                 "Xem"
             });
         }
 
-        rebuildPagination(totalPages);
-        table.getTableHeader().repaint(); // cập nhật mũi tên sort
+        rebuildPagination(
+            result.totalPages
+        );
+
+        table.getTableHeader().repaint();
+    }
+    
+    private void fireFilter() {
+        render(controller.query(
+            txtFrom.getText(),
+            txtTo.getText(),
+            txtSearch.getText(),
+            currentPage
+        ));
     }
 
     // ── Helpers ────────────────────────────────────────────────
 
-    private void validateAndFilter() {
-        currentPage = 1;
-        renderPage();
-    }
-
     private int parseMa(String formatted) {
         return Integer.parseInt(formatted.replaceAll("\\D", ""));
     }
-
-    private String nvl(String s) { return s == null ? "" : s; }
+    private String fmt(java.time.LocalDateTime d) {
+        return d != null ? d.format(FMT) : "";
+    }
 
     private void openDetail(int id) {
         controller.openDetailDialog(table, id);

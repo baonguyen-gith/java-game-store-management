@@ -3,7 +3,7 @@ package otkhongluong.gamestoremanagement.view.panel;
 import otkhongluong.gamestoremanagement.controller.ProductController;
 import otkhongluong.gamestoremanagement.model.Product;
 import otkhongluong.gamestoremanagement.util.IconUtils;
-
+import otkhongluong.gamestoremanagement.util.RoundButton;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -280,7 +280,7 @@ public class ProductPanel extends JPanel {
 
         paginationPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         paginationPanel.setBackground(BG_DARK);
-        rebuildPagination(paginationPanel);
+        rebuildPagination(1);
         bar.add(paginationPanel, BorderLayout.WEST);
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
@@ -326,11 +326,8 @@ public class ProductPanel extends JPanel {
         return bar;
     }
 
-    private void rebuildPagination(JPanel panel) {
-        panel.removeAll();
-        List<Product> filtered = getFilteredData();
-        final int total = Math.max(1,
-                (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
+    private void rebuildPagination(int totalPages) {
+        paginationPanel.removeAll();
 
         RoundButton btnPrev = new RoundButton("<", INPUT_BG, BG_DARK);
         btnPrev.setPreferredSize(new Dimension(40, 36));
@@ -339,23 +336,23 @@ public class ProductPanel extends JPanel {
             if (currentPage > 1) { currentPage--; renderPage(); }
         });
 
-        JLabel lblPageInfo = new JLabel("Trang " + currentPage + " / " + total);
+        JLabel lblPageInfo = new JLabel("Trang " + currentPage + " / " + totalPages);
         lblPageInfo.setForeground(TEXT_WHITE);
         lblPageInfo.setFont(FONT_LABEL);
         lblPageInfo.setBorder(new EmptyBorder(0, 10, 0, 10));
 
         RoundButton btnNext = new RoundButton(">", INPUT_BG, BG_DARK);
         btnNext.setPreferredSize(new Dimension(40, 36));
-        btnNext.setEnabled(currentPage < total);
+        btnNext.setEnabled(currentPage < totalPages);
         btnNext.addActionListener(e -> {
-            if (currentPage < total) { currentPage++; renderPage(); }
+            if (currentPage < totalPages) { currentPage++; renderPage(); }
         });
 
-        panel.add(btnPrev);
-        panel.add(lblPageInfo);
-        panel.add(btnNext);
-        panel.revalidate();
-        panel.repaint();
+        paginationPanel.add(btnPrev);
+        paginationPanel.add(lblPageInfo);
+        paginationPanel.add(btnNext);
+        paginationPanel.revalidate();
+        paginationPanel.repaint();
     }
 
     // ======================================================
@@ -368,28 +365,16 @@ public class ProductPanel extends JPanel {
         renderPage();
     }
 
-    /**
-     * Lấy danh sách đã lọc theo từ khóa hiện tại.
-     * Uỷ quyền logic lọc cho Controller.
-     */
-    private List<Product> getFilteredData() {
-        String keyword = txtSearch == null ? "" : txtSearch.getText().trim().toLowerCase();
-        return controller.filter(allData, keyword); // ← không tự lọc
-    }
-
     /** Render trang hiện tại lên JTable. */
     private void renderPage() {
         tableModel.setRowCount(0);
-        List<Product> filtered = getFilteredData();
 
-        int totalPage = Math.max(1,
-                (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
-        if (currentPage > totalPage) currentPage = totalPage;
+        String keyword = txtSearch == null ? "" : txtSearch.getText().trim().toLowerCase();
+        ProductController.PageResult result =
+            controller.getPage(allData, keyword, currentPage, PAGE_SIZE);
 
-        int from = (currentPage - 1) * PAGE_SIZE;
-        int to   = Math.min(from + PAGE_SIZE, filtered.size());
-
-        currentPageData = filtered.subList(from, to);
+        currentPage    = result.currentPage;   // Controller đã clamp giá trị an toàn
+        currentPageData = result.data;
 
         for (Product sp : currentPageData) {
             tableModel.addRow(new Object[]{
@@ -400,7 +385,7 @@ public class ProductPanel extends JPanel {
             });
         }
 
-        rebuildPagination(paginationPanel);
+        rebuildPagination(result.totalPages);   // truyền vào thay vì tự tính
     }
 
     // ======================================================
@@ -488,40 +473,5 @@ public class ProductPanel extends JPanel {
         menu.add(asc);
         menu.add(desc);
         menu.addSeparator();
-    }
-
-    // ======================================================
-    //  INNER: RoundButton
-    // ======================================================
-    static class RoundButton extends JButton {
-        private Color bg;
-        private final Color fg;
-
-        RoundButton(String text, Color bg, Color fg) {
-            super(text);
-            this.bg = bg; this.fg = fg;
-            setFocusPainted(false);
-            setContentAreaFilled(false);
-            setBorderPainted(false);
-            setForeground(fg);
-            setFont(new Font("Segoe UI", Font.BOLD, 13));
-            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        }
-
-        /** Cho phép đổi màu nền lúc runtime (dùng cho nút Lọc). */
-        @Override public void setBackground(Color bg) {
-            this.bg = bg;
-            repaint();
-        }
-
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                                RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(getModel().isRollover() ? bg.brighter() : bg);
-            g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 12, 12));
-            super.paintComponent(g2);
-            g2.dispose();
-        }
     }
 }

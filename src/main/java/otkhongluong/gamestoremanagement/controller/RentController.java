@@ -8,7 +8,8 @@ import otkhongluong.gamestoremanagement.view.dialog.RentDetailDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentEditDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentExtendDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentReturnDialog;
-
+import java.util.ArrayList;
+import java.time.format.DateTimeFormatter;
 import javax.swing.*;
 import java.awt.*;
 import java.time.LocalDate;
@@ -21,6 +22,11 @@ public class RentController {
 
     private final RentalService   service;
     private final RentalOrderDAO  dao;
+    private int[] sortState = new int[7]; // số cột sort được
+    private int sortCol = -1;
+    private static final int PAGE_SIZE = 8;
+    private static final DateTimeFormatter FMT =
+    DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     public RentController() {
         this.service = new RentalService();
@@ -132,6 +138,113 @@ public class RentController {
         ).toLowerCase();
         return row.contains(keyword.toLowerCase());
     }
+    
+    public static class RentPageResult {
+        public final List<RentalOrder> rows;
+        public final int currentPage;
+        public final int totalPages;
+        public final int totalRows;
+        public final boolean fromDateError;
+        public final boolean toDateError;
+
+        public RentPageResult(List<RentalOrder> rows,
+                              int currentPage,
+                              int totalPages,
+                              int totalRows,
+                              boolean fromDateError,
+                              boolean toDateError) {
+            this.rows = rows;
+            this.currentPage = currentPage;
+            this.totalPages = totalPages;
+            this.totalRows = totalRows;
+            this.fromDateError = fromDateError;
+            this.toDateError = toDateError;
+        }
+
+        public boolean hasDateError() {
+            return fromDateError || toDateError;
+        }
+    }
+    
+    public int[] getSortState() {
+        return sortState;
+    }
+
+    public int getSortCol() {
+        return sortCol;
+    }
+    
+    public RentPageResult onSortChanged(int col,
+                                    String from,
+                                    String to,
+                                    String kw) {
+
+        sortState[col] = (sortState[col] + 1) % 3;
+        sortCol = sortState[col] == 0 ? -1 : col;
+
+        for (int i = 0; i < sortState.length; i++) {
+            if (i != col) sortState[i] = 0;
+        }
+
+        return query(from, to, kw, 1);
+    }
+    
+    public RentPageResult query(String fromStr,
+                            String toStr,
+                            String keyword,
+                            int page) {
+
+        boolean fromErr = false;
+        boolean toErr = false;
+
+        LocalDate from = null;
+        LocalDate to = null;
+
+        try {
+            if (!fromStr.trim().isEmpty())
+                from = parseDate(fromStr);
+        } catch (Exception e) {
+            fromErr = true;
+        }
+
+        try {
+            if (!toStr.trim().isEmpty())
+                to = parseDate(toStr);
+        } catch (Exception e) {
+            toErr = true;
+        }
+
+        if (fromErr || toErr) {
+            return new RentPageResult(
+                new ArrayList<>(),
+                page, 1, 0,
+                fromErr, toErr
+            );
+        }
+
+        boolean asc = sortCol < 0 || sortState[sortCol] != 2;
+
+        List<RentalOrder> filtered =
+            getFilteredRentals(from, to, keyword, sortCol, asc);
+
+        int total = Math.max(1,
+            (int)Math.ceil((double)filtered.size() / PAGE_SIZE));
+
+        if (page > total) page = total;
+        if (page < 1) page = 1;
+
+        int fromIndex = (page - 1) * PAGE_SIZE;
+        int toIndex = Math.min(fromIndex + PAGE_SIZE, filtered.size());
+
+        return new RentPageResult(
+            filtered.subList(fromIndex, toIndex),
+            page,
+            total,
+            filtered.size(),
+            false,
+            false
+        );
+    }
 
     // ── Private: sort ─────────────────────────────────────────
     private Comparator<RentalOrder> buildComparator(int col) {
@@ -156,5 +269,9 @@ public class RentController {
 
     private String nvl(String s) {
         return s == null ? "" : s;
+    }
+    private LocalDate parseDate(String text) {
+        if (text == null || text.trim().isEmpty()) return null;
+        return LocalDate.parse(text.trim(), FMT); // throws DateTimeParseException nếu sai
     }
 }

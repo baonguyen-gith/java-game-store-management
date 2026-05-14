@@ -4,7 +4,6 @@ import otkhongluong.gamestoremanagement.model.Game;
 import otkhongluong.gamestoremanagement.controller.GameController;
 import otkhongluong.gamestoremanagement.view.dialog.InvoiceAddDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentAddDialog;
-
 import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;

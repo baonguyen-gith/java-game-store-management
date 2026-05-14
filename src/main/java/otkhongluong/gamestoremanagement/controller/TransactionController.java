@@ -1,7 +1,12 @@
 package otkhongluong.gamestoremanagement.controller;
 
 import otkhongluong.gamestoremanagement.service.TransactionService;
+import otkhongluong.gamestoremanagement.view.dialog.InvoiceDetailDialog;
+import otkhongluong.gamestoremanagement.view.dialog.RentDetailDialog;
+import otkhongluong.gamestoremanagement.view.dialog.TransactionDetailDialog;
 
+import javax.swing.*;
+import java.awt.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;

@@ -207,4 +207,37 @@ public class ProductController {
                 .filter(sp -> sp.getSoLuongCD() <= threshold)
                 .collect(Collectors.toList());
     }
+    
+    // Trong ProductController.java — thêm inner class này
+    public static class PageResult {
+        public final List<Product> data;
+        public final int currentPage;
+        public final int totalPages;
+
+        public PageResult(List<Product> data, int currentPage, int totalPages) {
+            this.data = data;
+            this.currentPage = currentPage;
+            this.totalPages = totalPages;
+        }
+    }
+
+    /** Controller chịu trách nhiệm phân trang, View chỉ nhận kết quả. */
+    public PageResult getPage(List<Product> all, String keyword, int page, int pageSize) {
+        // 1. Lọc
+        List<Product> filtered = filter(all, keyword);
+
+        // 2. Tính tổng trang
+        int total = Math.max(1, (int) Math.ceil((double) filtered.size() / pageSize));
+        int safePage = Math.min(Math.max(1, page), total);
+
+        // 3. Cắt trang
+        int from = (safePage - 1) * pageSize;
+        int to   = Math.min(from + pageSize, filtered.size());
+
+        return new PageResult(
+            filtered.subList(from, to),
+            safePage,
+            total
+        );
+    }
 }

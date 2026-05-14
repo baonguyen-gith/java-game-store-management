@@ -3,9 +3,10 @@ package otkhongluong.gamestoremanagement.view.panel;
 import otkhongluong.gamestoremanagement.model.Employee;
 import otkhongluong.gamestoremanagement.model.User;
 import otkhongluong.gamestoremanagement.controller.EmployeeController;
+import otkhongluong.gamestoremanagement.controller.EmployeeController.SaveResult;
 import otkhongluong.gamestoremanagement.util.IconUtils;
 import otkhongluong.gamestoremanagement.view.dialog.EmployeeDialog;
-
+import otkhongluong.gamestoremanagement.util.RoundButton;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -52,12 +53,21 @@ public class EmployeePanel extends JPanel {
     private static final int PAGE_SIZE = 8;
 
     private User currentUser;
-    private EmployeeController controller;
+
+    // ✅ Controller không nhận View, allData sống ở đây nhưng chỉ là cache hiển thị
+    private final EmployeeController controller;
+
+    // allData: cache dữ liệu từ DB sau mỗi lần loadData()
+    // currentPageData: subList hiện tại đang hiển thị trên bảng
     private List<Employee> allData;
     private List<Employee> currentPageData;
 
     public EmployeePanel(User user) {
         this.currentUser = user;
+
+        // ✅ FIX: Khởi tạo controller TRƯỚC KHI build UI
+        //    Trước đây controller được gán SAU buildBottomBar() → NullPointerException
+        this.controller = new EmployeeController();
 
         setLayout(new BorderLayout(0, 0));
         setBackground(BG_DARK);
@@ -66,8 +76,8 @@ public class EmployeePanel extends JPanel {
         add(buildTopBar(),    BorderLayout.NORTH);
         add(buildTable(),     BorderLayout.CENTER);
         add(buildBottomBar(), BorderLayout.SOUTH);
-        controller = new EmployeeController(this);
-        
+
+        // loadData() gọi cuối cùng sau khi toàn bộ UI đã sẵn sàng
         loadData();
     }
 
@@ -79,16 +89,13 @@ public class EmployeePanel extends JPanel {
         bar.setBackground(BG_DARK);
         bar.setBorder(new EmptyBorder(0, 0, 12, 0));
 
-        // Title on the left
         JLabel title = new JLabel("QUẢN LÝ NHÂN VIÊN");
         title.setForeground(Color.WHITE);
         title.setFont(new Font("Arial", Font.BOLD, 22));
         title.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 20));
         bar.add(title, BorderLayout.WEST);
 
-        // Search on the right
         bar.add(labeledSearch(), BorderLayout.EAST);
-
         return bar;
     }
 
@@ -122,46 +129,45 @@ public class EmployeePanel extends JPanel {
             public void keyReleased(KeyEvent e) { currentPage = 1; renderPage(); }
         });
 
-        // --- Nút Lọc ---
         RoundButton btnFilter = new RoundButton(" Lọc", PURPLE_HEADER, Color.WHITE);
         btnFilter.setPreferredSize(new Dimension(70, 40));
         btnFilter.addActionListener(e -> toggleFilterMode(btnFilter));
 
-        // --- Nút Sắp xếp ---
         RoundButton btnSort = new RoundButton(" Sắp xếp", PURPLE_HEADER, Color.WHITE);
         btnSort.setPreferredSize(new Dimension(90, 40));
         btnSort.addActionListener(e -> showSortMenu(btnSort));
 
-        // --- Nút Thêm NV ---
         RoundButton btnAdd = new RoundButton("", BTN_ADD, Color.WHITE);
         btnAdd.setIcon(IconUtils.getAddIcon(18, Color.WHITE));
         btnAdd.setPreferredSize(new Dimension(40, 40));
         btnAdd.addActionListener(e -> {
-            new EmployeeDialog((Frame) SwingUtilities.getWindowAncestor(this), null, this::loadData).setVisible(true);
+            new EmployeeDialog(
+                (Frame) SwingUtilities.getWindowAncestor(this),
+                null,
+                controller,
+                this::loadData
+            ).setVisible(true);
         });
 
-        // --- Nút Tài khoản ---
         RoundButton btnUser = new RoundButton("", INPUT_BG, BG_DARK);
         btnUser.setIcon(IconUtils.getUserIcon(18, BG_DARK));
         btnUser.setPreferredSize(new Dimension(40, 40));
         btnUser.addActionListener(e -> openUserPanel());
 
-        // Cụm Lọc + Sort bên trái ô Search
         JPanel leftGroup = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         leftGroup.setBackground(BG_DARK);
         leftGroup.add(btnFilter);
         leftGroup.add(btnSort);
 
-        // Cụm Add + User bên phải ô Search
         JPanel rightGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         rightGroup.setBackground(BG_DARK);
         rightGroup.add(btnAdd);
         rightGroup.add(btnUser);
 
-        row.add(leftGroup, BorderLayout.WEST);
-        row.add(txtSearch, BorderLayout.CENTER);
-        row.add(rightGroup,  BorderLayout.EAST);
-        
+        row.add(leftGroup,  BorderLayout.WEST);
+        row.add(txtSearch,  BorderLayout.CENTER);
+        row.add(rightGroup, BorderLayout.EAST);
+
         p.add(row, BorderLayout.CENTER);
         return p;
     }
@@ -253,7 +259,8 @@ public class EmployeePanel extends JPanel {
 
         paginationPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         paginationPanel.setBackground(BG_DARK);
-        rebuildPagination(paginationPanel);
+        // ✅ Lần đầu build, allData chưa có → truyền null-safe vào rebuildPagination
+        rebuildPagination(1);
         bar.add(paginationPanel, BorderLayout.WEST);
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
@@ -264,12 +271,15 @@ public class EmployeePanel extends JPanel {
         btnEdit.setPreferredSize(new Dimension(110, 40));
         btnEdit.addActionListener(e -> {
             int row = table.getSelectedRow();
-            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn nhân viên để sửa!"); return; }
-            
+            if (row < 0) {
+                JOptionPane.showMessageDialog(this, "Chọn nhân viên để sửa!");
+                return;
+            }
             Employee nv = currentPageData.get(row);
             new EmployeeDialog(
                 (Frame) SwingUtilities.getWindowAncestor(this),
                 nv,
+                controller,       // ✅ truyền controller vào Dialog
                 this::loadData
             ).setVisible(true);
         });
@@ -279,10 +289,26 @@ public class EmployeePanel extends JPanel {
         btnDelete.setPreferredSize(new Dimension(110, 40));
         btnDelete.addActionListener(e -> {
             int row = table.getSelectedRow();
-            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn nhân viên để xóa!"); return; }
+            if (row < 0) {
+                JOptionPane.showMessageDialog(this, "Chọn nhân viên để xóa!");
+                return;
+            }
             Employee nv = currentPageData.get(row);
-            if (controller.handleDelete(nv)) {
+
+            // ✅ View tự hỏi confirm, rồi mới gọi controller.handleDelete()
+            int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Xác nhận xóa nhân viên " + nv.getHoTen() + "?",
+                "Xác nhận", JOptionPane.YES_NO_OPTION
+            );
+            if (confirm != JOptionPane.YES_OPTION) return;
+
+            boolean ok = controller.handleDelete(nv.getMaNV());
+            if (ok) {
+                JOptionPane.showMessageDialog(this, "Đã xóa thành công!");
                 loadData();
+            } else {
+                JOptionPane.showMessageDialog(this, "Lỗi khi xóa nhân viên!");
             }
         });
 
@@ -293,17 +319,12 @@ public class EmployeePanel extends JPanel {
         return bar;
     }
 
-    private void rebuildPagination(JPanel panel) {
-        // 1. Xóa sạch mọi thứ đang có (bao gồm các nút số và dấu ...)
-        panel.removeAll();
-        panel.setOpaque(false);
-        
-        List<Employee> filtered = getFilteredData();
-        final int total = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
+    private void rebuildPagination(int totalPages) {
+        paginationPanel.removeAll();
+        paginationPanel.setOpaque(false);
 
-        // 2. Tạo nút Quay lại (<)
-        // Sử dụng màu ACCENT nếu bấm được, INPUT_BG nếu bị vô hiệu hóa
-        RoundButton btnPrev = new RoundButton("<", (currentPage > 1 ? ACCENT : INPUT_BG), TEXT_WHITE);
+        RoundButton btnPrev = new RoundButton("<",
+            (currentPage > 1 ? ACCENT : INPUT_BG), TEXT_WHITE);
         btnPrev.setPreferredSize(new Dimension(40, 40));
         btnPrev.setEnabled(currentPage > 1);
         btnPrev.addActionListener(e -> {
@@ -312,30 +333,29 @@ public class EmployeePanel extends JPanel {
                 renderPage();
             }
         });
-        panel.add(btnPrev);
 
-        // 3. Tạo nhãn hiển thị số trang (Ví dụ: 1 / 5)
-        JLabel lblPage = new JLabel(currentPage + " / " + total);
+        JLabel lblPage = new JLabel(currentPage + " / " + totalPages);
         lblPage.setForeground(Color.WHITE);
         lblPage.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        lblPage.setBorder(new EmptyBorder(0, 15, 0, 15)); // Tạo khoảng cách hai bên cho đẹp
-        panel.add(lblPage);
+        lblPage.setBorder(new EmptyBorder(0, 15, 0, 15));
 
-        // 4. Tạo nút Tiếp theo (>)
-        RoundButton btnNext = new RoundButton(">", (currentPage < total ? ACCENT : INPUT_BG), TEXT_WHITE);
+        RoundButton btnNext = new RoundButton(">",
+            (currentPage < totalPages ? ACCENT : INPUT_BG), TEXT_WHITE);
         btnNext.setPreferredSize(new Dimension(40, 40));
-        btnNext.setEnabled(currentPage < total);
+        btnNext.setEnabled(currentPage < totalPages);
         btnNext.addActionListener(e -> {
-            if (currentPage < total) {
+            if (currentPage < totalPages) {
                 currentPage++;
                 renderPage();
             }
         });
-        panel.add(btnNext);
 
-        // 5. Vẽ lại giao diện
-        panel.revalidate();
-        panel.repaint();
+        paginationPanel.add(btnPrev);
+        paginationPanel.add(lblPage);
+        paginationPanel.add(btnNext);
+
+        paginationPanel.revalidate();
+        paginationPanel.repaint();
     }
 
     /* ======================================================
@@ -343,86 +363,78 @@ public class EmployeePanel extends JPanel {
     ====================================================== */
     private void loadData() {
         allData = controller.loadAll();
+        currentPage = 1;
         renderPage();
-    }
-    
-    private List<Employee> getFilteredData() {
-        String keyword = txtSearch == null ? "" : txtSearch.getText().trim();
-        return controller.filter(allData, keyword);
     }
 
     private void renderPage() {
         tableModel.setRowCount(0);
-        List<Employee> filtered = getFilteredData();
 
-        int totalPage = (int) Math.ceil((double) filtered.size() / PAGE_SIZE);
-        if (currentPage > totalPage) currentPage = totalPage == 0 ? 1 : totalPage;
+        String keyword = (txtSearch == null) ? "" : txtSearch.getText().trim();
 
-        int from = (currentPage - 1) * PAGE_SIZE;
-        int to   = Math.min(from + PAGE_SIZE, filtered.size());
+        EmployeeController.PageResult<Employee> result =
+            controller.getPage(allData, keyword, currentPage, PAGE_SIZE);
 
-        currentPageData = filtered.subList(from, to);
+        currentPage = result.currentPage;
+        currentPageData = result.data;
+
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-        for (Employee nv : currentPageData) {
+        for (Employee nv : result.data) {
             tableModel.addRow(new Object[]{
                 nv.getMaNVFormatted(),
                 nv.getHoTen(),
-                nv.getSdt() != null ? nv.getSdt() : "",
-                nv.getCccd() != null ? nv.getCccd() : "",
-                nv.getNgaySinh() != null ? nv.getNgaySinh().format(dtf) : "",
+                nv.getSdt()        != null ? nv.getSdt()                    : "",
+                nv.getCccd()       != null ? nv.getCccd()                   : "",
+                nv.getNgaySinh()   != null ? nv.getNgaySinh().format(dtf)   : "",
                 nv.getNgayVaoLam() != null ? nv.getNgayVaoLam().format(dtf) : ""
             });
         }
 
-        rebuildPagination(paginationPanel);
+        rebuildPagination(result.totalPages);
     }
 
+    /* ======================================================
+        HELPERS
+    ====================================================== */
     private void openUserPanel() {
         try {
             JDialog dialog = new JDialog(
-                    (Frame) SwingUtilities.getWindowAncestor(this),
-                    "Quản lý tài khoản",
-                    true
+                (Frame) SwingUtilities.getWindowAncestor(this),
+                "Quản lý tài khoản", true
             );
             dialog.setSize(700, 400);
             dialog.setLocationRelativeTo(this);
             dialog.setLayout(new BorderLayout());
             dialog.add(new UserPanel(currentUser), BorderLayout.CENTER);
-            dialog.setVisible(true);
             dialog.setAlwaysOnTop(true);
+            dialog.setVisible(true);
         } catch (Exception e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(this, "Lỗi mở UserPanel!");
         }
     }
 
-    // ==========================================
-    // LOGIC SẮP XẾP (SORT)
-    // ==========================================
     private void showSortMenu(Component invoker) {
         JPopupMenu sortMenu = new JPopupMenu();
 
-        // --- Sắp xếp Mã Nhân Viên ---
         JMenu menuMaNV = new JMenu("Mã Nhân Viên");
-        JMenuItem maNVAsc = new JMenuItem("Tăng dần (1, 2, 10...)");
-        maNVAsc.addActionListener(e -> sortData(0, true));
+        JMenuItem maNVAsc  = new JMenuItem("Tăng dần (1, 2, 10...)");
+        maNVAsc.addActionListener(e  -> sortData(0, true));
         JMenuItem maNVDesc = new JMenuItem("Giảm dần (10, 2, 1...)");
         maNVDesc.addActionListener(e -> sortData(0, false));
         menuMaNV.add(maNVAsc); menuMaNV.add(maNVDesc);
 
-        // --- Sắp xếp Ngày Sinh ---
         JMenu menuNgaySinh = new JMenu("Ngày Sinh");
-        JMenuItem birthAsc = new JMenuItem("Cũ nhất -> Mới nhất");
-        birthAsc.addActionListener(e -> sortData(3, true));
+        JMenuItem birthAsc  = new JMenuItem("Cũ nhất -> Mới nhất");
+        birthAsc.addActionListener(e  -> sortData(3, true));
         JMenuItem birthDesc = new JMenuItem("Mới nhất -> Cũ nhất");
         birthDesc.addActionListener(e -> sortData(3, false));
         menuNgaySinh.add(birthAsc); menuNgaySinh.add(birthDesc);
 
-        // --- Sắp xếp Ngày Vào Làm ---
         JMenu menuNgayVaoLam = new JMenu("Ngày Vào Làm");
-        JMenuItem workAsc = new JMenuItem("Cũ nhất -> Mới nhất");
-        workAsc.addActionListener(e -> sortData(5, true));
+        JMenuItem workAsc  = new JMenuItem("Cũ nhất -> Mới nhất");
+        workAsc.addActionListener(e  -> sortData(5, true));
         JMenuItem workDesc = new JMenuItem("Mới nhất -> Cũ nhất");
         workDesc.addActionListener(e -> sortData(5, false));
         menuNgayVaoLam.add(workAsc); menuNgayVaoLam.add(workDesc);
@@ -430,92 +442,46 @@ public class EmployeePanel extends JPanel {
         sortMenu.add(menuMaNV);
         sortMenu.add(menuNgaySinh);
         sortMenu.add(menuNgayVaoLam);
-
         sortMenu.show(invoker, 0, invoker.getHeight());
     }
 
     private void sortData(int colIndex, boolean ascending) {
-        controller.sort(allData, colIndex, ascending); // sort in-place
+        controller.sort(allData, colIndex, ascending);
         currentPage = 1;
         renderPage();
     }
 
-    // Hàm phụ để tách số từ chuỗi (Ví dụ: "NV012" -> 12)
-    private int extractNumber(String s) {
-        if (s == null) return 0;
-        // Loại bỏ tất cả các ký tự không phải là số
-        String digits = s.replaceAll("\\D", ""); 
-        return digits.isEmpty() ? 0 : Integer.parseInt(digits);
-    }
-
-    // ==========================================
-    // LOGIC LỌC (FILTER) TẠI CỘT
-    // ==========================================
     private void toggleFilterMode(RoundButton btnFilter) {
         isFilterMode = !isFilterMode;
-        
+
         if (isFilterMode) {
-            // Đổi màu nút để báo hiệu Đang Bật
-            btnFilter.setBackground(BTN_ADD); 
-            
+            btnFilter.setBackground(BTN_ADD);
             if (rowSorter == null) {
                 rowSorter = new TableRowSorter<>(tableModel);
                 table.setRowSorter(rowSorter);
-                
                 table.getTableHeader().addMouseListener(new MouseAdapter() {
-                    @Override
-                    public void mouseClicked(MouseEvent e) {
-                        if (!isFilterMode) return; 
-                        
+                    @Override public void mouseClicked(MouseEvent e) {
+                        if (!isFilterMode) return;
                         int col = table.columnAtPoint(e.getPoint());
                         String colName = table.getColumnName(col);
-                        
                         String keyword = JOptionPane.showInputDialog(
-                                EmployeePanel.this, 
-                                "Nhập từ khóa lọc cho cột [" + colName + "]:", 
-                                "Lọc dữ liệu", 
-                                JOptionPane.QUESTION_MESSAGE);
-                                
+                            EmployeePanel.this,
+                            "Nhập từ khóa lọc cho cột [" + colName + "]:",
+                            "Lọc dữ liệu", JOptionPane.QUESTION_MESSAGE
+                        );
                         if (keyword != null && !keyword.trim().isEmpty()) {
                             rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + keyword.trim(), col));
-                        } else if (keyword != null && keyword.trim().isEmpty()) {
-                            rowSorter.setRowFilter(null); // Xóa lọc nếu để trống
+                        } else if (keyword != null) {
+                            rowSorter.setRowFilter(null);
                         }
                     }
                 });
             }
-            JOptionPane.showMessageDialog(this, "Chế độ Lọc ĐÃ BẬT.\nHãy click chuột vào Tiêu đề cột (VD: 'Họ Tên') trên bảng để lọc.");
+            JOptionPane.showMessageDialog(this,
+                "Chế độ Lọc ĐÃ BẬT.\nHãy click chuột vào Tiêu đề cột trên bảng để lọc.");
         } else {
-            // Tắt lọc, trả màu về mặc định
             btnFilter.setBackground(PURPLE_HEADER);
-            if (rowSorter != null) {
-                rowSorter.setRowFilter(null);
-            }
-        }
-    }
-
-    /* ======================================================
-        INNER: RoundButton
-    ====================================================== */
-    static class RoundButton extends JButton {
-        private final Color bg, fg;
-        RoundButton(String text, Color bg, Color fg) {
-            super(text);
-            this.bg = bg; this.fg = fg;
-            setFocusPainted(false);
-            setContentAreaFilled(false);
-            setBorderPainted(false);
-            setForeground(fg);
-            setFont(new Font("Segoe UI", Font.BOLD, 13));
-            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        }
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(getModel().isRollover() ? bg.brighter() : bg);
-            g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 12, 12));
-            super.paintComponent(g2);
-            g2.dispose();
+            if (rowSorter != null) rowSorter.setRowFilter(null);
         }
     }
 }

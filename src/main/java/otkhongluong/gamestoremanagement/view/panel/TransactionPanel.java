@@ -4,7 +4,7 @@ import otkhongluong.gamestoremanagement.controller.TransactionController;
 import otkhongluong.gamestoremanagement.controller.TransactionController.PageResult;
 import otkhongluong.gamestoremanagement.view.dialog.InvoiceDetailDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentDetailDialog;
-
+import otkhongluong.gamestoremanagement.util.RoundButton;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -481,28 +481,6 @@ public class TransactionPanel extends JPanel {
         tf.setOpaque(false);
         tf.setPreferredSize(new Dimension(0, 38));
         return tf;
-    }
-
-    static class RoundButton extends JButton {
-        private final Color bg, fg;
-        RoundButton(String text, Color bg, Color fg) {
-            super(text);
-            this.bg = bg; this.fg = fg;
-            setFocusPainted(false);
-            setContentAreaFilled(false);
-            setBorderPainted(false);
-            setForeground(fg);
-            setFont(new Font("Segoe UI", Font.BOLD, 13));
-            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        }
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(!isEnabled() ? bg.darker() : getModel().isRollover() ? bg.brighter() : bg);
-            g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 12, 12));
-            super.paintComponent(g2);
-            g2.dispose();
-        }
     }
 
     static class ButtonRenderer extends JButton implements TableCellRenderer {

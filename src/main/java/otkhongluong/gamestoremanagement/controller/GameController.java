@@ -2,10 +2,14 @@ package otkhongluong.gamestoremanagement.controller;
 
 import otkhongluong.gamestoremanagement.model.Game;
 import otkhongluong.gamestoremanagement.service.GameService;
+
+import java.awt.Frame;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 /**
  * GameController — lớp trung gian giữa View và Service (MVC).
  *
@@ -55,6 +59,27 @@ public class GameController {
         return ok;
     }
 
+    public SaveResult handleSave(Game existing, Map<String,String> form) {
+        String ten = form.getOrDefault("tenGame","").trim();
+        if (ten.isEmpty()) return SaveResult.fail("Tên game không được trống!");
+        Game target = existing != null ? existing : new Game();
+        target.setTenGame(ten);
+        target.setTheLoai(form.getOrDefault("theLoai","").trim());
+        target.setNenTang(form.getOrDefault("nenTang","").trim());
+        target.setGhiChu(form.getOrDefault("ghiChu","").trim());
+        target.setHinhAnh(form.getOrDefault("hinhAnh","").trim());
+        target.setRating(form.getOrDefault("rating","").trim());
+        target.setGenre(form.getOrDefault("genre","").trim());
+        target.setRegion(form.getOrDefault("region","").trim());
+        target.setMoTa(form.getOrDefault("moTa","").trim());
+        try {
+            String rel = form.getOrDefault("releaseDate","");
+            if (!rel.isEmpty()) target.setReleaseDate(LocalDate.parse(rel));
+        } catch (Exception e) { /* bỏ qua nếu sai định dạng */ }
+        boolean ok = existing != null ? updateGame(target) : addGame(target);
+        return ok ? SaveResult.ok("Thành công!") : SaveResult.fail("Lỗi lưu dữ liệu!");
+    }
+
     // =================================================================
     // FILTER — View truyền keyword, Controller trả về danh sách đã lọc
     // (dùng cache, không query DB lại)
@@ -64,6 +89,35 @@ public class GameController {
      * Lọc game theo từ khóa (tên hoặc mã).
      * Dùng cho GamePanel (store-front).
      */
+    public static class SaveResult {
+        public boolean success;
+        public String message;
+
+        public SaveResult(boolean success, String message) {
+            this.success = success;
+            this.message = message;
+        }
+
+        public static SaveResult ok(String msg) {
+            return new SaveResult(true, msg);
+        }
+
+        public static SaveResult fail(String msg) {
+            return new SaveResult(false, msg);
+        }
+    }
+    
+    public static class PageResult<T> {
+        public List<T> data;
+        public int currentPage;
+        public int totalPages;
+
+        public PageResult(List<T> data, int currentPage, int totalPages) {
+            this.data = data;
+            this.currentPage = currentPage;
+            this.totalPages = totalPages;
+        }
+    }
     public List<Game> filterByKeyword(String keyword) {
         ensureCache();
         if (keyword == null || keyword.isBlank()) return cachedGames;
@@ -116,12 +170,20 @@ public class GameController {
      * @param page     trang hiện tại (1-based)
      * @param pageSize số dòng mỗi trang
      */
-    public List<Game> getPage(List<Game> source, int page, int pageSize) {
-        if (source == null || source.isEmpty()) return List.of();
-        int from = Math.max(0, (page - 1) * pageSize);
-        if (from >= source.size()) from = 0;
-        int to = Math.min(from + pageSize, source.size());
-        return new ArrayList<>(source.subList(from, to));
+    public PageResult<Game> getPage(String keyword, int page, int pageSize) {
+        List<Game> filtered = filterForManage(keyword);
+
+        int total = Math.max(1, (int) Math.ceil((double) filtered.size() / pageSize));
+
+        if (page > total) page = total;
+        if (page < 1) page = 1;
+
+        int from = (page - 1) * pageSize;
+        int to = Math.min(from + pageSize, filtered.size());
+
+        List<Game> pageData = filtered.subList(from, to);
+
+        return new PageResult<>(pageData, page, total);
     }
 
     /** Tổng số trang. */

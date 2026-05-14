@@ -2,8 +2,10 @@ package otkhongluong.gamestoremanagement.view.panel;
 
 import otkhongluong.gamestoremanagement.model.Customer;
 import otkhongluong.gamestoremanagement.controller.CustomerController;
+import otkhongluong.gamestoremanagement.controller.CustomerController.ActionResult;
 import otkhongluong.gamestoremanagement.util.IconUtils;
-
+import otkhongluong.gamestoremanagement.view.dialog.DiemKhachHangDialog;
+import otkhongluong.gamestoremanagement.util.RoundButton;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -17,20 +19,17 @@ public class CustomerPanel extends JPanel {
     /* ============ COLORS ============ */
     private static final Color BG_DARK       = new Color(35, 20, 85);
     private static final Color BG_CARD       = Color.WHITE;
-
     private static final Color PURPLE_HEADER = new Color(155, 135, 245);
     private static final Color PURPLE_ROW    = new Color(245, 242, 255);
     private static final Color PURPLE_ALT    = Color.WHITE;
-
     private static final Color ACCENT        = new Color(130, 90, 230);
-
     private static final Color TEXT_WHITE    = Color.WHITE;
     private static final Color TEXT_MUTED    = new Color(120, 120, 140);
-
     private static final Color INPUT_BG      = Color.WHITE;
     private static final Color BTN_EDIT      = new Color(99, 179, 237);
     private static final Color BTN_DELETE    = new Color(252, 129, 129);
     private static final Color BTN_ADD       = new Color(104, 211, 145);
+    private static final Color BTN_POINT     = new Color(246, 173, 85);  // cam – nút quản lý điểm
 
     /* ============ FONTS ============ */
     private static final Font FONT_HEADER = new Font("Segoe UI", Font.BOLD, 13);
@@ -44,21 +43,19 @@ public class CustomerPanel extends JPanel {
     private JPanel paginationPanel;
     private int currentPage = 1;
     private static final int PAGE_SIZE = 8;
-    private RoundButton btnEdit;
-    private RoundButton btnDelete;
-    private RoundButton btnSort;
     private RoundButton btnFilter;
-    private boolean isAscending = true;
-    private String currentSortColumn = "MaKH";
     private boolean isFilterMode = false;
     private TableRowSorter<DefaultTableModel> rowSorter;
-    
 
-    private CustomerController controller;
+    // ✅ controller khởi tạo trước tất cả buildXxx()
+    private final CustomerController controller;
     private List<Customer> allData;
     private List<Customer> currentPageData;
 
     public CustomerPanel() {
+        // ✅ FIX: controller PHẢI được khởi tạo trước khi build UI
+        this.controller = new CustomerController();
+
         setLayout(new BorderLayout(0, 0));
         setBackground(BG_DARK);
         setBorder(new EmptyBorder(20, 20, 20, 20));
@@ -66,7 +63,7 @@ public class CustomerPanel extends JPanel {
         add(buildTopBar(),    BorderLayout.NORTH);
         add(buildTable(),     BorderLayout.CENTER);
         add(buildBottomBar(), BorderLayout.SOUTH);
-        controller = new CustomerController(this);
+
         loadData();
     }
 
@@ -85,7 +82,6 @@ public class CustomerPanel extends JPanel {
         bar.add(title, BorderLayout.WEST);
 
         bar.add(labeledSearch(), BorderLayout.EAST);
-
         return bar;
     }
 
@@ -100,29 +96,16 @@ public class CustomerPanel extends JPanel {
         JPanel row = new JPanel(new BorderLayout(8, 0));
         row.setBackground(BG_DARK);
 
-        // --- Cụm nút bên TRÁI ô tìm kiếm ---
         JPanel leftGroup = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         leftGroup.setBackground(BG_DARK);
 
-        btnSort = new RoundButton("Sắp xếp", INPUT_BG, BG_DARK);
+        RoundButton btnSort = new RoundButton("Sắp xếp", INPUT_BG, BG_DARK);
         btnSort.setPreferredSize(new Dimension(90, 40));
         btnSort.addActionListener(e -> showSortPopupMenu(btnSort));
 
-        // --- Nút Lọc (Chế độ lọc giống Nhân viên) ---
         btnFilter = new RoundButton("Lọc", INPUT_BG, BG_DARK);
         btnFilter.setPreferredSize(new Dimension(70, 40));
-        btnFilter.addActionListener(e -> {
-            isFilterMode = !isFilterMode;
-            if (isFilterMode) {
-                btnFilter.setBackground(ACCENT);
-                btnFilter.setForeground(Color.WHITE);
-                JOptionPane.showMessageDialog(this, "Chế độ Lọc ĐÃ BẬT.\nHãy nhấn vào tiêu đề cột (VD: 'Họ Tên') để lọc.");
-            } else {
-                btnFilter.setBackground(INPUT_BG);
-                btnFilter.setForeground(BG_DARK);
-                rowSorter.setRowFilter(null); // Tắt lọc
-            }
-        });
+        btnFilter.addActionListener(e -> toggleFilterMode());
 
         leftGroup.add(btnSort);
         leftGroup.add(btnFilter);
@@ -150,7 +133,6 @@ public class CustomerPanel extends JPanel {
         btnAdd.setIcon(IconUtils.getAddIcon(18, Color.WHITE));
         btnAdd.setPreferredSize(new Dimension(40, 40));
         btnAdd.setToolTipText("Thêm khách hàng");
-        // Tìm đoạn btnAdd trong hàm labeledSearch() và sửa lại:
         btnAdd.addActionListener(e -> showAddCustomerDialog());
 
         RoundButton btnRefresh = new RoundButton("", INPUT_BG, BG_DARK);
@@ -196,9 +178,8 @@ public class CustomerPanel extends JPanel {
         table = new JTable(tableModel) {
             @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
-                if (c instanceof JLabel) {
+                if (c instanceof JLabel)
                     ((JLabel) c).setHorizontalAlignment(SwingConstants.CENTER);
-                }
                 if (isRowSelected(row)) {
                     c.setBackground(ACCENT);
                     c.setForeground(Color.WHITE);
@@ -246,25 +227,21 @@ public class CustomerPanel extends JPanel {
         sp.setBackground(BG_CARD);
         sp.getViewport().setBackground(PURPLE_ALT);
 
-
         rowSorter = new TableRowSorter<>(tableModel);
         table.setRowSorter(rowSorter);
-        
-        // Sự kiện click vào tiêu đề cột để lọc (giống trang Nhân viên)
+
+        // ✅ Lọc theo cột khi click tiêu đề (chỉ hoạt động khi isFilterMode = true)
         table.getTableHeader().addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                if (isFilterMode) {
-                    int col = table.columnAtPoint(e.getPoint());
-                    String colName = table.getColumnName(col);
-                    String filter = JOptionPane.showInputDialog(null, "Lọc theo " + colName + ":");
-                    if (filter != null && !filter.trim().isEmpty()) {
-                        // Lọc không phân biệt hoa thường
-                        rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + filter, col));
-                    } else {
-                        rowSorter.setRowFilter(null);
-                    }
-                }
+            @Override public void mouseClicked(MouseEvent e) {
+                if (!isFilterMode) return;
+                int col = table.columnAtPoint(e.getPoint());
+                String colName = table.getColumnName(col);
+                String filter = JOptionPane.showInputDialog(
+                    CustomerPanel.this, "Lọc theo " + colName + ":");
+                if (filter != null && !filter.trim().isEmpty())
+                    rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + filter.trim(), col));
+                else if (filter != null)
+                    rowSorter.setRowFilter(null);
             }
         });
 
@@ -281,14 +258,31 @@ public class CustomerPanel extends JPanel {
 
         paginationPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         paginationPanel.setBackground(BG_DARK);
-        rebuildPagination(paginationPanel);
+        rebuildPagination(1);
         bar.add(paginationPanel, BorderLayout.WEST);
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         btnPanel.setBackground(BG_DARK);
 
-        // PHẢI KHỞI TẠO NÚT TRƯỚC KHI GÁN SỰ KIỆN
-        btnEdit = new RoundButton(" Sửa", BTN_EDIT, BG_DARK);
+        // ✅ Nút Quản lý điểm
+        RoundButton btnDiem = new RoundButton(" Điểm", BTN_POINT, Color.WHITE);
+        btnDiem.setPreferredSize(new Dimension(130, 40));
+        btnDiem.setToolTipText("Quản lý điểm tích lũy");
+        btnDiem.addActionListener(e -> {
+            int row = table.getSelectedRow();
+            if (row < 0) {
+                JOptionPane.showMessageDialog(this, "Vui lòng chọn khách hàng để quản lý điểm!");
+                return;
+            }
+            Customer kh = currentPageData.get(row);
+            new DiemKhachHangDialog(
+                (Frame) SwingUtilities.getWindowAncestor(this),
+                kh,
+                this::loadData   // callback: reload bảng sau khi thay đổi điểm
+            ).setVisible(true);
+        });
+
+        RoundButton btnEdit = new RoundButton(" Sửa", BTN_EDIT, BG_DARK);
         btnEdit.setIcon(IconUtils.getEditIcon(16, BG_DARK));
         btnEdit.setPreferredSize(new Dimension(110, 40));
         btnEdit.addActionListener(e -> {
@@ -300,7 +294,7 @@ public class CustomerPanel extends JPanel {
             showEditCustomerDialog(currentPageData.get(row));
         });
 
-        btnDelete = new RoundButton(" Xóa", BTN_DELETE, BG_DARK);
+        RoundButton btnDelete = new RoundButton(" Xóa", BTN_DELETE, BG_DARK);
         btnDelete.setIcon(IconUtils.getDeleteIcon(16, BG_DARK));
         btnDelete.setPreferredSize(new Dimension(110, 40));
         btnDelete.addActionListener(e -> {
@@ -310,11 +304,21 @@ public class CustomerPanel extends JPanel {
                 return;
             }
             Customer kh = currentPageData.get(row);
-            if (controller.handleDelete(kh)) { // ← confirm dialog + xóa + thông báo nằm trong controller
-                loadData();
-            }
+
+            // ✅ View tự hỏi confirm, rồi mới gọi controller
+            int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Xác nhận xóa khách hàng: " + kh.getHoTen() + "?",
+                "Xác nhận", JOptionPane.YES_NO_OPTION
+            );
+            if (confirm != JOptionPane.YES_OPTION) return;
+
+            ActionResult result = controller.handleDelete(kh.getMaKH());
+            JOptionPane.showMessageDialog(this, result.message);
+            if (result.success) loadData();
         });
 
+        btnPanel.add(btnDiem);
         btnPanel.add(btnEdit);
         btnPanel.add(btnDelete);
         bar.add(btnPanel, BorderLayout.EAST);
@@ -322,39 +326,40 @@ public class CustomerPanel extends JPanel {
         return bar;
     }
 
-    private void rebuildPagination(JPanel panel) {
-        panel.removeAll();
-        List<Customer> filtered = getFilteredData();
-        final int total = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
+    private void rebuildPagination(int totalPages) {
+        paginationPanel.removeAll();
 
-        // Nút Quay lại <
         RoundButton btnPrev = new RoundButton("<", INPUT_BG, BG_DARK);
         btnPrev.setPreferredSize(new Dimension(40, 36));
         btnPrev.setEnabled(currentPage > 1);
-        btnPrev.addActionListener(e -> { 
-            if (currentPage > 1) { currentPage--; renderPage(); } 
+        btnPrev.addActionListener(e -> {
+            if (currentPage > 1) {
+                currentPage--;
+                renderPage();
+            }
         });
 
-        // Nhãn hiển thị Trang X / Y
-        JLabel lblPageInfo = new JLabel("Trang " + currentPage + " / " + total);
+        JLabel lblPageInfo = new JLabel("Trang " + currentPage + " / " + totalPages);
         lblPageInfo.setForeground(TEXT_WHITE);
         lblPageInfo.setFont(FONT_LABEL);
         lblPageInfo.setBorder(new EmptyBorder(0, 10, 0, 10));
 
-        // Nút Tiếp theo >
         RoundButton btnNext = new RoundButton(">", INPUT_BG, BG_DARK);
         btnNext.setPreferredSize(new Dimension(40, 36));
-        btnNext.setEnabled(currentPage < total);
-        btnNext.addActionListener(e -> { 
-            if (currentPage < total) { currentPage++; renderPage(); } 
+        btnNext.setEnabled(currentPage < totalPages);
+        btnNext.addActionListener(e -> {
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderPage();
+            }
         });
 
-        panel.add(btnPrev);
-        panel.add(lblPageInfo);
-        panel.add(btnNext);
+        paginationPanel.add(btnPrev);
+        paginationPanel.add(lblPageInfo);
+        paginationPanel.add(btnNext);
 
-        panel.revalidate();
-        panel.repaint();
+        paginationPanel.revalidate();
+        paginationPanel.repaint();
     }
 
     /* ======================================================
@@ -362,186 +367,146 @@ public class CustomerPanel extends JPanel {
     ====================================================== */
     private void loadData() {
         allData = controller.loadAll();
+        currentPage = 1;
         renderPage();
-    }
-    
-    private List<Customer> getFilteredData() {
-        String keyword = txtSearch == null ? "" : txtSearch.getText().trim();
-        return controller.filter(allData, keyword);
     }
 
     private void renderPage() {
         tableModel.setRowCount(0);
-        List<Customer> filtered = getFilteredData();
 
-        int totalPage = (int) Math.ceil((double) filtered.size() / PAGE_SIZE);
-        if (currentPage > totalPage) currentPage = totalPage == 0 ? 1 : totalPage;
+        String keyword = (txtSearch == null)
+            ? ""
+            : txtSearch.getText().trim();
 
-        int from = (currentPage - 1) * PAGE_SIZE;
-        int to   = Math.min(from + PAGE_SIZE, filtered.size());
+        CustomerController.PageResult<Customer> r =
+            controller.getPage(allData, keyword, currentPage, PAGE_SIZE);
 
-        currentPageData = filtered.subList(from, to);
+        currentPage = r.currentPage;
+        currentPageData = r.data;
 
-        for (Customer kh : currentPageData) {
+        for (Customer kh : r.data) {
             tableModel.addRow(new Object[]{
                 "KH" + String.format("%03d", kh.getMaKH()),
                 kh.getHoTen(),
-                kh.getSdt() != null ? kh.getSdt() : "",
-                kh.getCccd() != null ? kh.getCccd() : "",
+                kh.getSdt()   != null ? kh.getSdt()   : "",
+                kh.getCccd()  != null ? kh.getCccd()  : "",
                 kh.getEmail() != null ? kh.getEmail() : "",
                 kh.getDiemTichLuy()
             });
         }
 
-        rebuildPagination(paginationPanel);
+        rebuildPagination(r.totalPages);
     }
 
     /* ======================================================
-        INNER: RoundButton
+        DIALOG: ADD / EDIT
     ====================================================== */
-    static class RoundButton extends JButton {
-        private final Color bg, fg;
-        RoundButton(String text, Color bg, Color fg) {
-            super(text);
-            this.bg = bg; this.fg = fg;
-            setFocusPainted(false);
-            setContentAreaFilled(false);
-            setBorderPainted(false);
-            setForeground(fg);
-            setFont(new Font("Segoe UI", Font.BOLD, 13));
-            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        }
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(getModel().isRollover() ? bg.brighter() : bg);
-            g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 12, 12));
-            super.paintComponent(g2);
-            g2.dispose();
-        }
-    }
-
-    // ✅ SAU — chỉ giữ phần UI, bỏ toàn bộ khối try-catch và new Customer()
     private void showAddCustomerDialog() {
-        JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
-        JTextField txtHoTen  = new JTextField();
-        JTextField txtSdt    = new JTextField();
-        JTextField txtCccd   = new JTextField();
-        JTextField txtEmail  = new JTextField();
-        JTextField txtDiaChi = new JTextField();
-
-        panel.add(new JLabel("Họ tên (*):")); panel.add(txtHoTen);
-        panel.add(new JLabel("Số điện thoại (*):")); panel.add(txtSdt);
-        panel.add(new JLabel("CCCD (*):")); panel.add(txtCccd);
-        panel.add(new JLabel("Email:")); panel.add(txtEmail);
-        panel.add(new JLabel("Địa chỉ:")); panel.add(txtDiaChi);
+        JPanel panel = buildCustomerForm(null);
+        JTextField[] fields = extractFields(panel);
 
         int result = JOptionPane.showConfirmDialog(this, panel,
-                "Thêm Khách Hàng Mới", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+            "Thêm Khách Hàng Mới", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 
         if (result == JOptionPane.OK_OPTION) {
-            // ← toàn bộ validation + new Customer() + gọi service chuyển vào controller
-            if (controller.handleAdd(
-                    txtHoTen.getText(), txtSdt.getText(),
-                    txtCccd.getText(), txtEmail.getText(), txtDiaChi.getText())) {
-                loadData();
-            }
+            // ✅ View hiện thông báo từ ActionResult
+            ActionResult ar = controller.handleAdd(
+                fields[0].getText(), fields[1].getText(),
+                fields[2].getText(), fields[3].getText(), fields[4].getText()
+            );
+            JOptionPane.showMessageDialog(this, ar.message);
+            if (ar.success) loadData();
         }
     }
 
-    // ✅ SAU
     private void showEditCustomerDialog(Customer kh) {
-        JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
-        JTextField txtHoTen  = new JTextField(kh.getHoTen());
-        JTextField txtSdt    = new JTextField(kh.getSdt());
-        JTextField txtCccd   = new JTextField(kh.getCccd());
-        JTextField txtEmail  = new JTextField(kh.getEmail());
-        JTextField txtDiaChi = new JTextField(kh.getDiaChi());
-
-        panel.add(new JLabel("Họ tên (*):")); panel.add(txtHoTen);
-        panel.add(new JLabel("Số điện thoại (*):")); panel.add(txtSdt);
-        panel.add(new JLabel("CCCD (*):")); panel.add(txtCccd);
-        panel.add(new JLabel("Email:")); panel.add(txtEmail);
-        panel.add(new JLabel("Địa chỉ:")); panel.add(txtDiaChi);
+        JPanel panel = buildCustomerForm(kh);
+        JTextField[] fields = extractFields(panel);
 
         int result = JOptionPane.showConfirmDialog(this, panel,
-                "Cập Nhật Thông Tin Khách Hàng", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+            "Cập Nhật Thông Tin Khách Hàng", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 
         if (result == JOptionPane.OK_OPTION) {
-            if (controller.handleUpdate(kh,
-                    txtHoTen.getText(), txtSdt.getText(),
-                    txtCccd.getText(), txtEmail.getText(), txtDiaChi.getText())) {
-                loadData();
-            }
+            ActionResult ar = controller.handleUpdate(kh,
+                fields[0].getText(), fields[1].getText(),
+                fields[2].getText(), fields[3].getText(), fields[4].getText()
+            );
+            JOptionPane.showMessageDialog(this, ar.message);
+            if (ar.success) loadData();
         }
     }
 
+    /** Tạo form chung cho Add và Edit */
+    private JPanel buildCustomerForm(Customer kh) {
+        JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
+        panel.add(new JLabel("Họ tên (*):")); panel.add(new JTextField(kh != null ? kh.getHoTen() : ""));
+        panel.add(new JLabel("Số điện thoại (*):")); panel.add(new JTextField(kh != null && kh.getSdt()   != null ? kh.getSdt()   : ""));
+        panel.add(new JLabel("CCCD (*):")); panel.add(new JTextField(kh != null && kh.getCccd()  != null ? kh.getCccd()  : ""));
+        panel.add(new JLabel("Email:")); panel.add(new JTextField(kh != null && kh.getEmail() != null ? kh.getEmail() : ""));
+        panel.add(new JLabel("Địa chỉ:")); panel.add(new JTextField(kh != null && kh.getDiaChi() != null ? kh.getDiaChi() : ""));
+        return panel;
+    }
+
+    /** Lấy 5 JTextField theo thứ tự từ form */
+    private JTextField[] extractFields(JPanel panel) {
+        JTextField[] result = new JTextField[5];
+        int idx = 0;
+        for (Component c : panel.getComponents())
+            if (c instanceof JTextField) result[idx++] = (JTextField) c;
+        return result;
+    }
+
+    /* ======================================================
+        SORT / FILTER
+    ====================================================== */
     private void showSortPopupMenu(Component invoker) {
         JPopupMenu menu = new JPopupMenu();
-        
         JMenuItem m1 = new JMenuItem("Mã KH (Tăng dần)");
         m1.addActionListener(e -> executeSort("MaKH", true));
-        
         JMenuItem m2 = new JMenuItem("Mã KH (Giảm dần)");
         m2.addActionListener(e -> executeSort("MaKH", false));
-        
         JMenuItem m3 = new JMenuItem("Điểm tích lũy (Tăng dần)");
         m3.addActionListener(e -> executeSort("Diem", true));
-        
         JMenuItem m4 = new JMenuItem("Điểm tích lũy (Giảm dần)");
         m4.addActionListener(e -> executeSort("Diem", false));
-
         menu.add(m1); menu.add(m2);
         menu.addSeparator();
         menu.add(m3); menu.add(m4);
-        
         menu.show(invoker, 0, invoker.getHeight());
     }
 
     private void executeSort(String type, boolean ascending) {
         if (allData == null) return;
-        controller.sort(allData, type, ascending); // ← sort in-place, Panel không cần biết logic
+        controller.sort(allData, type, ascending);
         currentPage = 1;
         renderPage();
     }
 
-    private void sortData(String column) {
-        if (allData == null || allData.isEmpty()) return;
-
-        // Nếu nhấn lại cột cũ thì đảo chiều, nhấn cột mới thì mặc định tăng dần
-        if (currentSortColumn.equals(column)) {
-            isAscending = !isAscending;
+    private void toggleFilterMode() {
+        isFilterMode = !isFilterMode;
+        if (isFilterMode) {
+            btnFilter.setBackground(ACCENT);
+            btnFilter.setForeground(Color.WHITE);
+            JOptionPane.showMessageDialog(this,
+                "Chế độ Lọc ĐÃ BẬT.\nHãy nhấn vào tiêu đề cột (VD: 'Họ Tên') để lọc.");
         } else {
-            currentSortColumn = column;
-            isAscending = true;
+            btnFilter.setBackground(INPUT_BG);
+            btnFilter.setForeground(BG_DARK);
+            if (rowSorter != null) rowSorter.setRowFilter(null);
         }
-
-        allData.sort((kh1, kh2) -> {
-            int result = 0;
-            if (column.equals("MaKH")) {
-                result = Integer.compare(kh1.getMaKH(), kh2.getMaKH());
-            } else {
-                result = Integer.compare(kh1.getDiemTichLuy(), kh2.getDiemTichLuy());
-            }
-            return isAscending ? result : -result;
-        });
-
-        renderPage();
     }
 
-    // ✅ SAU
     private void showSimpleFilterDialog() {
         String[] options = {"Tất cả", "Khách hàng thân thiết (>= 100 điểm)", "Khách hàng mới (< 100 điểm)"};
         String selection = (String) JOptionPane.showInputDialog(this,
-                "Chọn chế độ lọc nhanh:", "Bộ lọc",
-                JOptionPane.PLAIN_MESSAGE, null, options, options[0]);
+            "Chọn chế độ lọc nhanh:", "Bộ lọc",
+            JOptionPane.PLAIN_MESSAGE, null, options, options[0]);
         if (selection == null) return;
 
-        List<Customer> base = controller.loadAll(); // luôn lấy data mới nhất từ DB
         String mode = selection.contains(">= 100") ? "loyal"
                     : selection.contains("< 100")  ? "new"
                     : "all";
-        allData = controller.filterByPointMode(base, mode);
+        allData = controller.filterByPointMode(controller.loadAll(), mode);
         currentPage = 1;
         renderPage();
     }

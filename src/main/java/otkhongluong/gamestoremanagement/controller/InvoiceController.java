@@ -4,7 +4,7 @@ import otkhongluong.gamestoremanagement.model.Invoice;
 import otkhongluong.gamestoremanagement.service.InvoiceService;
 import otkhongluong.gamestoremanagement.view.dialog.InvoiceAddDialog;
 import otkhongluong.gamestoremanagement.view.dialog.InvoiceEditDialog;
-
+import java.util.ArrayList;
 import javax.swing.*;
 import java.awt.*;
 import java.time.LocalDate;
@@ -16,6 +16,9 @@ import java.util.stream.Collectors;
 public class InvoiceController {
 
     private final InvoiceService service;
+    private int[] sortState = new int[7]; // số cột
+    private int sortCol = -1;
+    private static final int PAGE_SIZE = 8;
 
     public InvoiceController() {
         this.service = new InvoiceService();
@@ -24,7 +27,114 @@ public class InvoiceController {
     public InvoiceController(InvoiceService service) {
         this.service = service;
     }
+    
+    public static class InvoicePageResult {
+        public final List<Invoice> rows;
+        public final int currentPage;
+        public final int totalPages;
+        public final int totalRows;
+        public final boolean fromDateError;
+        public final boolean toDateError;
+        
 
+        public InvoicePageResult(List<Invoice> rows,
+                                 int cur, int total, int totalRows,
+                                 boolean fromErr, boolean toErr) {
+                this.rows = rows;
+                this.currentPage = cur;
+                this.totalPages = total;
+                this.totalRows = totalRows;
+                this.fromDateError = fromErr;
+                this.toDateError = toErr;
+            }
+
+        public boolean hasDateError() {
+            return fromDateError || toDateError;
+        }
+    }
+    public int[] getSortState() {
+        return sortState;
+    }
+
+    public int getSortCol() {
+        return sortCol;
+    }
+    public InvoicePageResult onSortChanged(
+        int col, String from, String to, String kw, int page) {
+
+        sortState[col] = (sortState[col] + 1) % 3;
+        sortCol = sortState[col] == 0 ? -1 : col;
+
+        boolean asc = sortState[col] != 2;
+
+        return query(from, to, kw, sortCol, asc, 1);
+    }
+    
+    public InvoicePageResult query(
+            String from,
+            String to,
+            String keyword,
+            int page) {
+
+        boolean asc = true;
+
+        if (sortCol >= 0) {
+            asc = sortState[sortCol] != 2;
+        }
+
+        return query(from, to, keyword, sortCol, asc, page);
+    }
+    public InvoicePageResult query(String fromStr, String toStr,
+                               String keyword, int sortCol,
+                               boolean asc, int page) {
+
+        boolean fromErr = false;
+        boolean toErr = false;
+
+        LocalDate from = null;
+        LocalDate to = null;
+
+        try {
+            if (!fromStr.trim().isEmpty()) from = parseDate(fromStr);
+        } catch (Exception e) {
+            fromErr = true;
+        }
+
+        try {
+            if (!toStr.trim().isEmpty()) to = parseDate(toStr);
+        } catch (Exception e) {
+            toErr = true;
+        }
+
+        if (fromErr || toErr) {
+            return new InvoicePageResult(
+                    new ArrayList<>(),
+                    page, 1, 0,
+                    fromErr, toErr
+            );
+        }
+
+        List<Invoice> filtered =
+                getFilteredInvoices(from, to, keyword, sortCol, asc);
+
+        int total = Math.max(1,
+                (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
+
+        if (page > total) page = total;
+        if (page < 1) page = 1;
+
+        int f = (page - 1) * PAGE_SIZE;
+        int t = Math.min(f + PAGE_SIZE, filtered.size());
+
+        return new InvoicePageResult(
+                filtered.subList(f, t),
+                page,
+                total,
+                filtered.size(),
+                false,
+                false
+        );
+    }
     // ── Lấy toàn bộ dữ liệu ──────────────────────────────────
     public List<Invoice> getAllInvoices() {
         return service.getAllHoaDon();
@@ -104,4 +214,8 @@ public class InvoiceController {
     }
 
     private String nvl(String s) { return s == null ? "" : s; }
+    
+    private LocalDate parseDate(String text) {
+        return LocalDate.parse(text.trim());
+    }
 }

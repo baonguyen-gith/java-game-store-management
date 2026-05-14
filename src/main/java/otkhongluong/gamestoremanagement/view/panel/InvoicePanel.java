@@ -3,6 +3,7 @@
     import otkhongluong.gamestoremanagement.model.Invoice;
     import otkhongluong.gamestoremanagement.controller.InvoiceController;
     import otkhongluong.gamestoremanagement.view.dialog.InvoiceDetailDialog;
+    import otkhongluong.gamestoremanagement.util.RoundButton;
     import javax.swing.*;
     import javax.swing.border.*;
     import javax.swing.table.*;
@@ -46,9 +47,6 @@
             "Ngày lập", "Tổng tiền", "Chi tiết"
         };
 
-        /* ── Sorting ── */
-        private final int[] sortState = new int[COLS.length];
-        private int sortCol = -1;
 
         /* ── Pagination ── */
         private static final int PAGE_SIZE = 10;
@@ -96,8 +94,7 @@
             KeyAdapter dateListener = new KeyAdapter() {
                 public void keyReleased(KeyEvent e) {
                     currentPage = 1;
-                    validateDates();
-                    renderPage();
+                    fireFilter();
                 }
             };
             txtFrom.addKeyListener(dateListener);
@@ -201,7 +198,10 @@
             txtSearch.setOpaque(false);
             txtSearch.setPreferredSize(new Dimension(0, 38));
             txtSearch.addKeyListener(new KeyAdapter() {
-                public void keyReleased(KeyEvent e) { currentPage = 1; renderPage(); }
+                public void keyReleased(KeyEvent e) {
+                    currentPage = 1;
+                    fireFilter();
+                }
             });
 
             p.add(txtSearch, BorderLayout.CENTER);
@@ -243,6 +243,9 @@
             header.setDefaultRenderer(new DefaultTableCellRenderer() {
                 @Override public Component getTableCellRendererComponent(
                         JTable t, Object v, boolean sel, boolean foc, int r, int c) {
+                    int sortCol = controller.getSortCol();
+                    int[] sortState = controller.getSortState();
+
                     String arrow = "";
                     if (sortCol == c) {
                         arrow = sortState[c] == 1 ? "  ▲" : sortState[c] == 2 ? "  ▼" : "";
@@ -266,18 +269,21 @@
 
             // Click header → sort (trừ cột "Chi tiết")
             header.addMouseListener(new MouseAdapter() {
-                public void mouseClicked(MouseEvent e) {
-                    int col = header.columnAtPoint(e.getPoint());
-                    if (col < 0 || col == COLS.length - 1) return;
-                    sortState[col] = (sortState[col] + 1) % 3;
-                    sortCol = sortState[col] == 0 ? -1 : col;
-                    for (int i = 0; i < sortState.length; i++)
-                        if (i != col) sortState[i] = 0;
-                    currentPage = 1;
-                    renderPage();
-                    header.repaint();
-                }
-            });
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int col = table.columnAtPoint(e.getPoint());
+
+                currentPage = 1;
+
+                render(controller.onSortChanged(
+                        col,
+                        txtFrom.getText(),
+                        txtTo.getText(),
+                        txtSearch.getText(),
+                        currentPage
+                ));
+            }
+        });
 
             // Column widths
             int[] widths = {75, 75, 160, 115, 115, 130, 75};
@@ -400,13 +406,23 @@
             RoundButton btnPrev = new RoundButton("<", INPUT_BG, new Color(80, 80, 80));
             btnPrev.setPreferredSize(new Dimension(34, 34));
             btnPrev.setEnabled(currentPage > 1);
-            btnPrev.addActionListener(e -> { if (currentPage > 1) { currentPage--; renderPage(); } });
+            btnPrev.addActionListener(e -> {
+                if (currentPage > 1) {
+                    currentPage--;
+                    fireFilter();
+                }
+            });
             paginationPanel.add(btnPrev);
 
             RoundButton btnNext = new RoundButton(">", INPUT_BG, new Color(80, 80, 80));
             btnNext.setPreferredSize(new Dimension(34, 34));
             btnNext.setEnabled(currentPage < totalPages);
-            btnNext.addActionListener(e -> { if (currentPage < totalPages) { currentPage++; renderPage(); } });
+            btnNext.addActionListener(e -> { 
+                if (currentPage < totalPages) { 
+                    currentPage++; 
+                    fireFilter(); 
+                } 
+            });
             paginationPanel.add(btnNext);
 
             lblPageInfo.setText("Trang " + currentPage + " / " + Math.max(1, totalPages));
@@ -421,59 +437,19 @@
         private void loadData() {
             allData = controller.getAllInvoices();
             currentPage = 1;
-            Arrays.fill(sortState, 0);
-            sortCol = -1;
-            renderPage();
+            fireFilter();
         }
 
-        private LocalDate parseDate(String text) {
-            if (text == null || text.trim().isEmpty()) return null;
-            return LocalDate.parse(text.trim(), FMT);
-        }
+        private void render(InvoiceController.InvoicePageResult result) {
+            txtFrom.setBackground(result.fromDateError ? INPUT_ERROR : INPUT_BG);
+            txtTo.setBackground(result.toDateError ? INPUT_ERROR : INPUT_BG);
 
-        private boolean validateDates() {
-            boolean ok = true;
-            for (JTextField tf : new JTextField[]{txtFrom, txtTo}) {
-                String txt = tf.getText().trim();
-                if (txt.isEmpty()) { tf.setBackground(INPUT_BG); continue; }
-                try {
-                    LocalDate.parse(txt, FMT);
-                    tf.setBackground(INPUT_BG);
-                } catch (DateTimeParseException ex) {
-                    tf.setBackground(INPUT_ERROR);
-                    ok = false;
-                }
-            }
-            return ok;
-        }
-
-        private List<Invoice> getFilteredData() {
-            LocalDate from = null, to = null;
-            try { from = parseDate(txtFrom.getText()); } catch (Exception ignored) {}
-            try { to   = parseDate(txtTo.getText());   } catch (Exception ignored) {}
-            String kw  = txtSearch.getText().trim().toLowerCase();
-            boolean asc = sortCol < 0 || sortState[sortCol] == 1;
-
-            return controller.getFilteredInvoices(from, to, kw, sortCol, asc);
-        }
-
-
-        private void renderPage() {
-            if (!validateDates()) return;
+            if (result.hasDateError()) return;
 
             tableModel.setRowCount(0);
+            currentPageData = new ArrayList<>(result.rows);
 
-            List<Invoice> filtered = getFilteredData();
-
-            int totalPages = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
-            if (currentPage > totalPages) currentPage = totalPages;
-
-            int from = (currentPage - 1) * PAGE_SIZE;
-            int to   = Math.min(from + PAGE_SIZE, filtered.size());
-
-            currentPageData = new ArrayList<>(filtered.subList(from, to));
-
-            for (Invoice hd : currentPageData) {
+            for (Invoice hd : result.rows) {
                 tableModel.addRow(new Object[]{
                     hd.getMaHDFormatted(),
                     hd.getMaNVFormatted(),
@@ -485,8 +461,18 @@
                 });
             }
 
-            rebuildPagination(totalPages);
+            rebuildPagination(result.totalPages);
             table.getTableHeader().repaint();
+        }
+        
+        private void fireFilter() {
+            render(controller.query(
+                txtFrom.getText(),
+                txtTo.getText(),
+                txtSearch.getText(),
+                currentPage
+                // Controller tự lấy sortCol và asc từ internal state của nó
+            ));
         }
 
         // ── Helpers ────────────────────────────────────────────────
@@ -502,31 +488,6 @@
             d.pack();
             d.setLocationRelativeTo(parent);
             d.setVisible(true);
-        }
-
-        // ══════════════════════════════════════════════════════════
-        // INNER CLASSES
-        // ══════════════════════════════════════════════════════════
-        static class RoundButton extends JButton {
-            private final Color bg, fg;
-            RoundButton(String text, Color bg, Color fg) {
-                super(text);
-                this.bg = bg; this.fg = fg;
-                setFocusPainted(false);
-                setContentAreaFilled(false);
-                setBorderPainted(false);
-                setForeground(fg);
-                setFont(new Font("Segoe UI", Font.BOLD, 13));
-                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(!isEnabled() ? bg.darker() : getModel().isRollover() ? bg.brighter() : bg);
-                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 12, 12));
-                super.paintComponent(g2);
-                g2.dispose();
-            }
         }
 
         static class ButtonRenderer extends JButton implements TableCellRenderer {
