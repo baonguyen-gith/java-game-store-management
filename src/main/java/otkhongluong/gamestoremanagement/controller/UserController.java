@@ -1,72 +1,68 @@
 package otkhongluong.gamestoremanagement.controller;
 
-import otkhongluong.gamestoremanagement.dao.UserDAO;
 import otkhongluong.gamestoremanagement.model.User;
+import otkhongluong.gamestoremanagement.service.UserService;
 
 import java.util.List;
 
+/**
+ * Controller quản lý User.
+ *
+ * ✅ Chỉ gọi UserService — không chứa validation hay business logic.
+ * ✅ Không còn isAdmin() — logic đó thuộc AuthService (đã có sẵn).
+ * ✅ Bắt exception từ Service rồi trả về String lỗi cho View.
+ *    View chỉ gọi controller, không biết gì về Service hay DAO.
+ *
+ * Pattern trả lỗi: trả null = thành công, trả String = thông báo lỗi.
+ * View hiển thị thông báo lỗi này bằng JOptionPane hoặc label.
+ */
 public class UserController {
 
-    private final UserDAO userDAO = new UserDAO();
+    private final UserService userService;
 
-    // Lấy toàn bộ danh sách user
+    public UserController() {
+        this.userService = new UserService();
+    }
+
+    /** Lấy toàn bộ danh sách user để hiển thị lên bảng. */
     public List<User> getAllUsers() {
-        return userDAO.findAll();
+        return userService.getAllUsers();
     }
 
-    // Thêm user — trả về thông báo lỗi hoặc null nếu thành công
+    /**
+     * Thêm user mới.
+     *
+     * @return null nếu thành công, String thông báo lỗi nếu thất bại
+     */
     public String addUser(String username, String password, String roleStr) {
-        if (username == null || username.trim().isEmpty()) return "Username không được để trống!";
-        if (password == null || password.trim().isEmpty()) return "Password không được để trống!";
-
-        int role;
         try {
-            role = Integer.parseInt(roleStr.trim());
-            if (role != 1 && role != 2) return "Role phải là 1 (Admin) hoặc 2 (Staff)!";
-        } catch (NumberFormatException e) {
-            return "Role không hợp lệ!";
+            userService.addUser(username, password, roleStr);
+            return null;
+        } catch (RuntimeException e) {
+            return e.getMessage();
         }
-
-        if (userDAO.findByUsername(username.trim()) != null) {
-            return "Username đã tồn tại!";
-        }
-
-        User user = new User(0, username.trim(), password.trim(), role);
-        boolean ok = userDAO.insert(user);
-        return ok ? null : "Thêm thất bại! Lỗi database.";
     }
 
-    // Sửa user — trả về thông báo lỗi hoặc null nếu thành công
     public String updateUser(int maUser, String username, String password, String roleStr) {
-        if (username == null || username.trim().isEmpty()) return "Username không được để trống!";
-        if (password == null || password.trim().isEmpty()) return "Password không được để trống!";
-
-        int role;
         try {
-            role = Integer.parseInt(roleStr.trim());
-            if (role != 1 && role != 2) return "Role phải là 1 (Admin) hoặc 2 (Staff)!";
-        } catch (NumberFormatException e) {
-            return "Role không hợp lệ!";
+            userService.updateUser(maUser, username, password, roleStr);
+            return null;
+        } catch (RuntimeException e) {
+            return e.getMessage();
         }
-
-        User existing = userDAO.findByUsername(username.trim());
-        if (existing != null && existing.getMaUser() != maUser) {
-            return "Username đã tồn tại!";
-        }
-
-        User user = new User(maUser, username.trim(), password.trim(), role);
-        boolean ok = userDAO.update(user);
-        return ok ? null : "Sửa thất bại! Lỗi database.";
     }
 
-    // Xóa user — trả về thông báo lỗi hoặc null nếu thành công
+    /**
+     * Xóa user theo ID.
+     *
+     * @return null nếu thành công, String thông báo lỗi nếu thất bại
+     */
     public String deleteUser(int maUser) {
-        boolean ok = userDAO.delete(maUser);
-        return ok ? null : "Xóa thất bại! Lỗi database.";
-    }
-
-    // Kiểm tra quyền Admin
-    public boolean isAdmin(User user) {
-        return user != null && user.getMaRole() == 1;
+        try {
+            userService.deleteUser(maUser);
+            return null;
+        } catch (RuntimeException e) {
+            return e.getMessage();
+        }
     }
 }

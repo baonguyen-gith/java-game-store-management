@@ -192,11 +192,23 @@ public class RentalService {
 
     /* ================= CRUD ================= */
 
-    public boolean updatePhieuThue(RentalOrder pt) { return phieuThueDAO.update(pt); }
-    public boolean deletePhieuThue(int maPT)     { return phieuThueDAO.delete(maPT); }
-    public List<RentalOrder> getAll()              { return phieuThueDAO.findAll(); }
-    public RentalOrder getById(int id)             { return phieuThueDAO.findById(id); }
+    public boolean updatePhieuThue(RentalOrder pt) { 
+        return phieuThueDAO.update(pt); 
+    }
+    public boolean deletePhieuThue(int maPT){ 
+        return phieuThueDAO.delete(maPT); 
+    }
+    public List<RentalOrder> getAll() {
+        return phieuThueDAO.findAll();
+    }
+    public RentalOrder getById(int id) { 
+        return phieuThueDAO.findById(id); 
+    }
 
-    public List<String> getAllKhachHangNames()   { return khachHangDAO.getAllTenKhachHang(); }
-    public List<String> getAllNhanVienNames()    { return nhanVienDAO.getAllTenNhanVien(); }
+    public List<String> getAllKhachHangNames() { 
+        return khachHangDAO.getAllTenKhachHang(); 
+    }
+    public List<String> getAllNhanVienNames() { 
+        return nhanVienDAO.getAllTenNhanVien(); 
+    }
 }

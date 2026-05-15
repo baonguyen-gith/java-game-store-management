@@ -1,8 +1,8 @@
 package otkhongluong.gamestoremanagement.view;
 
+import otkhongluong.gamestoremanagement.controller.Navigator;
 import otkhongluong.gamestoremanagement.model.User;
-import otkhongluong.gamestoremanagement.util.*;
-import otkhongluong.gamestoremanagement.controller.LoginController;
+import otkhongluong.gamestoremanagement.util.UIStyle;
 import otkhongluong.gamestoremanagement.view.panel.*;
 
 import javax.swing.*;
@@ -10,18 +10,25 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
 
+/**
+ * AdminView — màn hình chính dành cho Admin.
+ *
+ * ✅ Nhận Navigator qua constructor — không biết LoginController hay LoginView.
+ * ✅ handleLogout() chỉ gọi navigator.goToLogin() — không tự tạo Controller.
+ * ✅ View KHÔNG chứa bất kỳ business logic nào.
+ */
 public class AdminView extends JFrame {
 
-    // ── CardLayout ──────────────────────────────────────────
     private CardLayout cardLayout;
     private JPanel     contentPanel;
-    private User       currentUser;
+    private final User       currentUser;
+    private final Navigator  navigator;       // ✅ nhận qua constructor
     private JButton    activeButton;
     private JButton    btnHome;
 
-    // ══════════════════════════════════════════════════════════
-    public AdminView(User user) {
+    public AdminView(User user, Navigator navigator) {
         this.currentUser = user;
+        this.navigator   = navigator;
 
         if (user.getMaRole() != 1) {
             JOptionPane.showMessageDialog(this, "Không có quyền!");
@@ -35,13 +42,26 @@ public class AdminView extends JFrame {
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
-        // Màu nền frame — che gap khi resize
         getContentPane().setBackground(UIStyle.BG_MAIN);
 
         add(createSidebar(),    BorderLayout.WEST);
         add(createMainPanel(), BorderLayout.CENTER);
 
         SwingUtilities.invokeLater(() -> switchTab(btnHome, "HOME"));
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // LOGOUT — ✅ chỉ gọi navigator, không biết View cụ thể nào
+    // ══════════════════════════════════════════════════════════
+
+    private void handleLogout() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+            "Bạn có chắc muốn đăng xuất?", "Đăng xuất",
+            JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        dispose();
+        navigator.goToLogin(); // ✅ không new LoginController(), không new LoginView()
     }
 
     // ══════════════════════════════════════════════════════════
@@ -60,7 +80,6 @@ public class AdminView extends JFrame {
         }
     }
 
-    /** Fallback khi icon không tải được — tránh crash. */
     private ImageIcon blankIcon(int size) {
         return new ImageIcon(new java.awt.image.BufferedImage(
                 size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB));
@@ -89,7 +108,6 @@ public class AdminView extends JFrame {
                     int x = (getWidth()  - nw) / 2;
                     int y = (getHeight() - nh) / 2;
                     g2.drawImage(scaled, x, y, null);
-                    // gradient overlay bên dưới — giúp text dễ đọc
                     GradientPaint gp = new GradientPaint(
                             0, getHeight() * 0.5f, new Color(0, 0, 0, 0),
                             0, getHeight(),         new Color(0, 0, 0, 180));
@@ -101,7 +119,6 @@ public class AdminView extends JFrame {
             lbl.setPreferredSize(new Dimension(w, h));
             return lbl;
         } catch (Exception e) {
-            // Placeholder màu
             JLabel lbl = new JLabel("NO IMG", SwingConstants.CENTER);
             lbl.setForeground(UIStyle.TEXT_MUTED);
             lbl.setFont(UIStyle.FONT_BADGE);
@@ -115,34 +132,20 @@ public class AdminView extends JFrame {
     // ══════════════════════════════════════════════════════════
     // SIDEBAR
     // ══════════════════════════════════════════════════════════
-    
-    private void handleLogout() {
-        int confirm = JOptionPane.showConfirmDialog(this,
-            "Bạn có chắc muốn đăng xuất?", "Đăng xuất",
-            JOptionPane.YES_NO_OPTION);
-        if (confirm != JOptionPane.YES_OPTION) return;
-
-        dispose();
-
-        LoginController ctrl = new LoginController();
-        LoginView loginView  = new LoginView(ctrl);  // constructor này gọi ctrl.setView(this) bên trong
-        loginView.setVisible(true);
-    }
 
     private JPanel createSidebar() {
         JPanel sidebar = new JPanel(new BorderLayout());
         sidebar.setPreferredSize(new Dimension(220, 0));
         sidebar.setBackground(UIStyle.BG_SIDEBAR);
-        // Viền phải mờ — tách sidebar khỏi content
         sidebar.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1,
                 new Color(55, 45, 100)));
 
-        // ── Logo ─────────────────────────────────────────────
+        // Logo
         JPanel logoPanel = new JPanel(new BorderLayout());
         logoPanel.setBackground(UIStyle.BG_SIDEBAR);
         logoPanel.setBorder(new EmptyBorder(22, 20, 18, 16));
 
-        JLabel logo = new JLabel("QABAP");
+        JLabel logo    = new JLabel("QABAP");
         logo.setFont(new Font("Segoe UI", Font.BOLD, 22));
         logo.setForeground(Color.WHITE);
 
@@ -156,30 +159,28 @@ public class AdminView extends JFrame {
         logoText.add(logo);
         logoText.add(logoSub);
 
-        // Icon logo nhỏ bên trái
         JLabel logoIcon = new JLabel(loadIcon("/icons/game_icon.png", 28));
         logoIcon.setBorder(new EmptyBorder(0, 0, 0, 10));
 
         logoPanel.add(logoIcon, BorderLayout.WEST);
         logoPanel.add(logoText, BorderLayout.CENTER);
 
-        // Separator dưới logo
         JPanel logoWrap = new JPanel(new BorderLayout());
         logoWrap.setBackground(UIStyle.BG_SIDEBAR);
         logoWrap.add(logoPanel, BorderLayout.CENTER);
         logoWrap.add(UIStyle.accentSeparator(), BorderLayout.SOUTH);
 
-        // ── Menu items ────────────────────────────────────────
+        // Menu items
         JPanel menu = new JPanel();
         menu.setLayout(new BoxLayout(menu, BoxLayout.Y_AXIS));
         menu.setBackground(UIStyle.BG_SIDEBAR);
         menu.setBorder(new EmptyBorder(12, 8, 8, 8));
 
-        btnHome              = createMenuButton("Trang chủ",      "/icons/home_icon.png");
-        JButton btnGame      = createMenuButton("Game",           "/icons/game_icon.png");
-        JButton btnAdmin     = createMenuButton("Quản trị",       "/icons/manage_icon.png");
-        JButton btnSales     = createMenuButton("Bán hàng",       "/icons/sales_icon.png");
-        JButton btnReport    = createMenuButton("Thống kê",       "/icons/statistic_icon.png");
+        btnHome              = createMenuButton("Trang chủ",  "/icons/home_icon.png");
+        JButton btnGame      = createMenuButton("Game",       "/icons/game_icon.png");
+        JButton btnAdmin     = createMenuButton("Quản trị",   "/icons/manage_icon.png");
+        JButton btnSales     = createMenuButton("Bán hàng",   "/icons/sales_icon.png");
+        JButton btnReport    = createMenuButton("Thống kê",   "/icons/statistic_icon.png");
 
         for (JButton b : new JButton[]{btnHome, btnGame, btnAdmin, btnSales, btnReport}) {
             b.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
@@ -187,7 +188,7 @@ public class AdminView extends JFrame {
             menu.add(Box.createVerticalStrut(2));
         }
 
-        // ── Logout ─────────────────────────────────────────────
+        // Logout
         JButton btnLogout = createMenuButton("Đăng xuất", "/icons/logout_icon.png");
         btnLogout.setForeground(new Color(220, 100, 100));
         btnLogout.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
@@ -195,27 +196,26 @@ public class AdminView extends JFrame {
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.setBackground(UIStyle.BG_SIDEBAR);
         bottomPanel.setBorder(new EmptyBorder(8, 8, 14, 8));
-        // Separator trên logout
+
         JPanel sepLogout = UIStyle.accentSeparator();
         sepLogout.setPreferredSize(new Dimension(0, 1));
         JPanel sepWrap = new JPanel(new BorderLayout());
         sepWrap.setBackground(UIStyle.BG_SIDEBAR);
         sepWrap.setBorder(new EmptyBorder(0, 0, 8, 0));
         sepWrap.add(sepLogout);
-        bottomPanel.add(sepWrap, BorderLayout.NORTH);
-        bottomPanel.add(btnLogout, BorderLayout.CENTER);
+        bottomPanel.add(sepWrap,    BorderLayout.NORTH);
+        bottomPanel.add(btnLogout,  BorderLayout.CENTER);
 
         sidebar.add(logoWrap,    BorderLayout.NORTH);
         sidebar.add(menu,        BorderLayout.CENTER);
         sidebar.add(bottomPanel, BorderLayout.SOUTH);
 
-        // ── Actions ──────────────────────────────────────────
         btnHome.addActionListener(e   -> switchTab(btnHome,   "HOME"));
         btnGame.addActionListener(e   -> switchTab(btnGame,   "GAME"));
         btnAdmin.addActionListener(e  -> switchTab(btnAdmin,  "ADMIN"));
         btnSales.addActionListener(e  -> switchTab(btnSales,  "SALES"));
         btnReport.addActionListener(e -> switchTab(btnReport, "REPORT"));
-        btnLogout.addActionListener(e -> handleLogout());
+        btnLogout.addActionListener(e -> handleLogout()); // ✅ gọi navigator bên trong
 
         return sidebar;
     }
@@ -264,7 +264,6 @@ public class AdminView extends JFrame {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setColor(UIStyle.BG_TOPBAR);
                 g2.fillRect(0, 0, getWidth(), getHeight());
-                // Đường kẻ dưới
                 g2.setColor(new Color(55, 45, 100));
                 g2.fillRect(0, getHeight() - 1, getWidth(), 1);
                 g2.dispose();
@@ -274,11 +273,8 @@ public class AdminView extends JFrame {
         topBar.setPreferredSize(new Dimension(0, 62));
         topBar.setBorder(new EmptyBorder(10, 18, 10, 18));
 
-        // ── Search ───────────────────────────────────────────
         JTextField txtSearch = new JTextField(22);
         txtSearch.setText("Tìm kiếm...");
-
-        // Placeholder logic
         txtSearch.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusGained(java.awt.event.FocusEvent e) {
                 if ("Tìm kiếm...".equals(txtSearch.getText())) {
@@ -296,8 +292,6 @@ public class AdminView extends JFrame {
 
         JPanel searchBox = UIStyle.buildSearchPanel(txtSearch);
         searchBox.setPreferredSize(new Dimension(320, 38));
-
-        // Icon search bên trái trong searchBox
         JLabel iconSearch = new JLabel(loadIcon("/icons/searching_icon.png", 16));
         iconSearch.setBorder(new EmptyBorder(0, 0, 0, 8));
         searchBox.add(iconSearch, BorderLayout.WEST);
@@ -306,11 +300,9 @@ public class AdminView extends JFrame {
         searchWrap.setOpaque(false);
         searchWrap.add(searchBox);
 
-        // ── Right — user icon ─────────────────────────────────
         JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         rightPanel.setOpaque(false);
 
-        // Badge tên user
         JLabel lblUser = new JLabel(
                 currentUser.getUsername() != null ? currentUser.getUsername() : "Admin");
         lblUser.setFont(UIStyle.FONT_BODY);
@@ -318,7 +310,6 @@ public class AdminView extends JFrame {
 
         JLabel userIcon = new JLabel(loadIcon("/icons/user_icon.png", 32));
         userIcon.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        // Viền tròn nhẹ quanh avatar
         userIcon.setBorder(BorderFactory.createLineBorder(UIStyle.ACCENT, 1, true));
 
         JPopupMenu userDropdown = new JPopupMenu();
@@ -335,7 +326,6 @@ public class AdminView extends JFrame {
 
         topBar.add(searchWrap,  BorderLayout.WEST);
         topBar.add(rightPanel,  BorderLayout.EAST);
-
         return topBar;
     }
 
@@ -353,13 +343,13 @@ public class AdminView extends JFrame {
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
         content.setBorder(new EmptyBorder(22, 22, 22, 22));
 
-        // Heading
         JLabel heading = new JLabel("Dashboard");
         heading.setFont(UIStyle.FONT_HEADING);
         heading.setForeground(Color.WHITE);
         heading.setAlignmentX(Component.LEFT_ALIGNMENT);
         content.add(heading);
         content.add(Box.createVerticalStrut(4));
+
         JPanel sep = UIStyle.accentSeparator();
         sep.setAlignmentX(Component.LEFT_ALIGNMENT);
         sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 2));
@@ -446,9 +436,8 @@ public class AdminView extends JFrame {
         section.setOpaque(false);
 
         JLabel title = new JLabel("Trending Now");
-        title.setForeground(Color.WHITE);
-        title.setFont(new Font("Segoe UI", Font.BOLD, 15));
         title.setForeground(UIStyle.TEXT_MUTED);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 15));
         title.setBorder(new EmptyBorder(0, 0, 10, 0));
 
         JPanel grid = new JPanel(new GridLayout(1, 4, 14, 0));

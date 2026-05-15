@@ -1,9 +1,9 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.controller.DiemLichSuController;
-import otkhongluong.gamestoremanagement.controller.DiemLichSuController.ActionResult;
+import otkhongluong.gamestoremanagement.controller.PointController;
+import otkhongluong.gamestoremanagement.controller.PointController.ActionResult;
 import otkhongluong.gamestoremanagement.model.Customer;
-import otkhongluong.gamestoremanagement.model.DiemLichSu;
+import otkhongluong.gamestoremanagement.model.Point;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -17,7 +17,7 @@ import java.util.List;
  * Dialog quản lý điểm tích lũy của 1 khách hàng.
  * Cho phép: Cộng điểm | Trừ điểm | Sửa điểm | Xóa bản ghi lịch sử (+ hoàn tác).
  */
-public class DiemKhachHangDialog extends JDialog {
+public class CustomerPointDialog extends JDialog {
 
     /* ============ COLORS ============ */
     private static final Color BG_DARK       = new Color(35, 20, 85);
@@ -44,7 +44,7 @@ public class DiemKhachHangDialog extends JDialog {
 
     /* ============ STATE ============ */
     private final Customer               customer;
-    private final DiemLichSuController   controller;
+    private final PointController   controller;
     private final Runnable               onChanged; // callback để CustomerPanel reload
 
     /* ============ COMPONENTS ============ */
@@ -53,10 +53,10 @@ public class DiemKhachHangDialog extends JDialog {
     private DefaultTableModel tableModel;
 
     // ================================================================
-    public DiemKhachHangDialog(Frame parent, Customer customer, Runnable onChanged) {
+    public CustomerPointDialog(Frame parent, Customer customer, Runnable onChanged) {
         super(parent, "Quản lý điểm – " + customer.getHoTen(), true);
         this.customer   = customer;
-        this.controller = new DiemLichSuController();
+        this.controller = new PointController();
         this.onChanged  = onChanged;
 
         setSize(780, 560);
@@ -322,8 +322,8 @@ public class DiemKhachHangDialog extends JDialog {
     /** Load toàn bộ lịch sử điểm vào bảng */
     private void loadHistory() {
         tableModel.setRowCount(0);
-        List<DiemLichSu> list = controller.getLichSu(customer.getMaKH());
-        for (DiemLichSu d : list) {
+        List<Point> list = controller.getLichSu(customer.getMaKH());
+        for (Point d : list) {
             tableModel.addRow(new Object[]{
                 d.getMaLS(),
                 d.getLoaiDisplay(),
@@ -340,7 +340,7 @@ public class DiemKhachHangDialog extends JDialog {
      */
     private void refreshDiem() {
         // Cập nhật điểm trong object customer từ DB
-        List<DiemLichSu> list = controller.getLichSu(customer.getMaKH());
+        List<Point> list = controller.getLichSu(customer.getMaKH());
 
         // Tính lại điểm từ lịch sử (hoặc reload từ DB qua CustomerController)
         // Dùng cách đơn giản: tái dùng CustomerController để lấy điểm mới

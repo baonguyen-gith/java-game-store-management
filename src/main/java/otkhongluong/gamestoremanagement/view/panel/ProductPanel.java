@@ -66,7 +66,7 @@ public class ProductPanel extends JPanel {
     //  KHỞI TẠO
     // ======================================================
     public ProductPanel() {
-        controller = new ProductController(this); // View tạo Controller, truyền chính mình
+        controller = new ProductController(); // View tạo Controller, truyền chính mình
 
         setLayout(new BorderLayout(0, 0));
         setBackground(BG_DARK);
@@ -315,7 +315,28 @@ public class ProductPanel extends JPanel {
             Product sp = currentPageData.get(modelRow);
 
             // Giao toàn bộ logic xác nhận + xóa cho Controller
-            if (controller.handleDelete(sp)) {
+            int confirm = JOptionPane.showConfirmDialog(
+                    this,
+                    "Xác nhận xóa sản phẩm mã: SP" + String.format("%03d", sp.getMaSP()) + "?",
+                    "Xác nhận",
+                    JOptionPane.YES_NO_OPTION
+            );
+
+            if (confirm != JOptionPane.YES_OPTION) return;
+
+            ProductController.ActionResult result =
+                    controller.handleDelete(sp.getMaSP());
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    result.message,
+                    result.success ? "Thành công" : "Lỗi",
+                    result.success
+                            ? JOptionPane.INFORMATION_MESSAGE
+                            : JOptionPane.ERROR_MESSAGE
+            );
+
+            if (result.success) {
                 loadData();
             }
         });
@@ -408,9 +429,24 @@ public class ProductPanel extends JPanel {
 
         if (result == JOptionPane.OK_OPTION) {
             // View chỉ thu thập text, Controller lo validate + gọi Service
-            boolean ok = controller.handleAdd(
-                    txtMaGame.getText(), txtGiaBan.getText(), txtGiaThue.getText());
-            if (ok) loadData();
+            ProductController.ActionResult actionResult =
+                    controller.handleAdd(
+                            txtMaGame.getText(),
+                            txtGiaBan.getText(),
+                            txtGiaThue.getText());
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    actionResult.message,
+                    actionResult.success ? "Thành công" : "Lỗi",
+                    actionResult.success
+                            ? JOptionPane.INFORMATION_MESSAGE
+                            : JOptionPane.ERROR_MESSAGE
+            );
+
+            if (actionResult.success) {
+                loadData();
+            }
         }
     }
 
@@ -429,9 +465,25 @@ public class ProductPanel extends JPanel {
                 JOptionPane.PLAIN_MESSAGE);
 
         if (result == JOptionPane.OK_OPTION) {
-            boolean ok = controller.handleUpdate(
-                    sp, txtMaGame.getText(), txtGiaBan.getText(), txtGiaThue.getText());
-            if (ok) loadData();
+            ProductController.ActionResult actionResult =
+                    controller.handleUpdate(
+                            sp,
+                            txtMaGame.getText(),
+                            txtGiaBan.getText(),
+                            txtGiaThue.getText());
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    actionResult.message,
+                    actionResult.success ? "Thành công" : "Lỗi",
+                    actionResult.success
+                            ? JOptionPane.INFORMATION_MESSAGE
+                            : JOptionPane.ERROR_MESSAGE
+            );
+
+            if (actionResult.success) {
+                loadData();
+            }
         }
     }
 

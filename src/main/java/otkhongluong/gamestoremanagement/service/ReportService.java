@@ -1,41 +1,137 @@
 package otkhongluong.gamestoremanagement.service;
 
 import otkhongluong.gamestoremanagement.dao.ReportDAO;
-import otkhongluong.gamestoremanagement.model.RevenueDTO;
+import otkhongluong.gamestoremanagement.controller.ReportController.*;
+
+import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * ReportService — chuyển raw data từ DAO sang DTO mà Controller/View dùng.
+ * Không có SQL ở đây.
+ */
 public class ReportService {
-    private final ReportDAO reportDAO;
+
+    private final ReportDAO dao;
 
     public ReportService() {
-        this.reportDAO = new ReportDAO();
+        this.dao = new ReportDAO();
     }
 
-    public List<RevenueDTO> getDailyRevenue() {
-        return reportDAO.getDoanhThuTheoNgay();
+    // ── Tab 1 ────────────────────────────────────────────────
+
+    public OverviewKPI getOverviewKPI() {
+        return new OverviewKPI(
+            dao.getDoanhThuThang(),
+            dao.getTienThueThang(),
+            dao.getSoPhieuQuaHan(),
+            dao.getSoKhachHoatDong()
+        );
     }
 
-    public List<RevenueDTO> getMonthlyRevenue() {
-        return reportDAO.getDoanhThuTheoThang();
+    public List<ChartPoint> getWeeklyRevenue() {
+        List<ChartPoint> result = new ArrayList<>();
+        for (Object[] row : dao.getWeeklyRevenue())
+            result.add(new ChartPoint((String) row[0], (double) row[1]));
+        return result;
     }
 
-    public List<RevenueDTO> getYearlyRevenue() {
-        return reportDAO.getDoanhThuTheoNam();
+    // ── Tab 2 ────────────────────────────────────────────────
+
+    public List<Integer> getAvailableMonthYears() {
+        return dao.getAvailableMonthYears();
     }
 
-    /**
-     * API báo cáo: Tổng hợp dữ liệu thành chuỗi thông tin tóm tắt
-     */
-    public String generateSummary() {
-        List<RevenueDTO> daily = getDailyRevenue();
-        if (daily.isEmpty()) return "Không có dữ liệu doanh thu.";
-        
-        double total = 0;
-        int orders = 0;
-        for (RevenueDTO r : daily) {
-            total += r.getTongDoanhThu();
-            orders += r.getSoDonHang();
+    public List<MonthlyRow> getMonthlyDetail(int month, int year) {
+        List<MonthlyRow> rows = new ArrayList<>();
+        for (Object[] r : dao.getMonthlyRows(month, year))
+            rows.add(new MonthlyRow((String)r[0], (int)r[1], (double)r[2], (double)r[3]));
+        return rows;
+    }
+
+    public double[][] getMonthlyChartData(int month, int year) {
+        return dao.getMonthlyChartData(month, year);
+    }
+
+    // ── Tab 3 ────────────────────────────────────────────────
+
+    public List<Integer> getAvailableYears() {
+        return dao.getAvailableYears();
+    }
+
+    public List<YearlyRow> getYearlyDetail(int year) {
+        List<YearlyRow> rows = new ArrayList<>();
+        for (Object[] r : dao.getYearlyRows(year))
+            rows.add(new YearlyRow((String)r[0], (int)r[1], (double)r[2], (int)r[3], (double)r[4]));
+        return rows;
+    }
+
+    public YearlySummary getYearlySummary(int year) {
+        double ban = 0, thue = 0;
+        for (YearlyRow r : getYearlyDetail(year)) { ban += r.doanhThuBan; thue += r.tienThue; }
+        return new YearlySummary(ban, thue);
+    }
+
+    public double[][] getYearlyChartData(int year) {
+        return dao.getYearlyChartData(year);
+    }
+
+    // ── Tab 4 ────────────────────────────────────────────────
+
+    public List<TopGameRow> getTopGameSold() {
+        List<TopGameRow> rows = new ArrayList<>();
+        for (Object[] r : dao.getTopGameSold())
+            rows.add(new TopGameRow((int)r[0], (String)r[1], (String)r[2], (int)r[3], (double)r[4]));
+        return rows;
+    }
+
+    public List<TopGameRow> getTopGameRented() {
+        List<TopGameRow> rows = new ArrayList<>();
+        for (Object[] r : dao.getTopGameRented())
+            rows.add(new TopGameRow((int)r[0], (String)r[1], (String)r[2], (int)r[3], 0.0));
+        return rows;
+    }
+
+    // ── Tab 5 ────────────────────────────────────────────────
+
+    public CDStatusKPI getCDStatusKPI() {
+        int[] c = dao.getCDStatusCounts();
+        return new CDStatusKPI(c[0], c[1], c[2], c[3]);
+    }
+
+    public List<CDDetailRow> getCDStatusDetail() {
+        List<CDDetailRow> rows = new ArrayList<>();
+        for (Object[] r : dao.getCDStatusDetail())
+            rows.add(new CDDetailRow((String)r[0], (String)r[1], (String)r[2], (String)r[3], (String)r[4]));
+        return rows;
+    }
+
+    // ── Tab 6 ────────────────────────────────────────────────
+
+    public OverdueKPI getOverdueKPI() {
+        int[] c = dao.getOverdueCounts();
+        return new OverdueKPI(c[0], dao.getOverdueTotalFine(), c[1]);
+    }
+
+    public List<OverdueRow> getOverdueList() {
+        List<OverdueRow> rows = new ArrayList<>();
+        for (Object[] r : dao.getOverdueList())
+            rows.add(new OverdueRow((String)r[0], (String)r[1], (String)r[2],
+                                    (String)r[3], (String)r[4], (int)r[5], (double)r[6]));
+        return rows;
+    }
+
+    // ── Tab 7 ────────────────────────────────────────────────
+
+    public List<VIPRow> getVIPCustomers() {
+        List<VIPRow> rows = new ArrayList<>();
+        int rank = 1;
+        for (Object[] r : dao.getVIPCustomers()) {
+            String medal = rank == 1 ? "🥇" : rank == 2 ? "🥈" : rank == 3 ? "🥉" : String.valueOf(rank);
+            rows.add(new VIPRow(medal, (String)r[0], (String)r[1], (String)r[2],
+                                (int)r[3], (double)r[4], (double)r[5]));
+            rank++;
         }
-        return String.format("Tổng số đơn hàng: %d | Tổng doanh thu: %,.0f VND", orders, total);
+        return rows;
     }
 }

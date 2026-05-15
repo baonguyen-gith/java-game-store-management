@@ -1,7 +1,7 @@
 package otkhongluong.gamestoremanagement.service;
 
-import otkhongluong.gamestoremanagement.dao.DiemLichSuDAO;
-import otkhongluong.gamestoremanagement.model.DiemLichSu;
+import otkhongluong.gamestoremanagement.dao.PointDAO;
+import otkhongluong.gamestoremanagement.model.Point;
 
 import java.util.List;
 
@@ -9,13 +9,13 @@ import java.util.List;
  * Service quản lý điểm tích lũy khách hàng.
  * Validate đầu vào rồi uỷ quyền xuống DAO.
  */
-public class DiemLichSuService {
+public class PointService {
 
-    private final DiemLichSuDAO dao = new DiemLichSuDAO();
+    private final PointDAO dao = new PointDAO();
 
     // ==================== ĐỌC LỊCH SỬ ====================
 
-    public List<DiemLichSu> getLichSu(int maKH) {
+    public List<Point> getLichSu(int maKH) {
         if (maKH <= 0) throw new IllegalArgumentException("Mã khách hàng không hợp lệ!");
         return dao.findByMaKH(maKH);
     }

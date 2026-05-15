@@ -1,6 +1,6 @@
 package otkhongluong.gamestoremanagement.dao;
 
-import otkhongluong.gamestoremanagement.model.DiemLichSu;
+import otkhongluong.gamestoremanagement.model.Point;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 
 import java.sql.*;
@@ -11,12 +11,12 @@ import java.util.List;
  * DAO thao tác bảng DIEM_LICHSU và KHACHHANG (phần điểm).
  * Gọi Stored Procedure đã tạo trong diem_lichsu_procedures.sql.
  */
-public class DiemLichSuDAO {
+public class PointDAO {
 
     // ==================== LẤY LỊCH SỬ THEO MÃ KH ====================
 
-    public List<DiemLichSu> findByMaKH(int maKH) {
-        List<DiemLichSu> list = new ArrayList<>();
+    public List<Point> findByMaKH(int maKH) {
+        List<Point> list = new ArrayList<>();
         String sql = "SELECT * FROM DIEM_LICHSU WHERE MaKH = ? ORDER BY Ngay DESC";
 
         try (Connection conn = DBConnection.getConnection();
@@ -127,8 +127,8 @@ public class DiemLichSuDAO {
 
     // ==================== MAPPER ====================
 
-    private DiemLichSu map(ResultSet rs) throws SQLException {
-        DiemLichSu d = new DiemLichSu();
+    private Point map(ResultSet rs) throws SQLException {
+        Point d = new Point();
         d.setMaLS(rs.getInt("MaLS"));
         d.setMaKH(rs.getInt("MaKH"));
 

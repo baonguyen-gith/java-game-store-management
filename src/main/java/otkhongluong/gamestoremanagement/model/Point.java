@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 /**
  * Ánh xạ bảng DIEM_LICHSU trong database.
  */
-public class DiemLichSu {
+public class Point {
 
     private int    maLS;
     private int    maKH;
@@ -16,9 +16,9 @@ public class DiemLichSu {
     private String ghiChu;
 
     // ===== Constructor =====
-    public DiemLichSu() {}
+    public Point() {}
 
-    public DiemLichSu(int maKH, String loai, int soDiem, String ghiChu) {
+    public Point(int maKH, String loai, int soDiem, String ghiChu) {
         this.maKH   = maKH;
         this.loai   = loai;
         this.soDiem = soDiem;

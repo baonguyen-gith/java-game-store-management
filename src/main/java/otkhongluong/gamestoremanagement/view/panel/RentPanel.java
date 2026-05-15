@@ -2,16 +2,19 @@ package otkhongluong.gamestoremanagement.view.panel;
 
 import otkhongluong.gamestoremanagement.controller.RentController;
 import otkhongluong.gamestoremanagement.model.RentalOrder;
-
+import otkhongluong.gamestoremanagement.view.dialog.RentAddDialog;
+import otkhongluong.gamestoremanagement.view.dialog.RentEditDialog;
+import otkhongluong.gamestoremanagement.view.dialog.RentReturnDialog;
+import otkhongluong.gamestoremanagement.view.dialog.RentExtendDialog;
+import otkhongluong.gamestoremanagement.view.dialog.RentDetailDialog;
+import otkhongluong.gamestoremanagement.util.RoundButton;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.RoundRectangle2D;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.List;
 
@@ -110,9 +113,10 @@ public class RentPanel extends JPanel {
         btnReturn.setPreferredSize(new Dimension(118, 38));
         btnReturn.addActionListener(e -> {
             int row = table.getSelectedRow();
-            int id = (row >= 0)
-                ? parseMa(tableModel.getValueAt(row, 0).toString()) : -1;
-            controller.openReturnDialog(this, id);
+            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn phiếu thuê để trả CD!"); return; }
+            int id = parseMa(tableModel.getValueAt(row, 0).toString());
+            Frame frame = (Frame) SwingUtilities.getWindowAncestor(this);
+            new RentReturnDialog(frame, id).setVisible(true);
             loadData();
         });
 
@@ -120,16 +124,18 @@ public class RentPanel extends JPanel {
         btnExtend.setPreferredSize(new Dimension(118, 38));
         btnExtend.addActionListener(e -> {
             int row = table.getSelectedRow();
-            int id = (row >= 0)
-                ? parseMa(tableModel.getValueAt(row, 0).toString()) : -1;
-            controller.openExtendDialog(this, id);
+            if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn phiếu thuê để gia hạn!"); return; }
+            int id = parseMa(tableModel.getValueAt(row, 0).toString());
+            Frame frame = (Frame) SwingUtilities.getWindowAncestor(this);
+            new RentExtendDialog(frame, id).setVisible(true);
             loadData();
         });
 
         RoundButton btnAdd = new RoundButton("+  Thêm", BTN_ADD, new Color(30, 30, 30));
         btnAdd.setPreferredSize(new Dimension(105, 38));
         btnAdd.addActionListener(e -> {
-            controller.openAddDialog(this);
+            Frame frame = (Frame) SwingUtilities.getWindowAncestor(this);
+            new RentAddDialog(frame).setVisible(true);
             loadData();
         });
 
@@ -311,7 +317,9 @@ public class RentPanel extends JPanel {
 
         // "Chi tiết" button column
         table.getColumnModel().getColumn(7).setCellRenderer(new ButtonRenderer("Xem", ACCENT));
-        table.getColumnModel().getColumn(7).setCellEditor(new ButtonEditor(new JCheckBox(), table, controller));
+        table.getColumnModel().getColumn(7).setCellEditor(
+            new ButtonEditor(new JCheckBox(), table)
+        );
 
         // Double click → detail
         table.addMouseListener(new MouseAdapter() {
@@ -363,7 +371,8 @@ public class RentPanel extends JPanel {
             int row = table.getSelectedRow();
             if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn phiếu thuê để sửa!"); return; }
             RentalOrder pt = currentPageData.get(row);
-            controller.openEditDialog(this, pt);
+            Frame frame = (Frame) SwingUtilities.getWindowAncestor(this);
+            new RentEditDialog(frame, pt).setVisible(true);
             loadData();
         });
 
@@ -489,33 +498,11 @@ public class RentPanel extends JPanel {
     }
 
     private void openDetail(int id) {
-        controller.openDetailDialog(table, id);
-    }
-
-    // ══════════════════════════════════════════════════════════
-    // INNER CLASSES
-    // ══════════════════════════════════════════════════════════
-
-    static class RoundButton extends JButton {
-        private final Color bg, fg;
-        RoundButton(String text, Color bg, Color fg) {
-            super(text);
-            this.bg = bg; this.fg = fg;
-            setFocusPainted(false);
-            setContentAreaFilled(false);
-            setBorderPainted(false);
-            setForeground(fg);
-            setFont(new Font("Segoe UI", Font.BOLD, 13));
-            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        }
-        @Override protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(!isEnabled() ? bg.darker() : getModel().isRollover() ? bg.brighter() : bg);
-            g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 12, 12));
-            super.paintComponent(g2);
-            g2.dispose();
-        }
+        Frame frame = (Frame) SwingUtilities.getWindowAncestor(table);
+        RentDetailDialog d = new RentDetailDialog(frame, id);
+        d.pack();
+        d.setLocationRelativeTo(frame);
+        d.setVisible(true);
     }
 
     static class ButtonRenderer extends JButton implements TableCellRenderer {
@@ -536,12 +523,8 @@ public class RentPanel extends JPanel {
 
     static class ButtonEditor extends DefaultCellEditor {
         private int currentRow;
-        private final RentController controller;
-        
-        ButtonEditor(JCheckBox checkBox, JTable table, RentController controller) {
+        ButtonEditor(JCheckBox checkBox, JTable table) {  // ✅ Bỏ tham số controller
             super(checkBox);
-            this.controller = controller;
-            
             JButton btn = new JButton("Xem");
             btn.setBackground(new Color(130, 90, 230));
             btn.setForeground(Color.WHITE);
@@ -551,7 +534,12 @@ public class RentPanel extends JPanel {
                 fireEditingStopped();
                 String maPT = table.getValueAt(currentRow, 0).toString();
                 int id = Integer.parseInt(maPT.replaceAll("\\D", ""));
-                controller.openDetailDialog(table, id);
+                // ✅ View tự lấy Frame và mở Dialog
+                Frame frame = (Frame) SwingUtilities.getWindowAncestor(table);
+                RentDetailDialog d = new RentDetailDialog(frame, id);
+                d.pack();
+                d.setLocationRelativeTo(frame);
+                d.setVisible(true);
             });
             editorComponent = btn;
         }

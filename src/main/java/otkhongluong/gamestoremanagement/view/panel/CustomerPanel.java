@@ -4,7 +4,7 @@ import otkhongluong.gamestoremanagement.model.Customer;
 import otkhongluong.gamestoremanagement.controller.CustomerController;
 import otkhongluong.gamestoremanagement.controller.CustomerController.ActionResult;
 import otkhongluong.gamestoremanagement.util.IconUtils;
-import otkhongluong.gamestoremanagement.view.dialog.DiemKhachHangDialog;
+import otkhongluong.gamestoremanagement.view.dialog.CustomerPointDialog;
 import otkhongluong.gamestoremanagement.util.RoundButton;
 import javax.swing.*;
 import javax.swing.border.*;
@@ -275,7 +275,7 @@ public class CustomerPanel extends JPanel {
                 return;
             }
             Customer kh = currentPageData.get(row);
-            new DiemKhachHangDialog(
+            new CustomerPointDialog(
                 (Frame) SwingUtilities.getWindowAncestor(this),
                 kh,
                 this::loadData   // callback: reload bảng sau khi thay đổi điểm

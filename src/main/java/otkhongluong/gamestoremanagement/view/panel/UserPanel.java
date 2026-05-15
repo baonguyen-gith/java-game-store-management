@@ -35,25 +35,22 @@ public class UserPanel extends JPanel {
         setLayout(new BorderLayout());
         setBackground(new Color(20, 20, 50));
 
-        // Title
         JLabel title = new JLabel("QUẢN LÝ TÀI KHOẢN", JLabel.CENTER);
         title.setFont(new Font("Arial", Font.BOLD, 22));
         title.setForeground(Color.WHITE);
         title.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
 
-        // Table
         String[] cols = {"ID", "Username", "Role"};
         tableModel = new DefaultTableModel(cols, 0) {
             @Override
             public boolean isCellEditable(int row, int col) {
-                return false; // không cho sửa trực tiếp trên bảng
+                return false;
             }
         };
         table = new JTable(tableModel);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         JScrollPane scroll = new JScrollPane(table);
 
-        // Buttons
         btnAdd    = new JButton("➕ Thêm");
         btnEdit   = new JButton("✏️ Sửa");
         btnDelete = new JButton("❌ Xóa");
@@ -70,8 +67,11 @@ public class UserPanel extends JPanel {
     }
 
     // ===== PHÂN QUYỀN =====
+    // ✅ Kiểm tra MaRole trực tiếp từ User object — không cần qua Controller
+    //    View đã có sẵn currentUser, không cần hỏi Controller về thông tin này.
+    //    Controller.isAdmin() đã bị xóa vì logic role thuộc AuthService, không phải UserController.
     private void initPermissions() {
-        boolean isAdmin = controller.isAdmin(currentUser);
+        boolean isAdmin = currentUser.getMaRole() == 1;
         btnAdd.setEnabled(isAdmin);
         btnEdit.setEnabled(isAdmin);
         btnDelete.setEnabled(isAdmin);
@@ -87,7 +87,7 @@ public class UserPanel extends JPanel {
     // ===== XỬ LÝ THÊM =====
     private void handleAdd() {
         String username = JOptionPane.showInputDialog(this, "Nhập username:");
-        if (username == null) return; // người dùng bấm Cancel
+        if (username == null) return;
 
         String password = JOptionPane.showInputDialog(this, "Nhập password:");
         if (password == null) return;

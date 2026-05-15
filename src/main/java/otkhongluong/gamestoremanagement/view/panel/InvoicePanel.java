@@ -1,21 +1,20 @@
-    package otkhongluong.gamestoremanagement.view.panel;
+package otkhongluong.gamestoremanagement.view.panel;
 
-    import otkhongluong.gamestoremanagement.model.Invoice;
-    import otkhongluong.gamestoremanagement.controller.InvoiceController;
-    import otkhongluong.gamestoremanagement.view.dialog.InvoiceDetailDialog;
-    import otkhongluong.gamestoremanagement.util.RoundButton;
-    import javax.swing.*;
-    import javax.swing.border.*;
-    import javax.swing.table.*;
-    import java.awt.*;
-    import java.awt.event.*;
-    import java.awt.geom.RoundRectangle2D;
-    import java.time.LocalDate;
-    import java.time.format.DateTimeFormatter;
-    import java.time.format.DateTimeParseException;
-    import java.util.*;
-    import java.util.List;
-    import java.util.stream.Collectors;
+import otkhongluong.gamestoremanagement.model.Invoice;
+import otkhongluong.gamestoremanagement.controller.InvoiceController;
+import otkhongluong.gamestoremanagement.view.dialog.InvoiceDetailDialog;
+import otkhongluong.gamestoremanagement.view.dialog.InvoiceAddDialog;
+import otkhongluong.gamestoremanagement.view.dialog.InvoiceEditDialog;
+import otkhongluong.gamestoremanagement.util.RoundButton;
+import javax.swing.*;
+import javax.swing.border.*;
+import javax.swing.table.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.awt.geom.RoundRectangle2D;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.List;
 
     public class InvoicePanel extends JPanel {
 
@@ -111,7 +110,8 @@
             RoundButton btnAdd = new RoundButton("+  Thêm", BTN_ADD, new Color(30, 30, 30));
             btnAdd.setPreferredSize(new Dimension(105, 38));
             btnAdd.addActionListener(e -> {
-                    controller.openAddDialog(this);
+                Frame frame = (Frame) SwingUtilities.getWindowAncestor(this);
+                new InvoiceAddDialog(frame).setVisible(true);
                 loadData();
             });
 
@@ -344,7 +344,8 @@
                 int row = table.getSelectedRow();
                 if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn hóa đơn để sửa!"); return; }
                 int maHD = parseMa(tableModel.getValueAt(row, 0).toString());
-                controller.openEditDialog(this, maHD);  // Controller quyết định mở dialog nào
+                Frame frame = (Frame) SwingUtilities.getWindowAncestor(this);  // ✅ View tự lấy Frame
+                new InvoiceEditDialog(frame, maHD).setVisible(true);            // ✅ View tự mở Dialog
                 loadData();
             });
 

@@ -1,16 +1,12 @@
 package otkhongluong.gamestoremanagement;
 
-import otkhongluong.gamestoremanagement.view.LoginView;
-import otkhongluong.gamestoremanagement.controller.LoginController;
-import otkhongluong.gamestoremanagement.service.AuthService;
-
 public class Main {
     public static void main(String[] args) {
-
-        AuthService authService = new AuthService();
-        LoginController controller = new LoginController(authService);
-
-        LoginView view = new LoginView(controller);
-        view.setVisible(true);
+        // ✅ AppNavigator là entry point duy nhất của app.
+        //    Nó tạo LoginController(navigator) và LoginView đúng thứ tự bên trong.
+        //    Main không cần biết AuthService, LoginController hay LoginView.
+        javax.swing.SwingUtilities.invokeLater(
+            () -> new AppNavigator().goToLogin()
+        );
     }
 }
