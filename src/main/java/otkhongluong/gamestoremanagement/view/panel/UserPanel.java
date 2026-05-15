@@ -40,15 +40,22 @@ public class UserPanel extends JPanel {
         title.setForeground(Color.WHITE);
         title.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
 
-        String[] cols = {"ID", "Username", "Role"};
+        // ✅ Thêm 2 cột: Mã NV và Tên NV
+        String[] cols = {"ID", "Username", "Role", "Mã NV", "Tên Nhân Viên"};
         tableModel = new DefaultTableModel(cols, 0) {
             @Override
-            public boolean isCellEditable(int row, int col) {
-                return false;
-            }
+            public boolean isCellEditable(int row, int col) { return false; }
         };
         table = new JTable(tableModel);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        // Căn chỉnh độ rộng cột
+        table.getColumnModel().getColumn(0).setPreferredWidth(50);   // ID
+        table.getColumnModel().getColumn(1).setPreferredWidth(130);  // Username
+        table.getColumnModel().getColumn(2).setPreferredWidth(70);   // Role
+        table.getColumnModel().getColumn(3).setPreferredWidth(80);   // Mã NV
+        table.getColumnModel().getColumn(4).setPreferredWidth(180);  // Tên NV
+
         JScrollPane scroll = new JScrollPane(table);
 
         btnAdd    = new JButton("➕ Thêm");
@@ -67,9 +74,6 @@ public class UserPanel extends JPanel {
     }
 
     // ===== PHÂN QUYỀN =====
-    // ✅ Kiểm tra MaRole trực tiếp từ User object — không cần qua Controller
-    //    View đã có sẵn currentUser, không cần hỏi Controller về thông tin này.
-    //    Controller.isAdmin() đã bị xóa vì logic role thuộc AuthService, không phải UserController.
     private void initPermissions() {
         boolean isAdmin = currentUser.getMaRole() == 1;
         btnAdd.setEnabled(isAdmin);
@@ -112,6 +116,7 @@ public class UserPanel extends JPanel {
             return;
         }
 
+        // Cột 0 vẫn là MaUser (int)
         int id = (int) tableModel.getValueAt(row, 0);
 
         String username = JOptionPane.showInputDialog(this, "Username mới:");
@@ -159,13 +164,12 @@ public class UserPanel extends JPanel {
     // ===== NẠP DỮ LIỆU VÀO BẢNG =====
     private void loadData() {
         tableModel.setRowCount(0);
-        List<User> list = controller.getAllUsers();
-        for (User u : list) {
-            tableModel.addRow(new Object[]{
-                u.getMaUser(),
-                u.getUsername(),
-                u.getMaRole() == 1 ? "Admin" : "Staff"
-            });
+        // ✅ Dùng getAllUsersWithEmployee() thay vì getAllUsers()
+        //    để lấy thêm Mã NV (formatted "NV1") và Tên NV từ JOIN NHANVIEN
+        List<Object[]> list = controller.getAllUsersWithEmployee();
+        for (Object[] row : list) {
+            // row = [MaUser(int), Username, Role(String), MaNVFormatted(String), HoTen(String)]
+            tableModel.addRow(row);
         }
     }
 }

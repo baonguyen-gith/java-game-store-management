@@ -254,15 +254,15 @@ public class GameDetailPanel extends JPanel {
 
         // ── Nút mua/thuê trên ảnh ──
         btnOverlay.removeAll();
-        // if (game.getGiaCD() != null && game.getGiaCD() > 0)
-        //     btnOverlay.add(makeBannerBtn("BUY CD", game.getGiaCDText(), BTN_CD,
-        //         e -> openBillAdd("CD")));
-        // if (game.getGiaROM() != null && game.getGiaROM() > 0)
-        //     btnOverlay.add(makeBannerBtn("BUY ROM", game.getGiaROMText(), BTN_ROM,
-        //         e -> openBillAdd("ROM")));
-        // if (game.getGiaThueNgay() != null && game.getGiaThueNgay() > 0)
-        //     btnOverlay.add(makeBannerBtn("RENT", game.getGiaThueText(), BTN_RENT,
-        //         e -> openRent()));
+        if (game.getGiaCD() != null && game.getGiaCD() > 0)
+            btnOverlay.add(makeBannerBtn("BUY CD", game.getGiaCDText(), BTN_CD,
+                e -> openBillAdd("CD")));
+        if (game.getGiaROM() != null && game.getGiaROM() > 0)
+            btnOverlay.add(makeBannerBtn("BUY ROM", game.getGiaROMText(), BTN_ROM,
+                e -> openBillAdd("ROM")));
+        if (game.getGiaThueNgay() != null && game.getGiaThueNgay() > 0)
+            btnOverlay.add(makeBannerBtn("RENT", game.getGiaThueText(), BTN_RENT,
+                e -> openRent()));
         btnOverlay.revalidate();
         btnOverlay.repaint();
 

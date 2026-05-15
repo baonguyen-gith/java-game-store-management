@@ -1,9 +1,14 @@
 package otkhongluong.gamestoremanagement.view.panel;
 
+import otkhongluong.gamestoremanagement.controller.DiscController;
 import otkhongluong.gamestoremanagement.controller.ProductController;
+import otkhongluong.gamestoremanagement.controller.RomController;
+import otkhongluong.gamestoremanagement.model.Disc;
 import otkhongluong.gamestoremanagement.model.Product;
+import otkhongluong.gamestoremanagement.model.ROM;
 import otkhongluong.gamestoremanagement.util.IconUtils;
 import otkhongluong.gamestoremanagement.util.RoundButton;
+
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -14,8 +19,7 @@ import java.util.List;
 
 /**
  * View – chỉ chịu trách nhiệm hiển thị và thu nhận sự kiện.
- * Mọi nghiệp vụ (load, filter, sort, add, edit, delete) đều
- * uỷ quyền cho ProductController.
+ * Mọi nghiệp vụ uỷ quyền cho ProductController / RomController / DiscController.
  */
 public class ProductPanel extends JPanel {
 
@@ -36,6 +40,8 @@ public class ProductPanel extends JPanel {
     private static final Color BTN_EDIT      = new Color(99, 179, 237);
     private static final Color BTN_DELETE    = new Color(252, 129, 129);
     private static final Color BTN_ADD       = new Color(104, 211, 145);
+    private static final Color BTN_ROM       = new Color(255, 193, 80);   // vàng cam
+    private static final Color BTN_DISC      = new Color(100, 200, 220);  // xanh ngọc
 
     /* ============ FONTS ============ */
     private static final Font FONT_HEADER = new Font("Segoe UI", Font.BOLD, 13);
@@ -54,19 +60,22 @@ public class ProductPanel extends JPanel {
     private boolean isFilterMode = false;
     private TableRowSorter<DefaultTableModel> rowSorter;
 
-    /* ============ MVC: chỉ giữ Controller, không giữ Service ============ */
+    /* ============ CONTROLLERS ============ */
     private final ProductController controller;
+    private final RomController romController;
+    private final DiscController discController;
 
-    /** Dữ liệu gốc (toàn bộ từ DB). */
+    /* ============ DATA ============ */
     private List<Product> allData;
-    /** Dữ liệu của trang hiện tại (sau filter + phân trang). */
     private List<Product> currentPageData;
 
     // ======================================================
     //  KHỞI TẠO
     // ======================================================
     public ProductPanel() {
-        controller = new ProductController(); // View tạo Controller, truyền chính mình
+        controller     = new ProductController();
+        romController  = new RomController();
+        discController = new DiscController();
 
         setLayout(new BorderLayout(0, 0));
         setBackground(BG_DARK);
@@ -109,7 +118,7 @@ public class ProductPanel extends JPanel {
         JPanel row = new JPanel(new BorderLayout(8, 0));
         row.setBackground(BG_DARK);
 
-        // --- Nút Sắp xếp & Lọc (trái) ---
+        // Nút Sắp xếp & Lọc
         JPanel leftGroup = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         leftGroup.setBackground(BG_DARK);
 
@@ -124,7 +133,7 @@ public class ProductPanel extends JPanel {
         leftGroup.add(btnSort);
         leftGroup.add(btnFilter);
 
-        // --- Ô tìm kiếm (giữa) ---
+        // Ô tìm kiếm
         txtSearch = new JTextField(22) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -141,7 +150,6 @@ public class ProductPanel extends JPanel {
             }
         };
         styleTextField(txtSearch);
-        // Sự kiện gõ phím: View chỉ reset trang rồi re-render
         txtSearch.addKeyListener(new KeyAdapter() {
             @Override public void keyReleased(KeyEvent e) {
                 currentPage = 1;
@@ -149,7 +157,7 @@ public class ProductPanel extends JPanel {
             }
         });
 
-        // --- Nút Add & Refresh (phải) ---
+        // Nút Add & Refresh
         RoundButton btnAdd = new RoundButton("", BTN_ADD, Color.WHITE);
         btnAdd.setIcon(IconUtils.getAddIcon(18, Color.WHITE));
         btnAdd.setPreferredSize(new Dimension(40, 40));
@@ -197,9 +205,10 @@ public class ProductPanel extends JPanel {
         table = new JTable(tableModel) {
             @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
-                if (c instanceof JLabel)
+                if (c instanceof JLabel) {
                     ((JLabel) c).setHorizontalAlignment(SwingConstants.LEFT);
-                   ((JLabel) c).setBorder(new EmptyBorder(0, 12, 0, 12));
+                    ((JLabel) c).setBorder(new EmptyBorder(0, 12, 0, 12));
+                }
                 if (isRowSelected(row)) {
                     c.setBackground(ACCENT);
                     c.setForeground(Color.WHITE);
@@ -245,7 +254,6 @@ public class ProductPanel extends JPanel {
         rowSorter = new TableRowSorter<>(tableModel);
         table.setRowSorter(rowSorter);
 
-        // Click tiêu đề cột để lọc (chỉ khi isFilterMode bật)
         table.getTableHeader().addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
                 if (!isFilterMode) return;
@@ -287,19 +295,43 @@ public class ProductPanel extends JPanel {
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         btnPanel.setBackground(BG_DARK);
 
+        // --- Nút Quản lý ROM ---
+        RoundButton btnRom = new RoundButton(" ROM", BTN_ROM, BG_DARK);
+        btnRom.setPreferredSize(new Dimension(120, 40));
+        btnRom.setToolTipText("Quản lý thông tin ROM (bản kỹ thuật số) của sản phẩm");
+        btnRom.addActionListener(e -> {
+            Product sp = getSelectedProduct();
+            if (sp == null) {
+                JOptionPane.showMessageDialog(this, "Vui lòng chọn sản phẩm cần quản lý ROM!");
+                return;
+            }
+            showRomDialog(sp);
+        });
+
+        // --- Nút Tồn kho CD ---
+        RoundButton btnDisc = new RoundButton(" Tồn kho CD", BTN_DISC, BG_DARK);
+        btnDisc.setPreferredSize(new Dimension(130, 40));
+        btnDisc.setToolTipText("Quản lý tồn kho đĩa CD của sản phẩm");
+        btnDisc.addActionListener(e -> {
+            Product sp = getSelectedProduct();
+            if (sp == null) {
+                JOptionPane.showMessageDialog(this, "Vui lòng chọn sản phẩm cần quản lý tồn kho CD!");
+                return;
+            }
+            showDiscDialog(sp);
+        });
+
         // --- Nút Sửa ---
         RoundButton btnEdit = new RoundButton(" Sửa", BTN_EDIT, BG_DARK);
         btnEdit.setIcon(IconUtils.getEditIcon(16, BG_DARK));
         btnEdit.setPreferredSize(new Dimension(110, 40));
         btnEdit.addActionListener(e -> {
-            int viewRow = table.getSelectedRow();
-            if (viewRow < 0) {
+            Product sp = getSelectedProduct();
+            if (sp == null) {
                 JOptionPane.showMessageDialog(this, "Vui lòng chọn sản phẩm cần sửa!");
                 return;
             }
-            int modelRow = table.convertRowIndexToModel(viewRow);
-            Product selected = currentPageData.get(modelRow);
-            showEditProductDialog(selected);
+            showEditProductDialog(sp);
         });
 
         // --- Nút Xóa ---
@@ -307,45 +339,42 @@ public class ProductPanel extends JPanel {
         btnDelete.setIcon(IconUtils.getDeleteIcon(16, BG_DARK));
         btnDelete.setPreferredSize(new Dimension(110, 40));
         btnDelete.addActionListener(e -> {
-            int viewRow = table.getSelectedRow();
-            if (viewRow < 0) {
+            Product sp = getSelectedProduct();
+            if (sp == null) {
                 JOptionPane.showMessageDialog(this, "Vui lòng chọn sản phẩm để xóa!");
                 return;
             }
-            int modelRow = table.convertRowIndexToModel(viewRow);
-            Product sp = currentPageData.get(modelRow);
-
-            // Giao toàn bộ logic xác nhận + xóa cho Controller
             int confirm = JOptionPane.showConfirmDialog(
                     this,
                     "Xác nhận xóa sản phẩm mã: SP" + String.format("%03d", sp.getMaSP()) + "?",
                     "Xác nhận",
                     JOptionPane.YES_NO_OPTION
             );
-
             if (confirm != JOptionPane.YES_OPTION) return;
 
-            ProductController.ActionResult result =
-                    controller.handleDelete(sp.getMaSP());
-
+            ProductController.ActionResult result = controller.handleDelete(sp.getMaSP());
             JOptionPane.showMessageDialog(
-                    this,
-                    result.message,
+                    this, result.message,
                     result.success ? "Thành công" : "Lỗi",
-                    result.success
-                            ? JOptionPane.INFORMATION_MESSAGE
-                            : JOptionPane.ERROR_MESSAGE
+                    result.success ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.ERROR_MESSAGE
             );
-
-            if (result.success) {
-                loadData();
-            }
+            if (result.success) loadData();
         });
 
+        btnPanel.add(btnRom);
+        btnPanel.add(btnDisc);
         btnPanel.add(btnEdit);
         btnPanel.add(btnDelete);
         bar.add(btnPanel, BorderLayout.EAST);
         return bar;
+    }
+
+    /** Lấy Product đang được chọn trên bảng, null nếu chưa chọn. */
+    private Product getSelectedProduct() {
+        int viewRow = table.getSelectedRow();
+        if (viewRow < 0) return null;
+        int modelRow = table.convertRowIndexToModel(viewRow);
+        return currentPageData.get(modelRow);
     }
 
     private void rebuildPagination(int totalPages) {
@@ -378,16 +407,13 @@ public class ProductPanel extends JPanel {
     }
 
     // ======================================================
-    //  DATA – View chỉ gọi Controller
+    //  DATA
     // ======================================================
-
-    /** Tải lại toàn bộ dữ liệu từ Controller rồi re-render. */
     private void loadData() {
-        allData = controller.loadAll(); // ← không gọi service trực tiếp
+        allData = controller.loadAll();
         renderPage();
     }
 
-    /** Render trang hiện tại lên JTable. */
     private void renderPage() {
         tableModel.setRowCount(0);
 
@@ -395,7 +421,7 @@ public class ProductPanel extends JPanel {
         ProductController.PageResult result =
             controller.getPage(allData, keyword, currentPage, PAGE_SIZE);
 
-        currentPage    = result.currentPage;   // Controller đã clamp giá trị an toàn
+        currentPage     = result.currentPage;
         currentPageData = result.data;
 
         for (Product sp : currentPageData) {
@@ -407,13 +433,12 @@ public class ProductPanel extends JPanel {
             });
         }
 
-        rebuildPagination(result.totalPages);   // truyền vào thay vì tự tính
+        rebuildPagination(result.totalPages);
     }
 
     // ======================================================
-    //  DIALOGS – View thu thập dữ liệu, Controller xử lý
+    //  DIALOG: THÊM / SỬA SẢN PHẨM
     // ======================================================
-
     private void showAddProductDialog() {
         JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
         JTextField txtMaGame  = new JTextField();
@@ -425,29 +450,13 @@ public class ProductPanel extends JPanel {
         panel.add(new JLabel("Giá Thuê (CD) - VNĐ:"));   panel.add(txtGiaThue);
 
         int result = JOptionPane.showConfirmDialog(this, panel,
-                "Thêm Sản Phẩm Mới", JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.PLAIN_MESSAGE);
+                "Thêm Sản Phẩm Mới", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 
         if (result == JOptionPane.OK_OPTION) {
-            // View chỉ thu thập text, Controller lo validate + gọi Service
             ProductController.ActionResult actionResult =
-                    controller.handleAdd(
-                            txtMaGame.getText(),
-                            txtGiaBan.getText(),
-                            txtGiaThue.getText());
-
-            JOptionPane.showMessageDialog(
-                    this,
-                    actionResult.message,
-                    actionResult.success ? "Thành công" : "Lỗi",
-                    actionResult.success
-                            ? JOptionPane.INFORMATION_MESSAGE
-                            : JOptionPane.ERROR_MESSAGE
-            );
-
-            if (actionResult.success) {
-                loadData();
-            }
+                    controller.handleAdd(txtMaGame.getText(), txtGiaBan.getText(), txtGiaThue.getText());
+            showResult(actionResult);
+            if (actionResult.success) loadData();
         }
     }
 
@@ -462,36 +471,233 @@ public class ProductPanel extends JPanel {
         panel.add(new JLabel("Giá Thuê (CD) - VNĐ:"));   panel.add(txtGiaThue);
 
         int result = JOptionPane.showConfirmDialog(this, panel,
-                "Cập Nhật Sản Phẩm", JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.PLAIN_MESSAGE);
+                "Cập Nhật Sản Phẩm", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 
         if (result == JOptionPane.OK_OPTION) {
             ProductController.ActionResult actionResult =
-                    controller.handleUpdate(
-                            sp,
-                            txtMaGame.getText(),
-                            txtGiaBan.getText(),
-                            txtGiaThue.getText());
+                    controller.handleUpdate(sp, txtMaGame.getText(), txtGiaBan.getText(), txtGiaThue.getText());
+            showResult(actionResult);
+            if (actionResult.success) loadData();
+        }
+    }
 
-            JOptionPane.showMessageDialog(
-                    this,
-                    actionResult.message,
-                    actionResult.success ? "Thành công" : "Lỗi",
-                    actionResult.success
-                            ? JOptionPane.INFORMATION_MESSAGE
-                            : JOptionPane.ERROR_MESSAGE
+    // ======================================================
+    //  DIALOG: QUẢN LÝ ROM
+    // ======================================================
+    private void showRomDialog(Product sp) {
+        String maSPLabel = "SP" + String.format("%03d", sp.getMaSP());
+
+        // Load ROM hiện tại (nếu có)
+        ROM existing = romController.loadRom(sp.getMaSP());
+
+        JPanel panel = new JPanel(new GridLayout(0, 1, 5, 8));
+
+        JTextField txtDungLuong  = new JTextField(existing != null ? existing.getDungLuong()  : "");
+        JTextField txtLink       = new JTextField(existing != null ? existing.getLinkLuuTru() : "");
+        JTextField txtSoLuotBan  = new JTextField(existing != null ? String.valueOf(existing.getSoLuotBan()) : "0");
+        txtSoLuotBan.setEditable(false); // Số lượt bán chỉ đọc, không nhập tay
+
+        panel.add(new JLabel("Sản phẩm: " + maSPLabel));
+        panel.add(new JSeparator());
+        panel.add(new JLabel("Dung lượng (*):"));   panel.add(txtDungLuong);
+        panel.add(new JLabel("Link lưu trữ (*):"));  panel.add(txtLink);
+        panel.add(new JLabel("Số lượt bán:"));       panel.add(txtSoLuotBan);
+
+        // Tuỳ chỉnh nút: nếu đã có ROM thì hiện thêm nút Xóa ROM
+        Object[] options = existing != null
+                ? new Object[]{"Lưu", "Xóa ROM", "Hủy"}
+                : new Object[]{"Lưu", "Hủy"};
+
+        int choice = JOptionPane.showOptionDialog(
+                this, panel,
+                "Quản lý ROM – " + maSPLabel,
+                JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,
+                null, options, options[0]);
+
+        if (choice == 0) {
+            // Lưu (insert hoặc update)
+            ProductController.ActionResult result = romController.handleSave(
+                    sp.getMaSP(),
+                    txtDungLuong.getText(),
+                    txtLink.getText(),
+                    txtSoLuotBan.getText()
             );
-
-            if (actionResult.success) {
-                loadData();
+            showResult(result);
+        } else if (choice == 1 && existing != null) {
+            // Xóa ROM
+            int confirm = JOptionPane.showConfirmDialog(
+                    this, "Xác nhận xóa ROM của " + maSPLabel + "?",
+                    "Xác nhận", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                showResult(romController.handleDelete(sp.getMaSP()));
             }
         }
     }
 
     // ======================================================
-    //  SORT / FILTER UI
+    //  DIALOG: QUẢN LÝ TỒN KHO CD
     // ======================================================
+    private void showDiscDialog(Product sp) {
+        String maSPLabel = "SP" + String.format("%03d", sp.getMaSP());
 
+        // Tạo JDialog để có thể refresh danh sách bên trong
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
+                "Tồn kho CD – " + maSPLabel, true);
+        dialog.setSize(560, 440);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new BorderLayout(10, 10));
+        dialog.getRootPane().setBorder(new EmptyBorder(12, 12, 12, 12));
+
+        // --- Header thông tin tồn kho ---
+        JLabel lblInfo = buildDiscInfoLabel(sp.getMaSP());
+        dialog.add(lblInfo, BorderLayout.NORTH);
+
+        // --- Bảng danh sách đĩa ---
+        String[] cols = {"Mã CD", "Tình Trạng", "Trạng Thái"};
+        DefaultTableModel discModel = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+        JTable discTable = new JTable(discModel);
+        discTable.setRowHeight(32);
+        discTable.setFont(FONT_CELL);
+        discTable.getTableHeader().setFont(FONT_HEADER);
+        discTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        JScrollPane scroll = new JScrollPane(discTable);
+        dialog.add(scroll, BorderLayout.CENTER);
+
+        // Hàm nội bộ để load lại bảng đĩa
+        Runnable refreshDiscTable = () -> {
+            discModel.setRowCount(0);
+            List<Disc> discs = discController.loadByMaSP(sp.getMaSP());
+            for (Disc d : discs) {
+                discModel.addRow(new Object[]{
+                    "CD" + String.format("%03d", d.getMaCD()),
+                    d.getTinhTrang(),
+                    d.getTrangThai()
+                });
+            }
+            // Cập nhật label tồn kho
+            lblInfo.setText(buildDiscInfoText(sp.getMaSP()));
+        };
+
+        refreshDiscTable.run();
+
+        // --- Panel nút hành động ---
+        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+
+        // Nút Thêm đĩa
+        RoundButton btnThem = new RoundButton("+ Thêm đĩa", BTN_ADD, Color.WHITE);
+        btnThem.setPreferredSize(new Dimension(120, 36));
+        btnThem.addActionListener(e -> {
+            JTextField txtSoLuong = new JTextField("1", 6);
+            JPanel inputPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+            inputPanel.add(new JLabel("Số lượng nhập kho:"));
+            inputPanel.add(txtSoLuong);
+            inputPanel.add(new JLabel("(Tình trạng mặc định: Mới)"));
+
+            int choice = JOptionPane.showConfirmDialog(dialog, inputPanel,
+                    "Thêm đĩa CD – " + maSPLabel,
+                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+            if (choice == JOptionPane.OK_OPTION) {
+                ProductController.ActionResult result =
+                        discController.handleThemNhieuDia(sp.getMaSP(), txtSoLuong.getText());
+                showResult(result);
+                if (result.success) refreshDiscTable.run();
+            }
+        });
+
+        // Nút Sửa tình trạng
+        RoundButton btnSuaTinhTrang = new RoundButton("Sửa tình trạng", BTN_EDIT, BG_DARK);
+        btnSuaTinhTrang.setPreferredSize(new Dimension(140, 36));
+        btnSuaTinhTrang.addActionListener(e -> {
+            int viewRow = discTable.getSelectedRow();
+            if (viewRow < 0) {
+                JOptionPane.showMessageDialog(dialog, "Vui lòng chọn đĩa cần sửa!");
+                return;
+            }
+            // Lấy MaCD từ bảng (bỏ prefix "CD0xx")
+            String maCDStr = discModel.getValueAt(viewRow, 0).toString().replaceAll("[^\\d]", "");
+            int maCD = Integer.parseInt(maCDStr);
+
+            String tinhTrangCu = discModel.getValueAt(viewRow, 1).toString();
+            String tinhTrangMoi = JOptionPane.showInputDialog(dialog,
+                    "Tình trạng mới:", tinhTrangCu);
+            if (tinhTrangMoi != null) {
+                ProductController.ActionResult result =
+                        discController.handleCapNhatTinhTrang(maCD, tinhTrangMoi);
+                showResult(result);
+                if (result.success) refreshDiscTable.run();
+            }
+        });
+
+        // Nút Xóa đĩa
+        RoundButton btnXoa = new RoundButton("Xóa đĩa", BTN_DELETE, BG_DARK);
+        btnXoa.setPreferredSize(new Dimension(100, 36));
+        btnXoa.addActionListener(e -> {
+            int viewRow = discTable.getSelectedRow();
+            if (viewRow < 0) {
+                JOptionPane.showMessageDialog(dialog, "Vui lòng chọn đĩa cần xóa!");
+                return;
+            }
+            String maCDStr = discModel.getValueAt(viewRow, 0).toString().replaceAll("[^\\d]", "");
+            int maCD = Integer.parseInt(maCDStr);
+            String trangThai = discModel.getValueAt(viewRow, 2).toString();
+
+            if (!"SanSang".equals(trangThai)) {
+                JOptionPane.showMessageDialog(dialog,
+                        "Chỉ có thể xóa đĩa đang ở trạng thái Sẵn Sàng!\n" +
+                        "Đĩa này đang ở trạng thái: " + trangThai,
+                        "Không thể xóa", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            int confirm = JOptionPane.showConfirmDialog(dialog,
+                    "Xác nhận xóa đĩa CD" + String.format("%03d", maCD) + "?",
+                    "Xác nhận", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                ProductController.ActionResult result = discController.handleXoaDia(maCD);
+                showResult(result);
+                if (result.success) refreshDiscTable.run();
+            }
+        });
+
+        // Nút Đóng
+        RoundButton btnDong = new RoundButton("Đóng", INPUT_BG, BG_DARK);
+        btnDong.setPreferredSize(new Dimension(90, 36));
+        btnDong.addActionListener(e -> dialog.dispose());
+
+        actionPanel.add(btnThem);
+        actionPanel.add(btnSuaTinhTrang);
+        actionPanel.add(btnXoa);
+        actionPanel.add(btnDong);
+        dialog.add(actionPanel, BorderLayout.SOUTH);
+
+        dialog.setVisible(true);
+    }
+
+    /** Tạo label tóm tắt tồn kho. */
+    private JLabel buildDiscInfoLabel(int maSP) {
+        JLabel lbl = new JLabel(buildDiscInfoText(maSP));
+        lbl.setFont(FONT_LABEL);
+        lbl.setBorder(new EmptyBorder(0, 0, 6, 0));
+        return lbl;
+    }
+
+    private String buildDiscInfoText(int maSP) {
+        int tongTon  = discController.getTongTon(maSP);
+        int sanSang  = discController.getSanSang(maSP);
+        int dangThue = tongTon - sanSang;
+        return String.format(
+                "Tổng tồn kho: %d đĩa  |  Sẵn sàng: %d  |  Đang thuê / Hỏng: %d",
+                tongTon, sanSang, dangThue
+        );
+    }
+
+    // ======================================================
+    //  SORT / FILTER
+    // ======================================================
     private void toggleFilterMode() {
         isFilterMode = !isFilterMode;
         if (isFilterMode) {
@@ -518,13 +724,23 @@ public class ProductPanel extends JPanel {
     private void addSortItem(JPopupMenu menu, String label, String type) {
         JMenuItem asc  = new JMenuItem(label + " (Thấp -> Cao)");
         JMenuItem desc = new JMenuItem(label + " (Cao -> Thấp)");
-
-        // View yêu cầu Controller sắp xếp, rồi tự re-render
         asc.addActionListener(e  -> { controller.sort(allData, type, true);  currentPage = 1; renderPage(); });
         desc.addActionListener(e -> { controller.sort(allData, type, false); currentPage = 1; renderPage(); });
-
         menu.add(asc);
         menu.add(desc);
         menu.addSeparator();
+    }
+
+    // ======================================================
+    //  HELPER
+    // ======================================================
+    /** Hiện thông báo kết quả từ ActionResult. */
+    private void showResult(ProductController.ActionResult result) {
+        JOptionPane.showMessageDialog(
+                this,
+                result.message,
+                result.success ? "Thành công" : "Lỗi",
+                result.success ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.ERROR_MESSAGE
+        );
     }
 }

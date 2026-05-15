@@ -11,14 +11,12 @@ public class UserDAO implements IUserDAO {
 
     @Override
     public boolean insert(User user) {
-        // ✅ Thêm MaNV vào INSERT — có thể NULL nếu chưa gắn nhân viên
         String sql = "INSERT INTO USERS (Username, Password, MaRole, MaNV) VALUES (?, ?, ?, ?)";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, user.getUsername());
             ps.setString(2, user.getPassword());
             ps.setInt(3, user.getMaRole());
-            // ✅ MaNV = 0 → lưu NULL vào DB
             if (user.getMaNV() > 0) ps.setInt(4, user.getMaNV());
             else                    ps.setNull(4, Types.INTEGER);
             return ps.executeUpdate() > 0;
@@ -29,7 +27,6 @@ public class UserDAO implements IUserDAO {
 
     @Override
     public boolean update(User user) {
-        // ✅ Thêm MaNV vào UPDATE
         String sql = "UPDATE USERS SET Username = ?, Password = ?, MaRole = ?, MaNV = ? WHERE MaUser = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -101,16 +98,50 @@ public class UserDAO implements IUserDAO {
         return list;
     }
 
-    // ✅ FIX: đọc thêm MaNV từ ResultSet
+    /**
+     * [MỚI] LEFT JOIN với NHANVIEN để lấy thêm MaNV (formatted) và HoTen.
+     * Trả Object[] mỗi phần tử gồm: [MaUser, Username, Role, MaNVFormatted, HoTen]
+     * LEFT JOIN để user chưa gắn NV vẫn hiện ra (MaNV = "", HoTen = "—").
+     */
+    public List<Object[]> findAllWithEmployee() {
+        List<Object[]> list = new ArrayList<>();
+        String sql =
+            "SELECT u.MaUser, u.Username, u.MaRole, u.MaNV, nv.HoTen " +
+            "FROM USERS u " +
+            "LEFT JOIN NHANVIEN nv ON u.MaNV = nv.MaNV " +
+            "ORDER BY u.MaUser DESC";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                int maNV = rs.getInt("MaNV");
+                String maNVFormatted = (maNV > 0) ? "NV" + maNV : "";
+                String hoTen = rs.getString("HoTen");
+                if (hoTen == null) hoTen = "—";
+
+                list.add(new Object[]{
+                    rs.getInt("MaUser"),
+                    rs.getString("Username"),
+                    rs.getInt("MaRole") == 1 ? "Admin" : "Staff",
+                    maNVFormatted,
+                    hoTen
+                });
+            }
+        } catch (SQLException e) {
+            throw new DatabaseException("Lỗi khi lấy danh sách user + nhân viên: " + e.getMessage(), e);
+        }
+        return list;
+    }
+
+    // ================= MAPPER =================
     private User mapRow(ResultSet rs) throws SQLException {
         int maNV = rs.getInt("MaNV");
-        // rs.getInt() trả 0 nếu cột NULL — hasEmployee() sẽ xử lý đúng
         return new User(
             rs.getInt("MaUser"),
             rs.getString("Username"),
             rs.getString("Password"),
             rs.getInt("MaRole"),
-            maNV   // ✅ truyền vào constructor mới
+            maNV
         );
     }
 }

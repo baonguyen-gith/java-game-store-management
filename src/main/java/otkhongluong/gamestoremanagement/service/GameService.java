@@ -5,8 +5,10 @@ import otkhongluong.gamestoremanagement.model.Game;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 
 import java.sql.Connection;
+import java.sql.Date;          // ← THÊM
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.time.LocalDate;    // ← THÊM (nếu chưa có)
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,30 +40,28 @@ public class GameService {
             "SELECT " +
             "  g.MaGame, g.TenGame, g.TheLoai, g.NenTang, g.GhiChu, g.HinhAnh, " +
 
-            // GiaBan CD — chỉ tính khi còn ít nhất 1 CD SanSang
+            // ← THÊM CÁC CỘT TỪ GAME_CHITIET
+            "  gc.MoTa, gc.Rating, gc.Genre, gc.DeliveryMethod, gc.ReleaseDate, " +
+            "  gc.Region, gc.Features, gc.Language, gc.Currency, " +
+
             "  CASE WHEN COUNT(CASE WHEN cd.TrangThai = N'SanSang' THEN 1 END) > 0 " +
             "       THEN MAX(CASE WHEN cd.MaSP IS NOT NULL THEN spCD.GiaBan ELSE NULL END) " +
             "       ELSE NULL END AS GiaCD, " +
-
-            // GiaBan ROM — ROM không có TrangThai, luôn lấy nếu có
             "  MAX(CASE WHEN r.MaSP IS NOT NULL THEN spROM.GiaBan ELSE NULL END) AS GiaROM, " +
-
-            // GiaThueNgay — chỉ tính khi còn ít nhất 1 CD SanSang
             "  CASE WHEN COUNT(CASE WHEN cd.TrangThai = N'SanSang' THEN 1 END) > 0 " +
             "       THEN MAX(CASE WHEN cd.MaSP IS NOT NULL THEN spCD.GiaThueNgay ELSE NULL END) " +
             "       ELSE NULL END AS GiaThueNgay " +
 
             "FROM GAME g " +
-
-            // JOIN riêng cho CD
+            "LEFT JOIN GAME_CHITIET gc ON gc.MaGame = g.MaGame " + // ← THÊM DÒNG NÀY
             "LEFT JOIN SANPHAM spCD ON spCD.MaGame = g.MaGame " +
             "LEFT JOIN CD cd        ON cd.MaSP     = spCD.MaSP " +
-
-            // JOIN riêng cho ROM
             "LEFT JOIN SANPHAM spROM ON spROM.MaGame = g.MaGame " +
             "LEFT JOIN ROM r         ON r.MaSP        = spROM.MaSP " +
 
-            "GROUP BY g.MaGame, g.TenGame, g.TheLoai, g.NenTang, g.GhiChu, g.HinhAnh " +
+            "GROUP BY g.MaGame, g.TenGame, g.TheLoai, g.NenTang, g.GhiChu, g.HinhAnh, " +
+            "  gc.MoTa, gc.Rating, gc.Genre, gc.DeliveryMethod, gc.ReleaseDate, " + // ← THÊM VÀO GROUP BY
+            "  gc.Region, gc.Features, gc.Language, gc.Currency " +
             "ORDER BY g.TenGame";
 
         try (
@@ -78,7 +78,14 @@ public class GameService {
                 g.setNenTang(rs.getString("NenTang"));
                 g.setGhiChu(rs.getString("GhiChu"));
                 g.setHinhAnh(rs.getString("HinhAnh"));
-
+                g.setMoTa(rs.getString("MoTa"));
+                g.setRating(rs.getString("Rating"));
+                g.setGenre(rs.getString("Genre"));
+                g.setDeliveryMethod(rs.getString("DeliveryMethod"));
+                g.setRegion(rs.getString("Region"));
+                g.setFeatures(rs.getString("Features"));
+                g.setLanguage(rs.getString("Language"));
+                g.setCurrency(rs.getString("Currency"));
                 double giaCD = rs.getDouble("GiaCD");
                 if (!rs.wasNull()) g.setGiaCD(giaCD);
 
@@ -87,6 +94,9 @@ public class GameService {
 
                 double giaThueNgay = rs.getDouble("GiaThueNgay");
                 if (!rs.wasNull()) g.setGiaThueNgay(giaThueNgay);
+                
+                Date rd = rs.getDate("ReleaseDate");
+                if (rd != null) g.setReleaseDate(rd.toLocalDate());
 
                 list.add(g);
             }

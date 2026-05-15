@@ -5,17 +5,6 @@ import otkhongluong.gamestoremanagement.service.UserService;
 
 import java.util.List;
 
-/**
- * Controller quản lý User.
- *
- * ✅ Chỉ gọi UserService — không chứa validation hay business logic.
- * ✅ Không còn isAdmin() — logic đó thuộc AuthService (đã có sẵn).
- * ✅ Bắt exception từ Service rồi trả về String lỗi cho View.
- *    View chỉ gọi controller, không biết gì về Service hay DAO.
- *
- * Pattern trả lỗi: trả null = thành công, trả String = thông báo lỗi.
- * View hiển thị thông báo lỗi này bằng JOptionPane hoặc label.
- */
 public class UserController {
 
     private final UserService userService;
@@ -24,16 +13,24 @@ public class UserController {
         this.userService = new UserService();
     }
 
-    /** Lấy toàn bộ danh sách user để hiển thị lên bảng. */
+    /** Lấy toàn bộ danh sách user (không kèm tên NV) — dùng nội bộ nếu cần. */
     public List<User> getAllUsers() {
         return userService.getAllUsers();
     }
 
     /**
-     * Thêm user mới.
-     *
-     * @return null nếu thành công, String thông báo lỗi nếu thất bại
+     * [MỚI] Lấy danh sách user kèm thông tin nhân viên liên kết.
+     * Mỗi Object[] gồm: [MaUser, Username, Role, MaNVFormatted ("NV1"/""), HoTen ("—" nếu chưa gắn)]
      */
+    public List<Object[]> getAllUsersWithEmployee() {
+        try {
+            return userService.getAllUsersWithEmployee();
+        } catch (RuntimeException e) {
+            return List.of();
+        }
+    }
+
+    /** @return null nếu thành công, String thông báo lỗi nếu thất bại */
     public String addUser(String username, String password, String roleStr) {
         try {
             userService.addUser(username, password, roleStr);
@@ -52,11 +49,7 @@ public class UserController {
         }
     }
 
-    /**
-     * Xóa user theo ID.
-     *
-     * @return null nếu thành công, String thông báo lỗi nếu thất bại
-     */
+    /** @return null nếu thành công, String thông báo lỗi nếu thất bại */
     public String deleteUser(int maUser) {
         try {
             userService.deleteUser(maUser);

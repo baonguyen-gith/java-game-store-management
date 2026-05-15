@@ -25,6 +25,7 @@ public class AdminView extends JFrame {
     private final Navigator  navigator;       // ✅ nhận qua constructor
     private JButton    activeButton;
     private JButton    btnHome;
+    private JTextField txtGameSearch;
 
     public AdminView(User user, Navigator navigator) {
         this.currentUser = user;
@@ -273,7 +274,8 @@ public class AdminView extends JFrame {
         topBar.setPreferredSize(new Dimension(0, 62));
         topBar.setBorder(new EmptyBorder(10, 18, 10, 18));
 
-        JTextField txtSearch = new JTextField(22);
+        txtGameSearch = new JTextField(22);
+        JTextField txtSearch = txtGameSearch;
         txtSearch.setText("Tìm kiếm...");
         txtSearch.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusGained(java.awt.event.FocusEvent e) {
@@ -376,8 +378,16 @@ public class AdminView extends JFrame {
     private JPanel createGameWrapper() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(UIStyle.BG_MAIN);
+        GamePanel gamePanel = new GamePanel();
         panel.add(createTopBar(), BorderLayout.NORTH);
-        panel.add(new GamePanel(), BorderLayout.CENTER);
+        panel.add(gamePanel, BorderLayout.CENTER);
+        if (txtGameSearch != null) {
+            txtGameSearch.addKeyListener(new java.awt.event.KeyAdapter() {
+                public void keyReleased(java.awt.event.KeyEvent e) {
+                    gamePanel.filterGames(txtGameSearch.getText().trim());
+                }
+            });
+        }
         return panel;
     }
 
