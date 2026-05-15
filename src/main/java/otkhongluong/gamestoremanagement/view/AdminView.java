@@ -25,8 +25,7 @@ public class AdminView extends JFrame {
     private final Navigator  navigator;       // ✅ nhận qua constructor
     private JButton    activeButton;
     private JButton    btnHome;
-    private JTextField txtGameSearch;
-
+    
     public AdminView(User user, Navigator navigator) {
         this.currentUser = user;
         this.navigator   = navigator;
@@ -274,34 +273,6 @@ public class AdminView extends JFrame {
         topBar.setPreferredSize(new Dimension(0, 62));
         topBar.setBorder(new EmptyBorder(10, 18, 10, 18));
 
-        txtGameSearch = new JTextField(22);
-        JTextField txtSearch = txtGameSearch;
-        txtSearch.setText("Tìm kiếm...");
-        txtSearch.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusGained(java.awt.event.FocusEvent e) {
-                if ("Tìm kiếm...".equals(txtSearch.getText())) {
-                    txtSearch.setText("");
-                    txtSearch.setForeground(Color.WHITE);
-                }
-            }
-            public void focusLost(java.awt.event.FocusEvent e) {
-                if (txtSearch.getText().isEmpty()) {
-                    txtSearch.setText("Tìm kiếm...");
-                    txtSearch.setForeground(UIStyle.TEXT_MUTED);
-                }
-            }
-        });
-
-        JPanel searchBox = UIStyle.buildSearchPanel(txtSearch);
-        searchBox.setPreferredSize(new Dimension(320, 38));
-        JLabel iconSearch = new JLabel(loadIcon("/icons/searching_icon.png", 16));
-        iconSearch.setBorder(new EmptyBorder(0, 0, 0, 8));
-        searchBox.add(iconSearch, BorderLayout.WEST);
-
-        JPanel searchWrap = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        searchWrap.setOpaque(false);
-        searchWrap.add(searchBox);
-
         JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         rightPanel.setOpaque(false);
 
@@ -317,10 +288,9 @@ public class AdminView extends JFrame {
         JPopupMenu userDropdown = new JPopupMenu();
         userDropdown.setLayout(new BorderLayout());
         EmployeeDashboardPanel dashPanel = new EmployeeDashboardPanel(currentUser);
-        dashPanel.setPreferredSize(new Dimension(280, 560)); // đảm bảo có kích thước
+        dashPanel.setPreferredSize(new Dimension(280, 560));
         userDropdown.add(dashPanel, BorderLayout.CENTER);
         userDropdown.setPreferredSize(new Dimension(280, 560));
-        userDropdown.add(new EmployeeDashboardPanel(currentUser));
         userIcon.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 userDropdown.show(userIcon, userIcon.getWidth() - 260, userIcon.getHeight());
@@ -330,8 +300,7 @@ public class AdminView extends JFrame {
         rightPanel.add(lblUser);
         rightPanel.add(userIcon);
 
-        topBar.add(searchWrap,  BorderLayout.WEST);
-        topBar.add(rightPanel,  BorderLayout.EAST);
+        topBar.add(rightPanel, BorderLayout.EAST);
         return topBar;
     }
 
@@ -379,15 +348,47 @@ public class AdminView extends JFrame {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(UIStyle.BG_MAIN);
         GamePanel gamePanel = new GamePanel();
-        panel.add(createTopBar(), BorderLayout.NORTH);
-        panel.add(gamePanel, BorderLayout.CENTER);
-        if (txtGameSearch != null) {
-            txtGameSearch.addKeyListener(new java.awt.event.KeyAdapter() {
-                public void keyReleased(java.awt.event.KeyEvent e) {
-                    gamePanel.filterGames(txtGameSearch.getText().trim());
+
+        JPanel topBar = createTopBar();
+
+        JTextField txtSearch = new JTextField(22);
+        txtSearch.setText("Tìm kiếm game...");
+        txtSearch.setForeground(UIStyle.TEXT_MUTED);
+        txtSearch.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusGained(java.awt.event.FocusEvent e) {
+                if ("Tìm kiếm game...".equals(txtSearch.getText())) {
+                    txtSearch.setText("");
+                    txtSearch.setForeground(Color.WHITE);
                 }
-            });
-        }
+            }
+            public void focusLost(java.awt.event.FocusEvent e) {
+                if (txtSearch.getText().isEmpty()) {
+                    txtSearch.setText("Tìm kiếm game...");
+                    txtSearch.setForeground(UIStyle.TEXT_MUTED);
+                }
+            }
+        });
+        txtSearch.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent e) {
+                String text = txtSearch.getText().trim();
+                if (text.equals("Tìm kiếm game...") || text.isEmpty()) {
+                    gamePanel.filterGames("");
+                } else {
+                    gamePanel.filterGames(text);
+                }
+            }
+        });
+
+        JPanel searchBox = UIStyle.buildSearchPanel(txtSearch);
+        searchBox.setPreferredSize(new Dimension(320, 38));
+        JPanel searchWrap = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        searchWrap.setOpaque(false);
+        searchWrap.add(searchBox);
+
+        topBar.add(searchWrap, BorderLayout.WEST);
+
+        panel.add(topBar,    BorderLayout.NORTH);
+        panel.add(gamePanel, BorderLayout.CENTER);
         return panel;
     }
 

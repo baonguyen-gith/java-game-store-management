@@ -29,11 +29,7 @@ public class StaffView extends JFrame {
     private final Navigator navigator;
     private JButton    activeButton;
     private JButton    btnHome;
-    private JTextField txtGameSearch;
 
-    // Sub-tab quản trị
-    private CardLayout staffAdminCardLayout;
-    private JPanel     staffAdminContent;
     private JButton    activeAdminBtn;
 
     public StaffView(User user, Navigator navigator) {
@@ -180,7 +176,7 @@ public class StaffView extends JFrame {
         logoWrap.add(UIStyle.accentSeparator(), BorderLayout.SOUTH);
 
         // Badge role
-        JLabel roleLabel = new JLabel("  \uD83D\uDC64 Nhân viên", JLabel.LEFT);
+        JLabel roleLabel = new JLabel("Welcome!", JLabel.LEFT);
         roleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         roleLabel.setForeground(new Color(160, 200, 255));
         roleLabel.setBorder(new EmptyBorder(6, 20, 6, 0));
@@ -281,82 +277,17 @@ public class StaffView extends JFrame {
         wrapper.setBackground(UIStyle.BG_MAIN);
         wrapper.add(createTopBar(), BorderLayout.NORTH);
 
-        // Sub-tab bar ngang
-        JPanel subTabBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 10));
-        subTabBar.setBackground(UIStyle.BG_MAIN);
-        subTabBar.setBorder(new EmptyBorder(0, 16, 0, 16));
+        JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane.setBackground(new Color(13, 13, 35));
+        tabbedPane.setOpaque(true);
+        tabbedPane.setUI(new CustomTabbedPaneUI());
 
-        JButton btnCustomer = createSubTabButton("Khách hàng", "/icons/user_icon.png");
-        JButton btnGameMgr  = createSubTabButton("Quản lý Game", "/icons/game_icon.png");
-        JButton btnProduct  = createSubTabButton("Sản phẩm", "/icons/sales_icon.png");
+        tabbedPane.addTab("Khách hàng", new CustomerPanel());
+        tabbedPane.addTab("Quản lý Game", new GameManagePanel());
+        tabbedPane.addTab("Sản phẩm", new ProductPanel());
 
-        subTabBar.add(btnCustomer);
-        subTabBar.add(btnGameMgr);
-        subTabBar.add(btnProduct);
-
-        // Content area với CardLayout
-        staffAdminCardLayout = new CardLayout();
-        staffAdminContent    = new JPanel(staffAdminCardLayout);
-        staffAdminContent.setBackground(UIStyle.BG_MAIN);
-
-        // Gắn các panel tương ứng
-        // CustomerPanel: quản lý thông tin khách hàng
-        staffAdminContent.add(new CustomerPanel(),  "CUSTOMER");
-        // GamePanel: quản lý danh sách game (dùng chung GamePanel)
-        staffAdminContent.add(new GamePanel(),      "GAME_MGR");
-        // ProductPanel: quản lý sản phẩm / key game
-        staffAdminContent.add(new ProductPanel(),   "PRODUCT");
-
-        // Mặc định hiển thị tab Khách hàng
-        setActiveAdminBtn(btnCustomer);
-        staffAdminCardLayout.show(staffAdminContent, "CUSTOMER");
-
-        btnCustomer.addActionListener(e -> {
-            setActiveAdminBtn(btnCustomer);
-            staffAdminCardLayout.show(staffAdminContent, "CUSTOMER");
-        });
-        btnGameMgr.addActionListener(e -> {
-            setActiveAdminBtn(btnGameMgr);
-            staffAdminCardLayout.show(staffAdminContent, "GAME_MGR");
-        });
-        btnProduct.addActionListener(e -> {
-            setActiveAdminBtn(btnProduct);
-            staffAdminCardLayout.show(staffAdminContent, "PRODUCT");
-        });
-
-        JPanel body = new JPanel(new BorderLayout());
-        body.setBackground(UIStyle.BG_MAIN);
-        body.add(subTabBar,          BorderLayout.NORTH);
-        body.add(staffAdminContent,  BorderLayout.CENTER);
-
-        wrapper.add(body, BorderLayout.CENTER);
+        wrapper.add(tabbedPane, BorderLayout.CENTER);
         return wrapper;
-    }
-
-    /** Tạo nút sub-tab trong panel Quản trị nhân viên */
-    private JButton createSubTabButton(String text, String iconPath) {
-        JButton btn = new JButton(text);
-        btn.setIcon(loadIcon(iconPath, 16));
-        btn.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        btn.setForeground(UIStyle.TEXT_MUTED);
-        btn.setBackground(UIStyle.BG_CARD);
-        btn.setBorderPainted(false);
-        btn.setFocusPainted(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setBorder(new EmptyBorder(8, 16, 8, 16));
-        btn.setOpaque(true);
-        return btn;
-    }
-
-    /** Đánh dấu sub-tab đang active */
-    private void setActiveAdminBtn(JButton btn) {
-        if (activeAdminBtn != null) {
-            activeAdminBtn.setBackground(UIStyle.BG_CARD);
-            activeAdminBtn.setForeground(UIStyle.TEXT_MUTED);
-        }
-        activeAdminBtn = btn;
-        activeAdminBtn.setBackground(UIStyle.SIDEBAR_ACTIVE);
-        activeAdminBtn.setForeground(UIStyle.TEXT_PRIMARY);
     }
 
     // ══════════════════════════════════════════════════════════
@@ -378,33 +309,7 @@ public class StaffView extends JFrame {
         topBar.setPreferredSize(new Dimension(0, 62));
         topBar.setBorder(new EmptyBorder(10, 18, 10, 18));
 
-        txtGameSearch = new JTextField(22);
-        JTextField txtSearch = txtGameSearch;
-        txtSearch.setText("Tìm kiếm...");
-        txtSearch.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusGained(java.awt.event.FocusEvent e) {
-                if ("Tìm kiếm...".equals(txtSearch.getText())) {
-                    txtSearch.setText("");
-                    txtSearch.setForeground(Color.WHITE);
-                }
-            }
-            public void focusLost(java.awt.event.FocusEvent e) {
-                if (txtSearch.getText().isEmpty()) {
-                    txtSearch.setText("Tìm kiếm...");
-                    txtSearch.setForeground(UIStyle.TEXT_MUTED);
-                }
-            }
-        });
-
-        JPanel searchBox = UIStyle.buildSearchPanel(txtSearch);
-        searchBox.setPreferredSize(new Dimension(320, 38));
-        JLabel iconSearch = new JLabel(loadIcon("/icons/searching_icon.png", 16));
-        iconSearch.setBorder(new EmptyBorder(0, 0, 0, 8));
-        searchBox.add(iconSearch, BorderLayout.WEST);
-
-        JPanel searchWrap = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        searchWrap.setOpaque(false);
-        searchWrap.add(searchBox);
+        // Bỏ toàn bộ phần txtGameSearch / searchBox / searchWrap
 
         JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         rightPanel.setOpaque(false);
@@ -420,21 +325,19 @@ public class StaffView extends JFrame {
         ));
 
         JLabel lblUser = new JLabel(
-                currentUser.getUsername() != null ? currentUser.getUsername() : "Staff");
+            currentUser.getUsername() != null ? currentUser.getUsername() : "Staff");
         lblUser.setFont(UIStyle.FONT_BODY);
         lblUser.setForeground(UIStyle.TEXT_MUTED);
 
         JLabel userIcon = new JLabel(loadIcon("/icons/user_icon.png", 32));
         userIcon.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        userIcon.setBorder(null);
 
         JPopupMenu userDropdown = new JPopupMenu();
         userDropdown.setLayout(new BorderLayout());
         EmployeeDashboardPanel dashPanel = new EmployeeDashboardPanel(currentUser);
-        dashPanel.setPreferredSize(new Dimension(280, 560)); // đảm bảo có kích thước
+        dashPanel.setPreferredSize(new Dimension(280, 560));
         userDropdown.add(dashPanel, BorderLayout.CENTER);
         userDropdown.setPreferredSize(new Dimension(280, 560));
-        userDropdown.add(new EmployeeDashboardPanel(currentUser));
         userIcon.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 userDropdown.show(userIcon, userIcon.getWidth() - 260, userIcon.getHeight());
@@ -445,8 +348,7 @@ public class StaffView extends JFrame {
         rightPanel.add(lblUser);
         rightPanel.add(userIcon);
 
-        topBar.add(searchWrap,  BorderLayout.WEST);
-        topBar.add(rightPanel,  BorderLayout.EAST);
+        topBar.add(rightPanel, BorderLayout.EAST);
         return topBar;
     }
 
@@ -494,15 +396,49 @@ public class StaffView extends JFrame {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(UIStyle.BG_MAIN);
         GamePanel gamePanel = new GamePanel();
-        panel.add(createTopBar(), BorderLayout.NORTH);
-        panel.add(gamePanel, BorderLayout.CENTER);
-        if (txtGameSearch != null) {
-            txtGameSearch.addKeyListener(new java.awt.event.KeyAdapter() {
-                public void keyReleased(java.awt.event.KeyEvent e) {
-                    gamePanel.filterGames(txtGameSearch.getText().trim());
+
+        // Top bar riêng cho tab Game, có search box
+        JPanel topBar = createTopBar();
+
+        // Tạo search box riêng chỉ cho tab này
+        JTextField txtSearch = new JTextField(22);
+        txtSearch.setText("Tìm kiếm game...");
+        txtSearch.setForeground(UIStyle.TEXT_MUTED);
+        txtSearch.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusGained(java.awt.event.FocusEvent e) {
+                if ("Tìm kiếm game...".equals(txtSearch.getText())) {
+                    txtSearch.setText("");
+                    txtSearch.setForeground(Color.WHITE);
                 }
-            });
-        }
+            }
+            public void focusLost(java.awt.event.FocusEvent e) {
+                if (txtSearch.getText().isEmpty()) {
+                    txtSearch.setText("Tìm kiếm game...");
+                    txtSearch.setForeground(UIStyle.TEXT_MUTED);
+                }
+            }
+        });
+        txtSearch.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent e) {
+                String text = txtSearch.getText().trim();
+                if (text.equals("Tìm kiếm game...") || text.isEmpty()) {
+                    gamePanel.filterGames("");
+                } else {
+                    gamePanel.filterGames(text);
+                }
+            }
+        });
+
+        JPanel searchBox = UIStyle.buildSearchPanel(txtSearch);
+        searchBox.setPreferredSize(new Dimension(320, 38));
+        JPanel searchWrap = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        searchWrap.setOpaque(false);
+        searchWrap.add(searchBox);
+
+        topBar.add(searchWrap, BorderLayout.WEST);
+
+        panel.add(topBar,     BorderLayout.NORTH);
+        panel.add(gamePanel,  BorderLayout.CENTER);
         return panel;
     }
 

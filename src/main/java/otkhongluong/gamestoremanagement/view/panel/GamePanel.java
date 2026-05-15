@@ -357,10 +357,16 @@ public class GamePanel extends JPanel {
 
     private String nvl(String s) { return s == null ? "" : s; }
     
-        public void filterGames(String keyword) {
+    public void filterGames(String keyword) {
         listPanel.removeAll();
 
-        List<Game> filtered = gameController.filterByKeyword(keyword);
+        List<Game> filtered;
+        if (keyword == null || keyword.isBlank()) {
+            // Keyword rỗng → hiện toàn bộ, đảm bảo cache không null
+            filtered = gameController.loadAllGames();
+        } else {
+            filtered = gameController.filterByKeyword(keyword);
+        }
 
         if (filtered.isEmpty()) {
             JLabel none = new JLabel("Không tìm thấy game nào phù hợp");
