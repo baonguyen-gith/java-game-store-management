@@ -170,7 +170,7 @@
                     if (getText().trim().isEmpty()) {
                         g2.setColor(TEXT_MUTED);
                         g2.setFont(FONT_CELL);
-                        g2.drawString("dd/MM/yyyy", 10, getHeight() / 2 + 5);
+                        g2.drawString("dd/mm/yyyy", 10, getHeight() / 2 + 5);
                     }
                     g2.setColor(TEXT_MUTED);
                     g2.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 13));
@@ -243,6 +243,10 @@
             table = new JTable(tableModel) {
                 @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                     Component c = super.prepareRenderer(r, row, col);
+                    if (c instanceof JLabel) {
+                        ((JLabel) c).setHorizontalAlignment(SwingConstants.LEFT);
+                        ((JLabel) c).setBorder(new EmptyBorder(0, 12, 0, 12));
+                    }
                     if (isRowSelected(row)) {
                         c.setBackground(ACCENT);
                         c.setForeground(Color.WHITE);
@@ -275,7 +279,7 @@
                         arrow = sortState[c] == 1 ? "  ▲" : sortState[c] == 2 ? "  ▼" : "";
                     } else {
                         // hiện mờ 2 mũi tên nếu chưa sort cột này (chỉ với cột có thể sort)
-                        if (c < COLS.length - 1) arrow = "  ⇅";
+                        if (c < COLS.length - 1) arrow = "";
                     }
                     JLabel lbl = new JLabel((v == null ? "" : v.toString()) + arrow);
                     lbl.setFont(FONT_HEADER);

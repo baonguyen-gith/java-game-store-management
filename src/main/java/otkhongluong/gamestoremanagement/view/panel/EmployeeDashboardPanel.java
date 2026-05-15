@@ -40,7 +40,7 @@ public class EmployeeDashboardPanel extends JPanel {
     public EmployeeDashboardPanel(User currentUser) {
         setLayout(new BorderLayout());
         setOpaque(false);
-        setPreferredSize(new Dimension(260, 0));
+        setPreferredSize(new Dimension(260, 560));
 
         // ===== MAIN CARD =====
         JPanel card = new JPanel();

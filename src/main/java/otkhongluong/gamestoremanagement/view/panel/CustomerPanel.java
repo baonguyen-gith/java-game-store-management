@@ -179,7 +179,8 @@ public class CustomerPanel extends JPanel {
             @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
                 if (c instanceof JLabel)
-                    ((JLabel) c).setHorizontalAlignment(SwingConstants.CENTER);
+                    ((JLabel) c).setHorizontalAlignment(SwingConstants.LEFT);
+                   ((JLabel) c).setBorder(new EmptyBorder(0, 12, 0, 12));
                 if (isRowSelected(row)) {
                     c.setBackground(ACCENT);
                     c.setForeground(Color.WHITE);
@@ -208,7 +209,7 @@ public class CustomerPanel extends JPanel {
                 lbl.setFont(FONT_HEADER);
                 lbl.setForeground(Color.WHITE);
                 lbl.setBackground(PURPLE_HEADER);
-                lbl.setHorizontalAlignment(SwingConstants.CENTER);
+                lbl.setHorizontalAlignment(SwingConstants.LEFT);
                 lbl.setOpaque(true);
                 lbl.setBorder(new EmptyBorder(10, 12, 10, 12));
                 return lbl;

@@ -5,6 +5,7 @@ import otkhongluong.gamestoremanagement.controller.TransactionController.PageRes
 import otkhongluong.gamestoremanagement.view.dialog.InvoiceDetailDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentDetailDialog;
 import otkhongluong.gamestoremanagement.util.RoundButton;
+import otkhongluong.gamestoremanagement.util.IconUtils;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -125,7 +126,8 @@ public class TransactionPanel extends JPanel {
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 4));
         right.setBackground(BG_DARK);
 
-        RoundButton btnRefresh = new RoundButton("⟳  Làm mới", ACCENT, TEXT_WHITE);
+        RoundButton btnRefresh = new RoundButton("Làm mới", ACCENT, TEXT_WHITE);
+        btnRefresh.setIcon(IconUtils.getRefreshIcon(18, BG_DARK));
         btnRefresh.setPreferredSize(new Dimension(120, 38));
         btnRefresh.setToolTipText("Tải lại dữ liệu từ cơ sở dữ liệu");
         btnRefresh.addActionListener(e -> {
@@ -212,6 +214,10 @@ public class TransactionPanel extends JPanel {
         table = new JTable(tableModel) {
             @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
+                if (c instanceof JLabel) {
+                    ((JLabel) c).setHorizontalAlignment(SwingConstants.LEFT);
+                    ((JLabel) c).setBorder(new EmptyBorder(0, 12, 0, 12));
+                }
                 if (isRowSelected(row)) {
                     c.setBackground(ACCENT);
                     c.setForeground(Color.WHITE);
@@ -422,7 +428,7 @@ public class TransactionPanel extends JPanel {
             if (sCol == c) {
                 arrow = state[c] == 1 ? "  ▲" : state[c] == 2 ? "  ▼" : "";
             } else if (c < COLS.length - 1) {
-                arrow = "  ⇅";
+                arrow = "";
             }
 
             JLabel lbl = new JLabel((v == null ? "" : v.toString()) + arrow);
@@ -462,7 +468,7 @@ public class TransactionPanel extends JPanel {
                 if (getText().trim().isEmpty()) {
                     g2.setColor(TEXT_MUTED);
                     g2.setFont(FONT_CELL);
-                    g2.drawString("dd/MM/yyyy", 10, getHeight() / 2 + 5);
+                    g2.drawString("dd/mm/yyyy", 10, getHeight() / 2 + 5);
                 }
                 g2.setColor(TEXT_MUTED);
                 g2.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 13));

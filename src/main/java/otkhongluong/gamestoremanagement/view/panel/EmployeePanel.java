@@ -129,11 +129,11 @@ public class EmployeePanel extends JPanel {
             public void keyReleased(KeyEvent e) { currentPage = 1; renderPage(); }
         });
 
-        RoundButton btnFilter = new RoundButton(" Lọc", PURPLE_HEADER, Color.WHITE);
+        RoundButton btnFilter = new RoundButton(" Lọc", Color.WHITE, BG_DARK);
         btnFilter.setPreferredSize(new Dimension(70, 40));
         btnFilter.addActionListener(e -> toggleFilterMode(btnFilter));
 
-        RoundButton btnSort = new RoundButton(" Sắp xếp", PURPLE_HEADER, Color.WHITE);
+        RoundButton btnSort = new RoundButton(" Sắp xếp", Color.WHITE, BG_DARK);
         btnSort.setPreferredSize(new Dimension(90, 40));
         btnSort.addActionListener(e -> showSortMenu(btnSort));
 
@@ -198,7 +198,8 @@ public class EmployeePanel extends JPanel {
             @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
                 if (c instanceof JLabel) {
-                    ((JLabel) c).setHorizontalAlignment(SwingConstants.CENTER);
+                    ((JLabel) c).setHorizontalAlignment(SwingConstants.LEFT);
+                    ((JLabel) c).setBorder(new EmptyBorder(0, 12, 0, 12));
                 }
                 if (isRowSelected(row)) {
                     c.setBackground(ACCENT);
@@ -228,7 +229,7 @@ public class EmployeePanel extends JPanel {
                 lbl.setFont(FONT_HEADER);
                 lbl.setForeground(Color.WHITE);
                 lbl.setBackground(PURPLE_HEADER);
-                lbl.setHorizontalAlignment(SwingConstants.CENTER);
+                lbl.setHorizontalAlignment(SwingConstants.LEFT);
                 lbl.setOpaque(true);
                 lbl.setBorder(new EmptyBorder(10, 12, 10, 12));
                 return lbl;

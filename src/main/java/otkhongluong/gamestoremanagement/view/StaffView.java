@@ -424,10 +424,14 @@ public class StaffView extends JFrame {
 
         JLabel userIcon = new JLabel(loadIcon("/icons/user_icon.png", 32));
         userIcon.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        userIcon.setBorder(BorderFactory.createLineBorder(UIStyle.ACCENT, 1, true));
+        userIcon.setBorder(null);
 
         JPopupMenu userDropdown = new JPopupMenu();
         userDropdown.setLayout(new BorderLayout());
+        EmployeeDashboardPanel dashPanel = new EmployeeDashboardPanel(currentUser);
+        dashPanel.setPreferredSize(new Dimension(280, 560)); // đảm bảo có kích thước
+        userDropdown.add(dashPanel, BorderLayout.CENTER);
+        userDropdown.setPreferredSize(new Dimension(280, 560));
         userDropdown.add(new EmployeeDashboardPanel(currentUser));
         userIcon.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {

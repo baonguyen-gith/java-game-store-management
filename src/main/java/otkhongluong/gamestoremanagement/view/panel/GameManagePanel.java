@@ -178,7 +178,8 @@ public class GameManagePanel extends JPanel {
         table = new JTable(tableModel) {
             @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
-                if (c instanceof JLabel) ((JLabel) c).setHorizontalAlignment(SwingConstants.CENTER);
+                if (c instanceof JLabel) ((JLabel) c).setHorizontalAlignment(SwingConstants.LEFT);
+                ((JLabel) c).setBorder(new EmptyBorder(0, 12, 0, 12));
                 if (isRowSelected(row)) {
                     c.setBackground(ACCENT); c.setForeground(Color.WHITE);
                 } else {
@@ -214,7 +215,7 @@ public class GameManagePanel extends JPanel {
             @Override public Component getTableCellRendererComponent(JTable t, Object v, boolean s, boolean f, int r, int c) {
                 JLabel lbl = new JLabel(v == null ? "" : v.toString());
                 lbl.setFont(FONT_HEADER); lbl.setForeground(Color.WHITE);
-                lbl.setBackground(PURPLE_HEADER); lbl.setHorizontalAlignment(SwingConstants.CENTER);
+                lbl.setBackground(PURPLE_HEADER); lbl.setHorizontalAlignment(SwingConstants.LEFT);
                 lbl.setOpaque(true); lbl.setBorder(new EmptyBorder(10, 12, 10, 12));
                 return lbl;
             }
