@@ -1,22 +1,24 @@
 package otkhongluong.gamestoremanagement.view.panel;
 
+import otkhongluong.gamestoremanagement.controller.EmployeeDashboardController;
 import otkhongluong.gamestoremanagement.model.DashboardStats;
 import otkhongluong.gamestoremanagement.model.Employee;
+import otkhongluong.gamestoremanagement.model.User;
 
 import javax.swing.*;
 import java.awt.*;
 
 /**
- * View – Hiển thị Dashboard của nhân viên.
+ * View – Hiển thị Dashboard của nhân viên đang đăng nhập.
  *
  * NGUYÊN TẮC MVC:
  *   - Panel KHÔNG biết đến DAO / Service / DB.
- *   - Dữ liệu được đẩy vào từ bên ngoài qua setEmployeeInfo() và setStats().
- *   - Controller gọi các phương thức này sau khi lấy data từ Service.
+ *   - Nhận User qua constructor → tạo Controller → Controller feed data vào.
+ *   - Các setter setEmployeeInfo() / setStats() chỉ được gọi từ Controller.
  */
 public class EmployeeDashboardPanel extends JPanel {
 
-    // ─── UI Components (cần giữ reference để cập nhật sau) ────────────────
+    // ─── UI Components ────────────────────────────────────────────────────
     private final JLabel lblBadge;
     private final JLabel lblName;
     private final JLabel lblMaNV;
@@ -24,7 +26,6 @@ public class EmployeeDashboardPanel extends JPanel {
     private final JLabel lblCccd;
     private final JLabel lblSdt;
 
-    // Stats cards
     private final JLabel lblDoanhThuHomNay;
     private final JLabel lblDoanhThuTuan;
     private final JLabel lblSoHoaDon;
@@ -32,9 +33,14 @@ public class EmployeeDashboardPanel extends JPanel {
 
     // ─── Constructor ──────────────────────────────────────────────────────
 
-    public EmployeeDashboardPanel() {
+    /**
+     * ✅ Nhận currentUser để Controller biết đang load thông tin ai.
+     *    Nếu user chưa gắn nhân viên (maNV == 0), hiển thị thông báo phù hợp.
+     */
+    public EmployeeDashboardPanel(User currentUser) {
         setLayout(new BorderLayout());
         setOpaque(false);
+        setPreferredSize(new Dimension(260, 0));
 
         // ===== MAIN CARD =====
         JPanel card = new JPanel();
@@ -43,8 +49,9 @@ public class EmployeeDashboardPanel extends JPanel {
         card.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         add(card, BorderLayout.CENTER);
 
-        // ================= TOP – BADGE =================
-        lblBadge = new JLabel("—");
+        // ── Badge role ──
+        String badgeText = currentUser.getMaRole() == 1 ? "ADMIN" : "NHÂN VIÊN";
+        lblBadge = new JLabel(badgeText);
         lblBadge.setOpaque(true);
         lblBadge.setBackground(new Color(160, 120, 255));
         lblBadge.setForeground(Color.BLACK);
@@ -61,25 +68,25 @@ public class EmployeeDashboardPanel extends JPanel {
         card.add(top);
         card.add(Box.createVerticalStrut(15));
 
-        // ================= AVATAR =================
+        // ── Avatar ──
         JLabel avatar = new JLabel("👩", SwingConstants.CENTER);
         avatar.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 60));
         avatar.setAlignmentX(Component.CENTER_ALIGNMENT);
         card.add(avatar);
         card.add(Box.createVerticalStrut(10));
 
-        // ================= NAME =================
+        // ── Name ──
         lblName = new JLabel("Đang tải...");
         lblName.setFont(new Font("Segoe UI", Font.BOLD, 22));
         lblName.setAlignmentX(Component.CENTER_ALIGNMENT);
         card.add(lblName);
         card.add(Box.createVerticalStrut(20));
 
-        // ================= INFO ROWS =================
-        lblMaNV      = new JLabel("—");
-        lblNgaySinh  = new JLabel("—");
-        lblCccd      = new JLabel("—");
-        lblSdt       = new JLabel("—");
+        // ── Info rows ──
+        lblMaNV     = new JLabel("—");
+        lblNgaySinh = new JLabel("—");
+        lblCccd     = new JLabel("—");
+        lblSdt      = new JLabel("—");
 
         card.add(createInfoRow("Mã nhân viên:", lblMaNV));
         card.add(createInfoRow("Ngày sinh:",    lblNgaySinh));
@@ -87,15 +94,15 @@ public class EmployeeDashboardPanel extends JPanel {
         card.add(createInfoRow("SĐT:",          lblSdt));
         card.add(Box.createVerticalStrut(20));
 
-        // ================= STATS CARDS =================
+        // ── Stats cards ──
         lblDoanhThuHomNay = new JLabel("—");
         lblDoanhThuTuan   = new JLabel("—");
         lblSoHoaDon       = new JLabel("—");
         lblSoPhieuThue    = new JLabel("—");
 
-        card.add(createStatCard("Doanh thu hôm nay",  lblDoanhThuHomNay));
+        card.add(createStatCard("Doanh thu hôm nay", lblDoanhThuHomNay));
         card.add(Box.createVerticalStrut(10));
-        card.add(createStatCard("Doanh thu tuần",     lblDoanhThuTuan));
+        card.add(createStatCard("Doanh thu tuần",    lblDoanhThuTuan));
         card.add(Box.createVerticalStrut(15));
 
         JPanel statsRow = new JPanel(new GridLayout(1, 2, 10, 0));
@@ -103,14 +110,22 @@ public class EmployeeDashboardPanel extends JPanel {
         statsRow.add(createStatCard("Hóa đơn hôm nay",    lblSoHoaDon));
         statsRow.add(createStatCard("Phiếu thuê hôm nay", lblSoPhieuThue));
         card.add(statsRow);
+
+        // ✅ Tạo Controller và load data ngay sau khi UI sẵn sàng
+        if (currentUser.hasEmployee()) {
+            EmployeeDashboardController controller =
+                new EmployeeDashboardController(this, currentUser.getMaNV());
+            controller.loadData();
+        } else {
+            // User chưa được gắn nhân viên (VD: tài khoản system thuần)
+            lblName.setText(currentUser.getUsername());
+            lblMaNV.setText("Chưa gắn NV");
+        }
     }
 
-    // ─── Public setters – gọi từ Controller ───────────────────────────────
+    // ─── Public setters — CHỈ được gọi từ EmployeeDashboardController ────
 
-    /**
-     * Điền thông tin nhân viên đang đăng nhập vào UI.
-     * Phải gọi trên Event Dispatch Thread.
-     */
+    /** Điền thông tin nhân viên vào UI. Phải gọi trên EDT. */
     public void setEmployeeInfo(Employee emp) {
         lblName.setText(emp.getHoTen());
         lblMaNV.setText(emp.getMaNVFormatted());
@@ -121,14 +136,9 @@ public class EmployeeDashboardPanel extends JPanel {
                 : "—");
         lblCccd.setText(emp.getCccd() != null ? emp.getCccd() : "—");
         lblSdt.setText(emp.getSdt()   != null ? emp.getSdt()  : "—");
-        // Badge hiện chưa có role trong model – để trống hoặc tuỳ chỉnh
-        lblBadge.setText("NHÂN VIÊN");
     }
 
-    /**
-     * Cập nhật các ô thống kê (doanh thu, số đơn).
-     * Phải gọi trên Event Dispatch Thread.
-     */
+    /** Cập nhật các ô thống kê. Phải gọi trên EDT. */
     public void setStats(DashboardStats stats) {
         if (stats == null) return;
         lblDoanhThuHomNay.setText(stats.getDoanhThuHomNayFormatted());
@@ -137,48 +147,37 @@ public class EmployeeDashboardPanel extends JPanel {
         lblSoPhieuThue.setText(String.valueOf(stats.getSoPhieuThueHomNay()));
     }
 
-    /**
-     * Hiển thị thông báo lỗi đơn giản (dùng khi load data thất bại).
-     */
+    /** Hiển thị lỗi khi load data thất bại. */
     public void showError(String message) {
+        lblName.setText("Lỗi tải dữ liệu");
         JOptionPane.showMessageDialog(this, message, "Lỗi", JOptionPane.ERROR_MESSAGE);
     }
 
     // ─── Private UI builders ──────────────────────────────────────────────
 
-    /** Tạo một hàng thông tin gồm nhãn tiêu đề + nhãn giá trị. */
     private JPanel createInfoRow(String title, JLabel valueLabel) {
         JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
         row.setOpaque(false);
-
         JLabel lblTitle = new JLabel(title);
         lblTitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-
         valueLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-
         row.add(lblTitle);
         row.add(valueLabel);
         return row;
     }
 
-    /** Tạo card thống kê với tiêu đề và nhãn giá trị được quản lý bên ngoài. */
     private JPanel createStatCard(String title, JLabel valueLabel) {
         JPanel card = new JPanel(new BorderLayout());
         card.setBackground(new Color(90, 95, 140));
         card.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-
         JLabel lblTitle = new JLabel(title);
         lblTitle.setForeground(Color.LIGHT_GRAY);
-
         valueLabel.setForeground(Color.WHITE);
         valueLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
-
-        card.add(lblTitle,  BorderLayout.NORTH);
+        card.add(lblTitle,   BorderLayout.NORTH);
         card.add(valueLabel, BorderLayout.CENTER);
         return card;
     }
-
-    // ─── Utility ──────────────────────────────────────────────────────────
 
     private String formatDate(int day, int month, int year) {
         return day + "/" + month + "/" + year;

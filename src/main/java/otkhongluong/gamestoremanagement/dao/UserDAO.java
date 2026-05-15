@@ -7,23 +7,20 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Triển khai IUserDAO — chỉ biết SQL, không biết business logic.
- *
- * Thay đổi so với bản cũ:
- *  - implements IUserDAO (có thể mock khi unit test)
- *  - throw DatabaseException thay vì e.printStackTrace() (caller biết lỗi)
- */
 public class UserDAO implements IUserDAO {
 
     @Override
     public boolean insert(User user) {
-        String sql = "INSERT INTO USERS (Username, Password, MaRole) VALUES (?, ?, ?)";
+        // ✅ Thêm MaNV vào INSERT — có thể NULL nếu chưa gắn nhân viên
+        String sql = "INSERT INTO USERS (Username, Password, MaRole, MaNV) VALUES (?, ?, ?, ?)";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, user.getUsername());
             ps.setString(2, user.getPassword());
             ps.setInt(3, user.getMaRole());
+            // ✅ MaNV = 0 → lưu NULL vào DB
+            if (user.getMaNV() > 0) ps.setInt(4, user.getMaNV());
+            else                    ps.setNull(4, Types.INTEGER);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             throw new DatabaseException("Lỗi khi thêm user: " + e.getMessage(), e);
@@ -32,13 +29,16 @@ public class UserDAO implements IUserDAO {
 
     @Override
     public boolean update(User user) {
-        String sql = "UPDATE USERS SET Username = ?, Password = ?, MaRole = ? WHERE MaUser = ?";
+        // ✅ Thêm MaNV vào UPDATE
+        String sql = "UPDATE USERS SET Username = ?, Password = ?, MaRole = ?, MaNV = ? WHERE MaUser = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, user.getUsername());
             ps.setString(2, user.getPassword());
             ps.setInt(3, user.getMaRole());
-            ps.setInt(4, user.getMaUser());
+            if (user.getMaNV() > 0) ps.setInt(4, user.getMaNV());
+            else                    ps.setNull(4, Types.INTEGER);
+            ps.setInt(5, user.getMaUser());
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             throw new DatabaseException("Lỗi khi cập nhật user: " + e.getMessage(), e);
@@ -101,12 +101,16 @@ public class UserDAO implements IUserDAO {
         return list;
     }
 
+    // ✅ FIX: đọc thêm MaNV từ ResultSet
     private User mapRow(ResultSet rs) throws SQLException {
+        int maNV = rs.getInt("MaNV");
+        // rs.getInt() trả 0 nếu cột NULL — hasEmployee() sẽ xử lý đúng
         return new User(
             rs.getInt("MaUser"),
             rs.getString("Username"),
             rs.getString("Password"),
-            rs.getInt("MaRole")
+            rs.getInt("MaRole"),
+            maNV   // ✅ truyền vào constructor mới
         );
     }
 }

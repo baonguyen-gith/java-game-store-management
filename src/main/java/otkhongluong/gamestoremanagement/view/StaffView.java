@@ -428,7 +428,7 @@ public class StaffView extends JFrame {
 
         JPopupMenu userDropdown = new JPopupMenu();
         userDropdown.setLayout(new BorderLayout());
-        userDropdown.add(new EmployeeDashboardPanel());
+        userDropdown.add(new EmployeeDashboardPanel(currentUser));
         userIcon.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 userDropdown.show(userIcon, userIcon.getWidth() - 260, userIcon.getHeight());
