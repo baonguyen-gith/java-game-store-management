@@ -1,7 +1,8 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
+import otkhongluong.gamestoremanagement.controller.InvoiceController;
+import otkhongluong.gamestoremanagement.model.ChiTietHoaDon;
 import otkhongluong.gamestoremanagement.model.Invoice;
-import otkhongluong.gamestoremanagement.service.InvoiceService;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -30,7 +31,6 @@ public class InvoiceDetailDialog extends JDialog {
     private static final Font FONT_TITLE  = new Font("Segoe UI", Font.BOLD, 16);
     private static final Font FONT_HEADER = new Font("Segoe UI", Font.BOLD, 13);
     private static final Font FONT_CELL   = new Font("Segoe UI", Font.PLAIN, 13);
-    private static final Font FONT_LABEL  = new Font("Segoe UI", Font.BOLD, 12);
     private static final Font FONT_SMALL  = new Font("Segoe UI", Font.PLAIN, 11);
     private static final Font FONT_BIG    = new Font("Segoe UI", Font.BOLD, 20);
 
@@ -45,12 +45,20 @@ public class InvoiceDetailDialog extends JDialog {
     private JTable table;
     private DefaultTableModel tableModel;
 
+    /* ── MVC: chỉ giữ controller, không giữ service ── */
+    private final InvoiceController controller;
     private final int maHD;
 
     // ═══════════════════════════════════════════════════════════
     public InvoiceDetailDialog(Frame parent, int maHD) {
+        this(parent, maHD, new InvoiceController());
+    }
+
+    /** Constructor chính — nhận controller từ ngoài (dễ test / inject). */
+    public InvoiceDetailDialog(Frame parent, int maHD, InvoiceController controller) {
         super(parent, "Chi tiết hóa đơn", true);
-        this.maHD = maHD;
+        this.maHD       = maHD;
+        this.controller = controller;
 
         setMinimumSize(new Dimension(860, 580));
         setLocationRelativeTo(parent);
@@ -89,7 +97,6 @@ public class InvoiceDetailDialog extends JDialog {
         p.setBackground(BG_DARK);
         p.setBorder(new EmptyBorder(14, 24, 0, 24));
 
-        // Row 1: KH, SDT, TrangThai
         lblTenKH     = cardValue();
         lblSDT       = cardValue();
         lblTrangThai = cardValue();
@@ -100,13 +107,12 @@ public class InvoiceDetailDialog extends JDialog {
         );
         row1.setPreferredSize(new Dimension(0, 68));
 
-        // Row 2: NgayLap, MaNV, SoLuong
         lblNgayLap   = cardValue();
         lblMaNV      = cardValue();
         lblSoLuongSP = cardValue();
         JPanel row2 = infoRow(
-            infoCard("Ngày lập",        lblNgayLap),
-            infoCard("Mã nhân viên",    lblMaNV),
+            infoCard("Ngày lập",          lblNgayLap),
+            infoCard("Mã nhân viên",      lblMaNV),
             infoCard("Số lượng sản phẩm", lblSoLuongSP)
         );
         row2.setPreferredSize(new Dimension(0, 68));
@@ -117,10 +123,7 @@ public class InvoiceDetailDialog extends JDialog {
         topBlock.add(row2);
         p.add(topBlock, BorderLayout.NORTH);
 
-        // Table chi tiết
-        p.add(buildTable(), BorderLayout.CENTER);
-
-        // Tổng tiền
+        p.add(buildTable(),   BorderLayout.CENTER);
         p.add(buildSummary(), BorderLayout.SOUTH);
         return p;
     }
@@ -133,7 +136,8 @@ public class InvoiceDetailDialog extends JDialog {
         };
 
         table = new JTable(tableModel) {
-            @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
+            @Override
+            public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
                 if (isRowSelected(row)) {
                     c.setBackground(ACCENT);
@@ -142,10 +146,8 @@ public class InvoiceDetailDialog extends JDialog {
                     c.setBackground(row % 2 == 0 ? PURPLE_ROW : PURPLE_ALT);
                     c.setForeground(new Color(40, 40, 40));
                 }
-                // căn phải cột số
-                if (c instanceof JLabel && col >= 2) {
+                if (c instanceof JLabel && col >= 2)
                     ((JLabel) c).setHorizontalAlignment(SwingConstants.RIGHT);
-                }
                 return c;
             }
         };
@@ -158,10 +160,10 @@ public class InvoiceDetailDialog extends JDialog {
         table.setSelectionForeground(Color.WHITE);
         table.setBackground(PURPLE_ALT);
 
-        // Header
         JTableHeader header = table.getTableHeader();
         header.setDefaultRenderer(new DefaultTableCellRenderer() {
-            @Override public Component getTableCellRendererComponent(
+            @Override
+            public Component getTableCellRendererComponent(
                     JTable t, Object v, boolean sel, boolean foc, int r, int c) {
                 JLabel lbl = new JLabel(v == null ? "" : v.toString());
                 lbl.setFont(FONT_HEADER);
@@ -178,7 +180,6 @@ public class InvoiceDetailDialog extends JDialog {
         header.setBorder(BorderFactory.createEmptyBorder());
         header.setReorderingAllowed(false);
 
-        // Column widths
         int[] widths = {220, 160, 80, 140, 140};
         for (int i = 0; i < widths.length; i++)
             table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
@@ -205,13 +206,12 @@ public class InvoiceDetailDialog extends JDialog {
 
         JPanel topRow = new JPanel(new BorderLayout());
         topRow.setBackground(new Color(30, 90, 70));
-
         JLabel titleLbl = new JLabel("TỔNG TIỀN HÓA ĐƠN");
         titleLbl.setFont(FONT_SMALL);
         titleLbl.setForeground(COLOR_REVENUE);
         topRow.add(titleLbl, BorderLayout.WEST);
 
-        card.add(topRow,     BorderLayout.NORTH);
+        card.add(topRow,      BorderLayout.NORTH);
         card.add(lblTongTien, BorderLayout.CENTER);
         card.setPreferredSize(new Dimension(0, 68));
         card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 68));
@@ -246,9 +246,11 @@ public class InvoiceDetailDialog extends JDialog {
         return p;
     }
 
-    // ── LOAD DATA ───────────────────────────────────────────────
+    // ── LOAD DATA — qua Controller, không gọi Service/DAO trực tiếp ──
     private void loadData() {
-        Invoice hd = new InvoiceService().getHoaDonById(maHD);
+        // ▼ Thay: new InvoiceService().getHoaDonById(maHD)
+        //   bằng: controller.getHoaDonById(maHD)
+        Invoice hd = controller.getHoaDonById(maHD);
         if (hd == null) {
             JOptionPane.showMessageDialog(this,
                 "Không tìm thấy hóa đơn HD" + String.format("%03d", maHD),
@@ -272,10 +274,9 @@ public class InvoiceDetailDialog extends JDialog {
         int soLuong = hd.getDanhSachChiTiet() != null ? hd.getDanhSachChiTiet().size() : 0;
         lblSoLuongSP.setText(soLuong + " sản phẩm");
 
-        // Fill table
         tableModel.setRowCount(0);
         if (hd.getDanhSachChiTiet() != null) {
-            for (Invoice.ChiTietHoaDon ct : hd.getDanhSachChiTiet()) {
+            for (ChiTietHoaDon ct : hd.getDanhSachChiTiet()) {
                 double thanhTien = ct.getSoLuong() * ct.getDonGia();
                 tableModel.addRow(new Object[]{
                     ct.getTenGame(),
@@ -335,7 +336,8 @@ public class InvoiceDetailDialog extends JDialog {
             setFont(new Font("Segoe UI", Font.BOLD, 13));
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         }
-        @Override protected void paintComponent(Graphics g) {
+        @Override
+        protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(getModel().isRollover() ? bg.brighter() : bg);

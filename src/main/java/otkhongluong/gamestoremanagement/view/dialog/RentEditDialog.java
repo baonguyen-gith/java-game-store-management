@@ -1,8 +1,7 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.dao.CustomerDAO;
-import otkhongluong.gamestoremanagement.dao.EmployeeDAO;
-import otkhongluong.gamestoremanagement.dao.RentalOrderDAO;
+import otkhongluong.gamestoremanagement.controller.RentController;
+import otkhongluong.gamestoremanagement.controller.RentController.ActionResult;
 import otkhongluong.gamestoremanagement.model.Customer;
 import otkhongluong.gamestoremanagement.model.Employee;
 import otkhongluong.gamestoremanagement.model.RentalOrder;
@@ -15,9 +14,14 @@ import java.awt.geom.RoundRectangle2D;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 
+/**
+ * RentEditDialog — Sửa phiếu thuê (đổi KH, NV, ngày trả dự kiến).
+ *
+ * MVC: Dialog chỉ gọi RentController —
+ * không import CustomerDAO, EmployeeDAO, RentalOrderDAO, DBConnection.
+ */
 public class RentEditDialog extends JDialog {
 
     /* ── Palette ── */
@@ -40,18 +44,17 @@ public class RentEditDialog extends JDialog {
     private static final Font F_HINT   = new Font("Segoe UI", Font.ITALIC, 11);
     private static final Font F_RESULT = new Font("Segoe UI", Font.BOLD, 13);
 
-    // Chỉ parse/format phần ngày từ input người dùng
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
+    /* ── CONTROLLER (MVC) ── */
+    private final RentController ctrl = new RentController();
+
     /* ── State ── */
-    private final RentalOrder    pt;
-    private final RentalOrderDAO ptDAO = new RentalOrderDAO();
-    private final CustomerDAO khDAO = new CustomerDAO();
-    private final EmployeeDAO  nvDAO = new EmployeeDAO();
+    private final RentalOrder pt;
 
     private Customer     foundKH    = null;
-    private Employee      foundNV    = null;
-    private LocalDateTime newNgayTra = null; // LocalDateTime để khớp model + DAO
+    private Employee     foundNV    = null;
+    private LocalDateTime newNgayTra = null;
 
     /* ── Components ── */
     private JTextField txtSdt;
@@ -129,9 +132,8 @@ public class RentEditDialog extends JDialog {
         row.setBackground(BG);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
 
-        // LocalDateTime.format(FMT "dd/MM/yyyy") — hợp lệ, chỉ in phần ngày
-        String ngayThue = pt.getNgayThue()      != null ? pt.getNgayThue().format(FMT)      : "—";
-        String ngayTra  = pt.getNgayTraDuKien()  != null ? pt.getNgayTraDuKien().format(FMT) : "—";
+        String ngayThue = pt.getNgayThue()     != null ? pt.getNgayThue().format(FMT)     : "—";
+        String ngayTra  = pt.getNgayTraDuKien() != null ? pt.getNgayTraDuKien().format(FMT) : "—";
 
         row.add(infoCard("Ngày thuê",        ngayThue));
         row.add(infoCard("Ngày trả dự kiến", ngayTra));
@@ -190,8 +192,8 @@ public class RentEditDialog extends JDialog {
         btnFind.addActionListener(e -> lookupKhachHang());
         txtSdt.addActionListener(e -> lookupKhachHang());
 
-        row.add(txtSdt,   BorderLayout.CENTER);
-        row.add(btnFind,  BorderLayout.EAST);
+        row.add(txtSdt,  BorderLayout.CENTER);
+        row.add(btnFind, BorderLayout.EAST);
         section.add(row);
         section.add(Box.createVerticalStrut(6));
 
@@ -221,8 +223,8 @@ public class RentEditDialog extends JDialog {
         btnFind.addActionListener(e -> lookupNhanVien());
         txtMaNV.addActionListener(e -> lookupNhanVien());
 
-        row.add(txtMaNV,  BorderLayout.CENTER);
-        row.add(btnFind,  BorderLayout.EAST);
+        row.add(txtMaNV, BorderLayout.CENTER);
+        row.add(btnFind, BorderLayout.EAST);
         section.add(row);
         section.add(Box.createVerticalStrut(6));
 
@@ -315,6 +317,7 @@ public class RentEditDialog extends JDialog {
         }
     }
 
+    /** MVC: dùng ctrl.findKHBySDT() thay vì khDAO.findBySDT() trực tiếp */
     private void lookupKhachHang() {
         String sdt = txtSdt.getText().trim();
         if (sdt.isEmpty()) {
@@ -322,7 +325,7 @@ public class RentEditDialog extends JDialog {
             foundKH = null;
             return;
         }
-        Customer kh = khDAO.findBySDT(sdt);
+        Customer kh = ctrl.findKHBySDT(sdt);
         if (kh == null) {
             setResult(lblKHResult, "✗  Không tìm thấy khách hàng với SĐT: " + sdt, RED);
             foundKH = null;
@@ -333,24 +336,17 @@ public class RentEditDialog extends JDialog {
         }
     }
 
+    /** MVC: dùng ctrl.findNVByMa() thay vì nvDAO.findById() trực tiếp */
     private void lookupNhanVien() {
-        String raw = txtMaNV.getText().trim().replaceAll("(?i)nv", "");
+        String raw = txtMaNV.getText().trim();
         if (raw.isEmpty()) {
             setResult(lblNVResult, "⚠  Nhập mã nhân viên trước!", MUTED);
             foundNV = null;
             return;
         }
-        int maNV;
-        try {
-            maNV = Integer.parseInt(raw);
-        } catch (NumberFormatException ex) {
-            setResult(lblNVResult, "✗  Mã NV phải là số (VD: NV001 hoặc 1)", RED);
-            foundNV = null;
-            return;
-        }
-        Employee nv = nvDAO.findById(maNV);
+        Employee nv = ctrl.findNVByMa(raw);
         if (nv == null) {
-            setResult(lblNVResult, "✗  Không tìm thấy nhân viên với mã: " + maNV, RED);
+            setResult(lblNVResult, "✗  Không tìm thấy nhân viên với mã: " + raw, RED);
             foundNV = null;
         } else {
             setResult(lblNVResult,
@@ -359,6 +355,7 @@ public class RentEditDialog extends JDialog {
         }
     }
 
+    /** MVC: dùng ctrl.parseDate() thay vì LocalDate.parse() inline */
     private void validateNgayTra() {
         String raw = txtNgayTra.getText().trim();
         if (raw.isEmpty()) {
@@ -367,20 +364,15 @@ public class RentEditDialog extends JDialog {
             return;
         }
 
-        // Dùng LocalDate để parse input dd/MM/yyyy (không có giờ)
-        LocalDate parsedDate;
-        try {
-            parsedDate = LocalDate.parse(raw, FMT);
-        } catch (DateTimeParseException ex) {
+        LocalDate parsedDate = ctrl.parseDate(raw);
+        if (parsedDate == null) {
             setResult(lblNgayTraResult, "✗  Định dạng không hợp lệ. Vui lòng nhập dd/MM/yyyy", RED);
             newNgayTra = null;
             return;
         }
 
-        // NgayThue là LocalDateTime → lấy toLocalDate() để so sánh ngày
         LocalDate ngayThueDateOnly = pt.getNgayThue() != null
-            ? pt.getNgayThue().toLocalDate()
-            : null;
+            ? pt.getNgayThue().toLocalDate() : null;
 
         if (ngayThueDateOnly != null && !parsedDate.isAfter(ngayThueDateOnly)) {
             setResult(lblNgayTraResult,
@@ -389,31 +381,31 @@ public class RentEditDialog extends JDialog {
             return;
         }
 
-        long soNgay = ngayThueDateOnly != null
-            ? ChronoUnit.DAYS.between(ngayThueDateOnly, parsedDate)
-            : 0;
+        long soNgayVal = ngayThueDateOnly != null
+            ? ChronoUnit.DAYS.between(ngayThueDateOnly, parsedDate) : 0;
 
-        // NgayTraDuKien là LocalDateTime → lấy toLocalDate() để so sánh
         LocalDate ngayTraCuDateOnly = pt.getNgayTraDuKien() != null
-            ? pt.getNgayTraDuKien().toLocalDate()
-            : null;
+            ? pt.getNgayTraDuKien().toLocalDate() : null;
 
         if (parsedDate.equals(ngayTraCuDateOnly)) {
             setResult(lblNgayTraResult,
-                "ℹ  Ngày không đổi (" + soNgay + " ngày). DonGiaThue không tính lại.", MUTED);
+                "ℹ  Ngày không đổi (" + soNgayVal + " ngày). DonGiaThue không tính lại.", MUTED);
             newNgayTra = null;
             return;
         }
 
-        // Chuyển LocalDate → LocalDateTime (atStartOfDay) để truyền vào DAO
         newNgayTra = parsedDate.atStartOfDay();
         setResult(lblNgayTraResult,
-            "✓  " + parsedDate.format(FMT) + "  (" + soNgay + " ngày)  — DonGiaThue sẽ được tính lại", GREEN);
+            "✓  " + parsedDate.format(FMT) + "  (" + soNgayVal + " ngày)  — DonGiaThue sẽ được tính lại", GREEN);
     }
 
+    /**
+     * MVC: dùng ctrl.saveEditRental() thay vì gọi trực tiếp
+     * ptDAO.updateKhachHangVaNhanVien() + khDAO.truDiem() + khDAO.congDiem() + ptDAO.updateNgayTraVaDonGia()
+     */
     private void doSave() {
-        boolean khChanged   = foundKH    != null && foundKH.getMaKH() != pt.getMaKH();
-        boolean nvChanged   = foundNV    != null && foundNV.getMaNV() != pt.getMaNV();
+        boolean khChanged   = foundKH != null && foundKH.getMaKH() != pt.getMaKH();
+        boolean nvChanged   = foundNV != null && foundNV.getMaNV() != pt.getMaNV();
         boolean ngayChanged = newNgayTra != null;
 
         if (!khChanged && !nvChanged && !ngayChanged) {
@@ -430,7 +422,7 @@ public class RentEditDialog extends JDialog {
                     "Chưa xác nhận", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            String txtNgay    = txtNgayTra.getText().trim();
+            String txtNgay     = txtNgayTra.getText().trim();
             String ngayHienTai = pt.getNgayTraDuKien() != null ? pt.getNgayTraDuKien().format(FMT) : "";
             if (!txtNgay.isEmpty() && !txtNgay.equals(ngayHienTai)) {
                 JOptionPane.showMessageDialog(this,
@@ -443,7 +435,7 @@ public class RentEditDialog extends JDialog {
             return;
         }
 
-        // Confirm
+        // Confirm dialog
         StringBuilder sb = new StringBuilder("Xác nhận cập nhật phiếu PT")
             .append(pt.getMaPT()).append("?\n\n");
         if (khChanged)
@@ -462,48 +454,28 @@ public class RentEditDialog extends JDialog {
             "Xác nhận sửa", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
         if (confirm != JOptionPane.YES_OPTION) return;
 
-        boolean anyFail = false;
+        // MVC: 1 lời gọi controller thay vì nhiều lời gọi DAO + SQL
+        ActionResult ar = ctrl.saveEditRental(
+            pt.getMaPT(),
+            khChanged ? foundKH : null,
+            nvChanged ? foundNV : null,
+            newNgayTra,
+            pt.getMaKH(),
+            pt.getMaNV()
+        );
 
-        // 1. Cập nhật KH / NV
-        if (khChanged || nvChanged) {
-            int newMaKH = khChanged ? foundKH.getMaKH() : pt.getMaKH();
-            int newMaNV = nvChanged ? foundNV.getMaNV() : pt.getMaNV();
-            boolean ok  = ptDAO.updateKhachHangVaNhanVien(pt.getMaPT(), newMaKH, newMaNV);
-            if (ok && khChanged) {
-                int diem = ptDAO.tinhDiemPhieu(pt.getMaPT());
-                if (diem > 0) {
-                    khDAO.truDiem(pt.getMaKH(), diem);
-                    khDAO.congDiem(foundKH.getMaKH(), diem);
-                }
-            }
-            if (!ok) {
-                anyFail = true;
-                JOptionPane.showMessageDialog(this,
-                    "Cập nhật Khách hàng / Nhân viên thất bại!", "Lỗi", JOptionPane.ERROR_MESSAGE);
-            }
-        }
-
-        // 2. Cập nhật Ngày trả + tính lại DonGiaThue
-        // newNgayTra là LocalDateTime → khớp đúng kiểu DAO
-        if (ngayChanged) {
-            boolean ok = ptDAO.updateNgayTraVaDonGia(pt.getMaPT(), newNgayTra);
-            if (!ok) {
-                anyFail = true;
-                JOptionPane.showMessageDialog(this,
-                    "Cập nhật Ngày trả / DonGiaThue thất bại!", "Lỗi", JOptionPane.ERROR_MESSAGE);
-            }
-        }
-
-        if (!anyFail) {
-            JOptionPane.showMessageDialog(this, "Cập nhật thành công!", "Thành công",
+        if (ar.success) {
+            JOptionPane.showMessageDialog(this, ar.message, "Thành công",
                 JOptionPane.INFORMATION_MESSAGE);
             dispose();
+        } else {
+            JOptionPane.showMessageDialog(this, ar.message, "Lỗi",
+                JOptionPane.ERROR_MESSAGE);
         }
     }
 
     // ── Helpers ─────────────────────────────────────────────────
 
-    /** Tính số ngày giữa 2 LocalDateTime — chỉ so phần ngày */
     private long soNgay(LocalDateTime from, LocalDateTime to) {
         if (from == null || to == null) return 0;
         return ChronoUnit.DAYS.between(from.toLocalDate(), to.toLocalDate());

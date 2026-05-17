@@ -9,74 +9,53 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 /**
- * DAO – Chứa tất cả truy vấn liên quan đến Dashboard.
- * Chỉ làm việc với DB, không chứa business logic.
- *
- * Giả sử tên bảng / cột như sau (chỉnh lại nếu DB bạn khác):
- *   HoaDon   : maHD, ngayLap (DATE), tongTien (DECIMAL)
- *   PhieuThue: maPhieu, ngayThue (DATE), tongTien (DECIMAL)
+ * FIX 1: tên bảng/cột đồng bộ với các DAO khác (HOADON, NgayLap, TongTien, PHIEUTHUE, NgayThue).
+ * FIX 2: gộp 4 queries vào 1 connection duy nhất — tránh mở/đóng 4 lần.
  */
 public class DashboardDAO {
 
-    // ───────────────────────────────────────────────────────────────────────
-    // SQL – SQL Server dùng CAST(... AS DATE) để so sánh ngày
-    // ───────────────────────────────────────────────────────────────────────
-
-    /** Tổng doanh thu hóa đơn bán hôm nay */
-    private static final String SQL_DOANH_THU_HOM_NAY =
-            "SELECT ISNULL(SUM(tongTien), 0) FROM HoaDon " +
-            "WHERE CAST(ngayLap AS DATE) = CAST(GETDATE() AS DATE)";
-
-    /** Tổng doanh thu hóa đơn bán trong tuần hiện tại (T2 → hôm nay) */
-    private static final String SQL_DOANH_THU_TUAN =
-            "SELECT ISNULL(SUM(tongTien), 0) FROM HoaDon " +
-            "WHERE ngayLap >= DATEADD(DAY, 1 - DATEPART(WEEKDAY, GETDATE()), CAST(GETDATE() AS DATE)) " +
-            "  AND ngayLap <  DATEADD(DAY, 1, CAST(GETDATE() AS DATE))";
-
-    /** Số hóa đơn bán hôm nay */
-    private static final String SQL_SO_HOA_DON =
-            "SELECT COUNT(*) FROM HoaDon " +
-            "WHERE CAST(ngayLap AS DATE) = CAST(GETDATE() AS DATE)";
-
-    /** Số phiếu thuê hôm nay */
-    private static final String SQL_SO_PHIEU_THUE =
-            "SELECT COUNT(*) FROM PhieuThue " +
-            "WHERE CAST(ngayThue AS DATE) = CAST(GETDATE() AS DATE)";
-
-    // ───────────────────────────────────────────────────────────────────────
-
-    /**
-     * Lấy toàn bộ số liệu thống kê trong một lần.
-     * Mỗi query dùng connection riêng (pattern hiện tại của project).
-     *
-     * @return DashboardStats với dữ liệu mới nhất, hoặc object rỗng nếu lỗi.
-     */
     public DashboardStats getStats() {
         DashboardStats stats = new DashboardStats();
-        stats.setDoanhThuHomNay(queryLong(SQL_DOANH_THU_HOM_NAY));
-        stats.setDoanhThuTuan(queryLong(SQL_DOANH_THU_TUAN));
-        stats.setSoHoaDonHomNay((int) queryLong(SQL_SO_HOA_DON));
-        stats.setSoPhieuThueHomNay((int) queryLong(SQL_SO_PHIEU_THUE));
+
+        String sqlDoanhThuHomNay =
+            "SELECT ISNULL(SUM(TongTien), 0) FROM HOADON " +
+            "WHERE CAST(NgayLap AS DATE) = CAST(GETDATE() AS DATE)";
+
+        String sqlDoanhThuTuan =
+            "SELECT ISNULL(SUM(TongTien), 0) FROM HOADON " +
+            "WHERE NgayLap >= DATEADD(DAY, 1 - DATEPART(WEEKDAY, GETDATE()), CAST(GETDATE() AS DATE)) " +
+            "  AND NgayLap <  DATEADD(DAY, 1, CAST(GETDATE() AS DATE))";
+
+        String sqlSoHoaDon =
+            "SELECT COUNT(*) FROM HOADON " +
+            "WHERE CAST(NgayLap AS DATE) = CAST(GETDATE() AS DATE)";
+
+        String sqlSoPhieuThue =
+            "SELECT COUNT(*) FROM PHIEUTHUE " +
+            "WHERE CAST(NgayThue AS DATE) = CAST(GETDATE() AS DATE)";
+
+        // Gộp vào 1 connection — tránh mở 4 connection riêng
+        try (Connection conn = DBConnection.getConnection()) {
+
+            stats.setDoanhThuHomNay(queryLong(conn, sqlDoanhThuHomNay));
+            stats.setDoanhThuTuan(queryLong(conn, sqlDoanhThuTuan));
+            stats.setSoHoaDonHomNay((int) queryLong(conn, sqlSoHoaDon));
+            stats.setSoPhieuThueHomNay((int) queryLong(conn, sqlSoPhieuThue));
+
+        } catch (SQLException e) {
+            System.err.println("[DashboardDAO] Lỗi kết nối: " + e.getMessage());
+        }
+
         return stats;
     }
 
-    // ─── Private helper ────────────────────────────────────────────────────
-
-    /**
-     * Thực thi một câu SELECT trả về một giá trị số duy nhất (COUNT / SUM).
-     *
-     * @param sql Câu truy vấn không có tham số (?)
-     * @return Giá trị long, hoặc 0 nếu không có kết quả / lỗi.
-     */
-    private long queryLong(String sql) {
-        Connection conn = DBConnection.getConnection();
+    // ── Helper dùng connection có sẵn ──────────────────
+    private long queryLong(Connection conn, String sql) {
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             if (rs.next()) return rs.getLong(1);
         } catch (SQLException e) {
             System.err.println("[DashboardDAO] Lỗi truy vấn: " + e.getMessage());
-        } finally {
-            DBConnection.closeConnection(conn);
         }
         return 0L;
     }

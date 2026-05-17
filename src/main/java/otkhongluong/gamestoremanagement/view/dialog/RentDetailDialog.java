@@ -1,32 +1,28 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.util.DBConnection;
-
+import otkhongluong.gamestoremanagement.controller.RentController;
+import otkhongluong.gamestoremanagement.model.RentDetailData;
 import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
-import java.sql.*;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 /**
  * RentDetailDialog — xem chi tiết phiếu thuê.
  *
- * Logic tiền:
- *   TienCoc          = tiền cọc thu lúc tạo phiếu (KHÔNG thay đổi khi gia hạn).
- *   TienThueBanDau   = SUM(ct.DonGiaThue) — tổng đơn giá gốc lúc lập phiếu (đã bao gồm số ngày).
- *   GiamDiem         = SUM(SoDiem) * 5.000 VNĐ từ DIEM_LICHSU WHERE MaPT=? AND Loai='TRU'
- *   TienThueNetDiem  = MAX(0, TienThueBanDau - GiamDiem)
- *   TienGiaHan       = soNgayGiaHan * GiaThueNgay (tách từ TienPhat DB)
- *   TreHanDaDong     = TienPhat DB - TienGiaHan  (phần phạt trễ + sửa chữa đã đóng)
- *   PhatTreTamTinh   = phạt trễ ước tính hôm nay (chỉ khi đang thuê & quá hạn, chưa ghi DB).
- *   DoanhThu         = TienThueNetDiem + TienPhatDB.
+ * MVC: Dialog chỉ gọi RentController.loadRentDetail() —
+ * không có DBConnection, SQL, hay PointDAO trực tiếp.
  *
- * Kết quả quyết toán:
- *   delta = TienCoc − TienThueNetDiem − PhatTreTamTinh − TreHanDaDong
- *   delta > 0 → hoàn tiền | = 0 → vừa đủ | < 0 → thu thêm
+ * Logic tiền (tính trong Service/Controller, dialog chỉ hiển thị):
+ *   TienThueBanDau   = SUM(ct.DonGiaThue)
+ *   GiamDiem         = SUM điểm từ DIEM_LICHSU × 5.000
+ *   TienThueNetDiem  = MAX(0, TienThueBanDau - GiamDiem)
+ *   TienGiaHan       = soNgayGiaHan × GiaThueNgay
+ *   TreHanDaDong     = TienPhat DB − TienGiaHan
+ *   PhatTreTamTinh   = ngày trễ × 10.000 (chỉ khi đang thuê & quá hạn)
+ *   delta            = TienCoc − TienThueNetDiem − PhatTreTamTinh − TreHanDaDong
  */
 public class RentDetailDialog extends JDialog {
 
@@ -61,13 +57,16 @@ public class RentDetailDialog extends JDialog {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
+    /* ===== CONTROLLER (MVC) ===== */
+    private final RentController ctrl = new RentController();
+
     /* ===== WIDGETS — Info ===== */
     private JLabel lblTenKH, lblSDT, lblTrangThai;
     private JLabel lblNgayThue, lblNgayTraDK, lblNgayTraThucTe;
 
     /* ===== WIDGETS — CD Info Card ===== */
     private JLabel lblMaCD, lblMaGame, lblTenGame;
-    private JLabel lblGiaThueNgayHT, lblDonGiaThueGoc;
+    private JLabel lblGiaThueNgayHT;
 
     /* ===== WIDGETS — Summary ===== */
     private JLabel lblDoanhThu;
@@ -83,18 +82,6 @@ public class RentDetailDialog extends JDialog {
     private JLabel lblCongThuc;
 
     private final int maPT;
-
-    /* ===== STATE ===== */
-    private double    _pendingTienThueBanDau  = 0;
-    private double    _pendingTienPhatDB      = 0;
-    private double    _pendingPhatTreTT       = 0;
-    private double    _pendingGiamDiem        = 0;
-    private double    _pendingTienThueNetDiem = 0;
-    private double    _pendingTienCoc         = 0;
-    private double    _pendingTreHanDaDong    = 0; // ✅ phạt trễ/sửa chữa đã đóng (tách từ TienPhat)
-    private boolean   _pendingDaTra           = false;
-    private Timestamp _pendingTsThue          = null;
-    private Timestamp _pendingTsDK            = null;
 
     public RentDetailDialog(Frame parent, int maPT) {
         super(parent, "Chi tiết phiếu thuê", true);
@@ -174,7 +161,6 @@ public class RentDetailDialog extends JDialog {
         lblMaGame        = cardValue();
         lblTenGame       = cardValue();
         lblGiaThueNgayHT = cardValue();
-        lblDonGiaThueGoc = cardValue();
 
         JPanel headerRow = new JPanel(new GridLayout(1, 4, 10, 0));
         headerRow.setBackground(PURPLE_HEADER);
@@ -222,7 +208,6 @@ public class RentDetailDialog extends JDialog {
         lblCongThuc.setFont(FONT_MICRO);
         lblCongThuc.setForeground(TEXT_MUTED);
 
-        // ── Hàng 0: Tổng doanh thu ──
         JPanel cardDoanhThu = new JPanel(new BorderLayout(0, 6));
         cardDoanhThu.setBackground(new Color(30, 90, 70));
         cardDoanhThu.setBorder(new CompoundBorder(
@@ -244,7 +229,6 @@ public class RentDetailDialog extends JDialog {
         cardDoanhThu.setMaximumSize(new Dimension(Integer.MAX_VALUE, 68));
         cardDoanhThu.setPreferredSize(new Dimension(0, 68));
 
-        // ── Hàng 1: 5 ô ──
         lblThueBanDauTitle = new JLabel("Tiền thuê ban đầu");
         lblThueBanDauTitle.setFont(FONT_SMALL);
         lblThueBanDauTitle.setForeground(TEXT_MUTED);
@@ -267,7 +251,6 @@ public class RentDetailDialog extends JDialog {
         row1.setMaximumSize(new Dimension(Integer.MAX_VALUE, 82));
         row1.setPreferredSize(new Dimension(0, 82));
 
-        // ── Hàng 2: Quyết toán cọc ──
         JPanel sectionLabelB = sectionLabel("QUYẾT TOÁN CỌC");
         JPanel rowB = new JPanel(new GridLayout(1, 3, 8, 0));
         rowB.setBackground(BG_DARK);
@@ -277,7 +260,6 @@ public class RentDetailDialog extends JDialog {
         rowB.setMaximumSize(new Dimension(Integer.MAX_VALUE, 82));
         rowB.setPreferredSize(new Dimension(0, 82));
 
-        // ── Ghi chú ──
         JPanel noteRow = new JPanel(new BorderLayout());
         noteRow.setBackground(BG_DARK);
         noteRow.setBorder(new EmptyBorder(4, 2, 0, 0));
@@ -333,267 +315,153 @@ public class RentDetailDialog extends JDialog {
         return p;
     }
 
-    /* ==================== LOAD DATA ==================== */
+    /* ==================== LOAD DATA (MVC) ==================== */
+    /**
+     * MVC: toàn bộ SQL + logic tính toán đã được chuyển vào
+     * RentalService.loadRentDetail() và gọi qua RentController.
+     * Dialog chỉ nhận RentDetailData và hiển thị.
+     */
+    private void loadData() {
+        RentDetailData data = ctrl.loadRentDetail(maPT);
+        if (data == null) {
+            JOptionPane.showMessageDialog(this,
+                "Phiếu thuê PT" + maPT + " không tìm thấy.",
+                "Thông báo", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
 
-    private double loadGiamDiemTuDB(Connection con, int maPT) throws SQLException {
-        String sql = "SELECT COALESCE(SUM(SoDiem), 0) FROM DIEM_LICHSU "
-                   + "WHERE MaPT = ? AND Loai = 'TRU'";
-        try (PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, maPT);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getInt(1) * (double) DIEM_TO_VND;
+        // ── Thông tin KH / trạng thái ──
+        lblTenKH.setText(data.tenKH);
+        lblSDT.setText(data.sdt);
+        lblTrangThai.setText(data.trangThai);
+        lblTrangThai.setForeground(data.daTra ? COLOR_BADGE_DONE : COLOR_BADGE_ACTIVE);
+        lblThueBanDauTitle.setText(data.daTra
+            ? "Tiền thuê ban đầu (đã trả)"
+            : "Tiền thuê ban đầu (chưa trả)");
+
+        // ── Ngày tháng ──
+        lblNgayThue.setText(data.ngayThue != null
+            ? data.ngayThue.toLocalDateTime().format(FMT) : "—");
+        lblNgayTraDK.setText(data.ngayTraDK != null
+            ? data.ngayTraDK.toLocalDateTime().format(FMT) : "—");
+        lblNgayTraThucTe.setText(data.ngayTraTT != null
+            ? data.ngayTraTT.toLocalDateTime().format(FMT) : "— (chưa trả)");
+
+        // ── CD ──
+        lblMaCD.setText("CD" + data.maCD);
+        lblMaGame.setText("G" + data.maGame);
+        lblTenGame.setText(data.tenGame);
+        lblGiaThueNgayHT.setText(String.format("%,.0f VNĐ", data.giaThueNgayHT));
+
+        // ── Tiền thuê ban đầu ──
+        lblThueBanDau.setText(String.format("%,.0f VNĐ  (%d ngày)",
+            data.tienThueBanDau, data.soNgayGoc));
+        lblThueBanDau.setForeground(COLOR_BASE);
+
+        // ── Giảm điểm ──
+        if (data.giamDiem > 0) {
+            int soDiem = (int) Math.round(data.giamDiem / DIEM_TO_VND);
+            lblGiamDiem.setText(String.format("-%,.0f VNĐ  (%d điểm)", data.giamDiem, soDiem));
+            lblGiamDiem.setForeground(COLOR_DIEM);
+        } else {
+            lblGiamDiem.setText("Không dùng điểm");
+            lblGiamDiem.setForeground(TEXT_MUTED);
+        }
+
+        // ── Tiền thuê sau giảm ──
+        lblTienThueNetDiem.setText(String.format("%,.0f VNĐ", data.tienThueNetDiem));
+        lblTienThueNetDiem.setForeground(COLOR_NET);
+
+        // ── Gia hạn & phạt đã đóng ──
+        if (data.tienPhatDB > 0) {
+            lblGiaHan.setText(String.format("%,.0f VNĐ", data.tienGiaHan));
+            lblGiaHan.setForeground(COLOR_EXTEND);
+            if (data.treHanDaDong > 0) {
+                lblTienPhatDB.setText(String.format("%,.0f VNĐ", data.treHanDaDong));
+                lblTienPhatDB.setForeground(COLOR_WARN);
+            } else {
+                lblTienPhatDB.setText("Không có!");
+                lblTienPhatDB.setForeground(COLOR_OK);
+            }
+        } else {
+            lblGiaHan.setText("Không có!");
+            lblGiaHan.setForeground(COLOR_OK);
+            lblTienPhatDB.setText("Không có!");
+            lblTienPhatDB.setForeground(COLOR_OK);
+        }
+
+        // ── Doanh thu ──
+        double doanhThu = data.tienThueNetDiem + data.tienPhatDB;
+        lblDoanhThu.setText(String.format("%,.0f VNĐ", doanhThu));
+        lblDoanhThu.setForeground(COLOR_REVENUE);
+
+        // ── Cọc / Phạt trễ tạm tính ──
+        lblTienCoc.setText(String.format("%,.0f VNĐ", data.tienCoc));
+        lblTienCoc.setForeground(TEXT_WHITE);
+
+        if (data.daTra) {
+            lblPhatTreTT.setText("Đã chốt khi trả!");
+            lblPhatTreTT.setForeground(TEXT_MUTED);
+            lblPhatTreTT.setFont(FONT_SMALL);
+        } else if (data.phatTreTamTinh > 0) {
+            lblPhatTreTT.setText(String.format("~%,.0f VNĐ", data.phatTreTamTinh));
+            lblPhatTreTT.setForeground(COLOR_PENALTY);
+        } else {
+            lblPhatTreTT.setText("Không có!");
+            lblPhatTreTT.setForeground(COLOR_OK);
+        }
+
+        // ── Delta quyết toán ──
+        double delta = data.tienCoc - data.tienThueNetDiem - data.phatTreTamTinh - data.treHanDaDong;
+
+        // ── Công thức ──
+        if (data.daTra) {
+            if (data.giamDiem > 0) {
+                lblCongThuc.setText(String.format(
+                    "Quyết toán: %.0f (cọc) − (%.0f − %.0f giảm điểm) − %.0f (phạt đã đóng) = %.0f VNĐ",
+                    data.tienCoc, data.tienThueBanDau, data.giamDiem, data.treHanDaDong, delta));
+            } else {
+                lblCongThuc.setText(String.format(
+                    "Quyết toán: %.0f (cọc) − %.0f (thuê) − %.0f (phạt đã đóng) = %.0f VNĐ",
+                    data.tienCoc, data.tienThueBanDau, data.treHanDaDong, delta));
+            }
+        } else {
+            if (data.giamDiem > 0) {
+                lblCongThuc.setText(String.format(
+                    "Ước tính: %.0f (cọc) − (%.0f − %.0f giảm điểm) − %.0f (phạt trễ TT) − %.0f (phạt đã đóng) = %.0f VNĐ",
+                    data.tienCoc, data.tienThueBanDau, data.giamDiem,
+                    data.phatTreTamTinh, data.treHanDaDong, delta));
+            } else {
+                lblCongThuc.setText(String.format(
+                    "Ước tính: %.0f (cọc) − %.0f (thuê) − %.0f (phạt trễ TT) − %.0f (phạt đã đóng) = %.0f VNĐ",
+                    data.tienCoc, data.tienThueBanDau,
+                    data.phatTreTamTinh, data.treHanDaDong, delta));
             }
         }
-        return 0;
-    }
 
-    private void loadData() {
-        String sqlHeader =
-            "SELECT pt.NgayThue, pt.NgayTraDuKien, pt.NgayTraThucTe, " +
-            "       pt.TienCoc, pt.TienPhat, pt.TrangThai, " +
-            "       kh.HoTen, kh.SDT, " +
-            "       SUM(ct.DonGiaThue) AS TongDonGiaThue " +
-            "FROM PHIEUTHUE pt " +
-            "LEFT JOIN KHACHHANG kh ON pt.MaKH = kh.MaKH " +
-            "LEFT JOIN CTPHIEUTHUE ct ON pt.MaPT = ct.MaPT " +
-            "WHERE pt.MaPT = ? " +
-            "GROUP BY pt.MaPT, pt.NgayThue, pt.NgayTraDuKien, pt.NgayTraThucTe, " +
-            "         pt.TienCoc, pt.TienPhat, pt.TrangThai, kh.HoTen, kh.SDT";
-
-        String sqlDetail =
-            "SELECT TOP 1 cd.MaCD, g.MaGame, g.TenGame, sp.GiaThueNgay, ct.DonGiaThue " +
-            "FROM CTPHIEUTHUE ct " +
-            "JOIN CD      cd ON ct.MaCD   = cd.MaCD " +
-            "JOIN SANPHAM sp ON cd.MaSP   = sp.MaSP " +
-            "JOIN GAME    g  ON sp.MaGame = g.MaGame " +
-            "WHERE ct.MaPT = ?";
-
-        try (Connection con = DBConnection.getConnection()) {
-
-            // ── Bước 1: load điểm đã trừ từ DIEM_LICHSU ──
-            _pendingGiamDiem = loadGiamDiemTuDB(con, maPT);
-
-            // ── Bước 2: Header phiếu thuê ──
-            try (PreparedStatement ps = con.prepareStatement(sqlHeader)) {
-                ps.setInt(1, maPT);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        boolean daTra = "DaTra".equalsIgnoreCase(rs.getString("TrangThai"));
-
-                        lblTenKH.setText(nvl(rs.getString("HoTen"), "—"));
-                        lblSDT.setText(nvl(rs.getString("SDT"), "—"));
-                        lblTrangThai.setText(daTra ? "Đã trả" : "Đang thuê");
-                        lblTrangThai.setForeground(daTra ? COLOR_BADGE_DONE : COLOR_BADGE_ACTIVE);
-                        lblThueBanDauTitle.setText(daTra
-                            ? "Tiền thuê ban đầu (đã trả)"
-                            : "Tiền thuê ban đầu (chưa trả)");
-
-                        Timestamp tsThue = rs.getTimestamp("NgayThue");
-                        Timestamp tsDK   = rs.getTimestamp("NgayTraDuKien");
-                        Timestamp tsTT   = rs.getTimestamp("NgayTraThucTe");
-
-                        lblNgayThue.setText(formatTs(tsThue));
-                        lblNgayTraDK.setText(formatTs(tsDK));
-                        lblNgayTraThucTe.setText(tsTT != null ? formatTs(tsTT) : "— (chưa trả)");
-
-                        double tienCoc         = rs.getDouble("TienCoc");
-                        double tienPhatDB      = rs.getDouble("TienPhat");
-                        double tienThueBanDau  = rs.getDouble("TongDonGiaThue");
-                        double tienThueNetDiem = Math.max(0, tienThueBanDau - _pendingGiamDiem);
-
-                        lblTienCoc.setText(String.format("%,.0f VNĐ", tienCoc));
-                        lblTienCoc.setForeground(TEXT_WHITE);
-
-                        // ── Phạt trễ tạm tính ──
-                        double phatTreTamTinh = 0;
-                        if (!daTra && tsDK != null) {
-                            LocalDateTime ngayDK = tsDK.toLocalDateTime();
-                            LocalDateTime homNay = LocalDate.now().atStartOfDay();
-                            if (homNay.isAfter(ngayDK)) {
-                                long ngayTre = java.time.temporal.ChronoUnit.DAYS.between(
-                                    ngayDK.toLocalDate(), homNay.toLocalDate());
-                                if (ngayTre <= 0) ngayTre = 1;
-                                phatTreTamTinh = ngayTre * 10_000;
-                            }
-                        }
-
-                        if (daTra) {
-                            lblPhatTreTT.setText("Đã chốt khi trả!");
-                            lblPhatTreTT.setForeground(TEXT_MUTED);
-                            lblPhatTreTT.setFont(FONT_SMALL);
-                        } else if (phatTreTamTinh > 0) {
-                            lblPhatTreTT.setText(String.format("~%,.0f VNĐ", phatTreTamTinh));
-                            lblPhatTreTT.setForeground(COLOR_PENALTY);
-                        } else {
-                            lblPhatTreTT.setText("Không có!");
-                            lblPhatTreTT.setForeground(COLOR_OK);
-                        }
-
-                        // ── Lưu state để dùng trong block sqlDetail ──
-                        _pendingTienThueBanDau  = tienThueBanDau;
-                        _pendingTienPhatDB      = tienPhatDB;
-                        _pendingPhatTreTT       = phatTreTamTinh;
-                        _pendingTienCoc         = tienCoc;
-                        _pendingTienThueNetDiem = tienThueNetDiem;
-                        _pendingDaTra           = daTra;
-                        _pendingTsThue          = tsThue;
-                        _pendingTsDK            = tsDK;
-                    }
-                }
+        // ── Hiển thị kết quả ──
+        if (data.daTra) {
+            if (delta > 0) {
+                lblDelta.setText(String.format("Đã hoàn %,.0f VNĐ", delta));
+                lblDelta.setForeground(COLOR_OK);
+            } else if (delta == 0) {
+                lblDelta.setText("Không hoàn cọc");
+                lblDelta.setForeground(TEXT_MUTED);
+            } else {
+                lblDelta.setText(String.format("Đã thu thêm %,.0f VNĐ", Math.abs(delta)));
+                lblDelta.setForeground(COLOR_PENALTY);
             }
-
-            // ── Bước 3: Chi tiết CD ──
-            try (PreparedStatement ps = con.prepareStatement(sqlDetail)) {
-                ps.setInt(1, maPT);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        double giaThueNgayHT = rs.getDouble("GiaThueNgay");
-                        double donGiaThueGoc = rs.getDouble("DonGiaThue");
-
-                        lblMaCD.setText("CD"  + rs.getInt("MaCD"));
-                        lblMaGame.setText("G"  + rs.getInt("MaGame"));
-                        lblTenGame.setText(nvl(rs.getString("TenGame"), "—"));
-                        lblGiaThueNgayHT.setText(String.format("%,.0f VNĐ", giaThueNgayHT));
-                        lblDonGiaThueGoc.setText(String.format("%,.0f VNĐ", donGiaThueGoc));
-
-                        // Số ngày thuê gốc
-                        long soNgayGoc = 1;
-                        if (giaThueNgayHT > 0) {
-                            soNgayGoc = Math.round(_pendingTienThueBanDau / giaThueNgayHT);
-                            if (soNgayGoc <= 0) soNgayGoc = 1;
-                        }
-
-                        lblThueBanDau.setText(String.format("%,.0f VNĐ  (%d ngày)",
-                            _pendingTienThueBanDau, soNgayGoc));
-                        lblThueBanDau.setForeground(COLOR_BASE);
-
-                        // ── Giảm điểm ──
-                        if (_pendingGiamDiem > 0) {
-                            int soDiem = (int) Math.round(_pendingGiamDiem / DIEM_TO_VND);
-                            lblGiamDiem.setText(String.format("-%,.0f VNĐ  (%d điểm)",
-                                _pendingGiamDiem, soDiem));
-                            lblGiamDiem.setForeground(COLOR_DIEM);
-                        } else {
-                            lblGiamDiem.setText("Không dùng điểm");
-                            lblGiamDiem.setForeground(TEXT_MUTED);
-                        }
-
-                        // ── Tiền thuê sau giảm điểm ──
-                        lblTienThueNetDiem.setText(String.format("%,.0f VNĐ", _pendingTienThueNetDiem));
-                        lblTienThueNetDiem.setForeground(COLOR_NET);
-
-                        // ── Gia hạn & phạt đã đóng ──
-                        if (_pendingTienPhatDB > 0) {
-                            long soNgayTong = java.time.temporal.ChronoUnit.DAYS.between(
-                                _pendingTsThue.toLocalDateTime().toLocalDate(),
-                                _pendingTsDK.toLocalDateTime().toLocalDate()
-                            );
-                            long soNgayGocL   = (giaThueNgayHT > 0)
-                                ? Math.round(_pendingTienThueBanDau / giaThueNgayHT) : 1;
-                            long soNgayGiaHan  = soNgayTong - soNgayGocL;
-                            if (soNgayGiaHan < 0) soNgayGiaHan = 0;
-
-                            double tienGiaHan   = soNgayGiaHan * giaThueNgayHT;
-                            double treHanDaDong = _pendingTienPhatDB - tienGiaHan;
-                            if (treHanDaDong < 0) treHanDaDong = 0;
-
-                            _pendingTreHanDaDong = treHanDaDong; // ✅ lưu để tính delta
-
-                            lblGiaHan.setText(String.format("%,.0f VNĐ  (%d ngày)", tienGiaHan, soNgayGiaHan));
-                            lblGiaHan.setForeground(COLOR_EXTEND);
-
-                            if (treHanDaDong > 0) {
-                                lblTienPhatDB.setText(String.format("%,.0f VNĐ", treHanDaDong));
-                                lblTienPhatDB.setForeground(COLOR_WARN);
-                            } else {
-                                lblTienPhatDB.setText("Không có!");
-                                lblTienPhatDB.setForeground(COLOR_OK);
-                            }
-                        } else {
-                            _pendingTreHanDaDong = 0; // ✅
-                            lblGiaHan.setText("Không có!");
-                            lblGiaHan.setForeground(COLOR_OK);
-                            lblTienPhatDB.setText("Không có!");
-                            lblTienPhatDB.setForeground(COLOR_OK);
-                        }
-
-                        // ── Doanh thu = tiền thuê net + toàn bộ TienPhat DB ──
-                        double doanhThu = _pendingTienThueNetDiem + _pendingTienPhatDB;
-                        lblDoanhThu.setText(String.format("%,.0f VNĐ", doanhThu));
-                        lblDoanhThu.setForeground(COLOR_REVENUE);
-
-                        // ── Bước 4: Tính delta — trừ đủ 3 khoản ──
-                        // delta = Cọc − ThuêNet − PhatTreTamTinh − TreHanDaDong
-                        double delta = _pendingTienCoc
-                                     - _pendingTienThueNetDiem
-                                     - _pendingPhatTreTT
-                                     - _pendingTreHanDaDong;
-
-                        // ── Công thức hiển thị ──
-                        if (_pendingDaTra) {
-                            if (_pendingGiamDiem > 0) {
-                                lblCongThuc.setText(String.format(
-                                    "Quyết toán: %.0f (cọc) − (%.0f − %.0f giảm điểm) − %.0f (phạt đã đóng) = %.0f VNĐ",
-                                    _pendingTienCoc, _pendingTienThueBanDau,
-                                    _pendingGiamDiem, _pendingTreHanDaDong, delta));
-                            } else {
-                                lblCongThuc.setText(String.format(
-                                    "Quyết toán: %.0f (cọc) − %.0f (thuê) − %.0f (phạt đã đóng) = %.0f VNĐ",
-                                    _pendingTienCoc, _pendingTienThueBanDau,
-                                    _pendingTreHanDaDong, delta));
-                            }
-                        } else {
-                            if (_pendingGiamDiem > 0) {
-                                lblCongThuc.setText(String.format(
-                                    "Ước tính: %.0f (cọc) − (%.0f − %.0f giảm điểm) − %.0f (phạt trễ TT) − %.0f (phạt đã đóng) = %.0f VNĐ",
-                                    _pendingTienCoc, _pendingTienThueBanDau, _pendingGiamDiem,
-                                    _pendingPhatTreTT, _pendingTreHanDaDong, delta));
-                            } else {
-                                lblCongThuc.setText(String.format(
-                                    "Ước tính: %.0f (cọc) − %.0f (thuê) − %.0f (phạt trễ TT) − %.0f (phạt đã đóng) = %.0f VNĐ",
-                                    _pendingTienCoc, _pendingTienThueBanDau,
-                                    _pendingPhatTreTT, _pendingTreHanDaDong, delta));
-                            }
-                        }
-
-                        // ── Hiển thị kết quả quyết toán ──
-                        if (_pendingDaTra) {
-                            if (delta > 0) {
-                                lblDelta.setText(String.format("Đã hoàn %,.0f VNĐ", delta));
-                                lblDelta.setForeground(COLOR_OK);
-                            } else if (delta == 0) {
-                                lblDelta.setText("Không hoàn cọc");
-                                lblDelta.setForeground(TEXT_MUTED);
-                            } else {
-                                lblDelta.setText(String.format("Đã thu thêm %,.0f VNĐ", Math.abs(delta)));
-                                lblDelta.setForeground(COLOR_PENALTY);
-                            }
-                        } else {
-                            if (delta > 0) {
-                                lblDelta.setText(String.format("Dự kiến hoàn %,.0f VNĐ", delta));
-                                lblDelta.setForeground(COLOR_OK);
-                            } else if (delta == 0) {
-                                lblDelta.setText("Dự kiến hòa");
-                                lblDelta.setForeground(TEXT_MUTED);
-                            } else {
-                                lblDelta.setText(String.format("Dự kiến thu %,.0f VNĐ", Math.abs(delta)));
-                                lblDelta.setForeground(COLOR_WARN);
-                            }
-                        }
-
-                    } else {
-                        JOptionPane.showMessageDialog(this,
-                            "Phiếu thuê PT" + maPT + " không tìm thấy CD.",
-                            "Thông báo", JOptionPane.INFORMATION_MESSAGE);
-                    }
-                }
+        } else {
+            if (delta > 0) {
+                lblDelta.setText(String.format("Dự kiến hoàn %,.0f VNĐ", delta));
+                lblDelta.setForeground(COLOR_OK);
+            } else if (delta == 0) {
+                lblDelta.setText("Dự kiến hòa");
+                lblDelta.setForeground(TEXT_MUTED);
+            } else {
+                lblDelta.setText(String.format("Dự kiến thu %,.0f VNĐ", Math.abs(delta)));
+                lblDelta.setForeground(COLOR_WARN);
             }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this,
-                "Lỗi tải dữ liệu: " + e.getMessage(),
-                "Lỗi", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -660,14 +528,6 @@ public class RentDetailDialog extends JDialog {
         sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
         sep.setPreferredSize(new Dimension(0, 1));
         return sep;
-    }
-
-    private String formatTs(Timestamp ts) {
-        return ts == null ? "—" : ts.toLocalDateTime().format(FMT);
-    }
-
-    private String nvl(String s, String def) {
-        return (s == null || s.isBlank()) ? def : s;
     }
 
     /* ==================== ROUND BUTTON ==================== */

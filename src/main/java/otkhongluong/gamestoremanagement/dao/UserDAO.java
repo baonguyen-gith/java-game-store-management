@@ -2,14 +2,17 @@ package otkhongluong.gamestoremanagement.dao;
 
 import otkhongluong.gamestoremanagement.model.User;
 import otkhongluong.gamestoremanagement.util.DBConnection;
+import otkhongluong.gamestoremanagement.util.FormatUtil;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class UserDAO implements IUserDAO {
+/**
+ * FIX: dùng FormatUtil.formatMaNV() thay vì tự format "NV" + maNV inline.
+ */
+public class UserDAO {
 
-    @Override
     public boolean insert(User user) {
         String sql = "INSERT INTO USERS (Username, Password, MaRole, MaNV) VALUES (?, ?, ?, ?)";
         try (Connection conn = DBConnection.getConnection();
@@ -25,7 +28,6 @@ public class UserDAO implements IUserDAO {
         }
     }
 
-    @Override
     public boolean update(User user) {
         String sql = "UPDATE USERS SET Username = ?, Password = ?, MaRole = ?, MaNV = ? WHERE MaUser = ?";
         try (Connection conn = DBConnection.getConnection();
@@ -42,7 +44,6 @@ public class UserDAO implements IUserDAO {
         }
     }
 
-    @Override
     public boolean delete(int maUser) {
         String sql = "DELETE FROM USERS WHERE MaUser = ?";
         try (Connection conn = DBConnection.getConnection();
@@ -54,7 +55,6 @@ public class UserDAO implements IUserDAO {
         }
     }
 
-    @Override
     public User findById(int maUser) {
         String sql = "SELECT * FROM USERS WHERE MaUser = ?";
         try (Connection conn = DBConnection.getConnection();
@@ -69,7 +69,6 @@ public class UserDAO implements IUserDAO {
         return null;
     }
 
-    @Override
     public User findByUsername(String username) {
         String sql = "SELECT * FROM USERS WHERE Username = ?";
         try (Connection conn = DBConnection.getConnection();
@@ -84,7 +83,6 @@ public class UserDAO implements IUserDAO {
         return null;
     }
 
-    @Override
     public List<User> findAll() {
         List<User> list = new ArrayList<>();
         String sql = "SELECT * FROM USERS ORDER BY MaUser DESC";
@@ -98,11 +96,6 @@ public class UserDAO implements IUserDAO {
         return list;
     }
 
-    /**
-     * [MỚI] LEFT JOIN với NHANVIEN để lấy thêm MaNV (formatted) và HoTen.
-     * Trả Object[] mỗi phần tử gồm: [MaUser, Username, Role, MaNVFormatted, HoTen]
-     * LEFT JOIN để user chưa gắn NV vẫn hiện ra (MaNV = "", HoTen = "—").
-     */
     public List<Object[]> findAllWithEmployee() {
         List<Object[]> list = new ArrayList<>();
         String sql =
@@ -115,7 +108,6 @@ public class UserDAO implements IUserDAO {
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 int maNV = rs.getInt("MaNV");
-                String maNVFormatted = (maNV > 0) ? "NV" + maNV : "";
                 String hoTen = rs.getString("HoTen");
                 if (hoTen == null) hoTen = "—";
 
@@ -123,7 +115,7 @@ public class UserDAO implements IUserDAO {
                     rs.getInt("MaUser"),
                     rs.getString("Username"),
                     rs.getInt("MaRole") == 1 ? "Admin" : "Staff",
-                    maNVFormatted,
+                    FormatUtil.formatMaNV(maNV),    // FIX: dùng FormatUtil
                     hoTen
                 });
             }
@@ -133,15 +125,13 @@ public class UserDAO implements IUserDAO {
         return list;
     }
 
-    // ================= MAPPER =================
     private User mapRow(ResultSet rs) throws SQLException {
-        int maNV = rs.getInt("MaNV");
         return new User(
             rs.getInt("MaUser"),
             rs.getString("Username"),
             rs.getString("Password"),
             rs.getInt("MaRole"),
-            maNV
+            rs.getInt("MaNV")
         );
     }
 }

@@ -1,6 +1,7 @@
 package otkhongluong.gamestoremanagement.controller;
 
 import otkhongluong.gamestoremanagement.dao.DatabaseException;
+import otkhongluong.gamestoremanagement.dao.UserDAO;
 import otkhongluong.gamestoremanagement.model.User;
 import otkhongluong.gamestoremanagement.service.AuthService;
 import otkhongluong.gamestoremanagement.util.Session;
@@ -8,15 +9,7 @@ import otkhongluong.gamestoremanagement.view.LoginView;
 
 /**
  * Controller đăng nhập.
- *
- * Thay đổi so với bản cũ:
- *  - Nhận AuthService qua constructor (không tự new bên trong)
- *  - Bắt thêm DatabaseException từ DAO để show lỗi hợp lý cho user
- *  - Session.setMaNV() vẫn ở đây vì đây là use-case login,
- *    nhưng được tách sau navigator.go*() để logic rõ ràng hơn
- *
- * ✅ Vẫn giữ: chỉ phụ thuộc AuthService + Navigator interface.
- * ✅ Vẫn giữ: không biết AdminView, StaffView hay View cụ thể nào.
+ * ✅ FIX: AuthService nhận UserDAO — truyền đúng dependency.
  */
 public class LoginController {
 
@@ -24,7 +17,13 @@ public class LoginController {
     private final Navigator   navigator;
     private LoginView view;
 
-    // ✅ Dependency Injection — nhận AuthService từ ngoài, không tự tạo
+    // ✅ FIX: tự tạo UserDAO và truyền vào AuthService thay vì truyền User
+    public LoginController(Navigator navigator) {
+        this.authService = new AuthService(new UserDAO());
+        this.navigator   = navigator;
+    }
+
+    /** Dependency Injection đầy đủ — dùng khi test hoặc cần mock AuthService. */
     public LoginController(AuthService authService, Navigator navigator) {
         this.authService = authService;
         this.navigator   = navigator;
@@ -38,13 +37,12 @@ public class LoginController {
     public void handleLogin(String username, String password) {
         try {
             User user = authService.login(username, password);
-
             if (user == null) {
                 view.showError("Sai tài khoản hoặc mật khẩu!");
                 return;
             }
 
-            Session.setMaNV(user.getMaUser());
+            Session.login(user.getMaNV(), user.getMaRole(), user.getUsername());
             view.dispose();
 
             if      (authService.isAdmin(user)) navigator.goToAdmin(user);
@@ -52,10 +50,8 @@ public class LoginController {
             else                                view.showError("Không xác định được quyền truy cập!");
 
         } catch (IllegalArgumentException e) {
-            // Validation lỗi (username/password rỗng)
             view.showError(e.getMessage());
         } catch (DatabaseException e) {
-            // Lỗi kết nối / truy vấn DB
             view.showError("Lỗi hệ thống, vui lòng thử lại sau.\n(" + e.getMessage() + ")");
         }
     }

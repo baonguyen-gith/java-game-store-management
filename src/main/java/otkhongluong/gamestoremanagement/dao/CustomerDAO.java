@@ -154,16 +154,8 @@ public class CustomerDAO {
 
             ps.setString(1, sdt);
 
-            ResultSet rs = ps.executeQuery();
-
-            if (rs.next()) {    
-                Customer kh = new Customer();
-                kh.setMaKH(rs.getInt("MaKH"));
-                kh.setHoTen(rs.getString("HoTen"));
-                kh.setSdt(rs.getString("SDT"));
-                kh.setCccd(rs.getString("CCCD")); 
-                kh.setDiemTichLuy(rs.getInt("DiemTichLuy"));
-                return kh;
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return map(rs);   // map() đã đọc đủ các field
             }
 
         } catch (Exception e) {
@@ -240,10 +232,6 @@ public class CustomerDAO {
             e.printStackTrace();
         }
     }
-    public void congDiem(int maKH, int diem) {
-        updatePoint(maKH, diem); // hàm updatePoint đã có sẵn trong CustomerDAO
-    }
-
 
     // ================= MAPPER =================
     private Customer map(ResultSet rs) throws SQLException {

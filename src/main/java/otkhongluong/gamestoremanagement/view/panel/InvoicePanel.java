@@ -6,6 +6,7 @@ import otkhongluong.gamestoremanagement.view.dialog.InvoiceDetailDialog;
 import otkhongluong.gamestoremanagement.view.dialog.InvoiceAddDialog;
 import otkhongluong.gamestoremanagement.view.dialog.InvoiceEditDialog;
 import otkhongluong.gamestoremanagement.util.RoundButton;
+import otkhongluong.gamestoremanagement.util.FormatUtil;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -456,8 +457,8 @@ import java.util.List;
 
             for (Invoice hd : result.rows) {
                 tableModel.addRow(new Object[]{
-                    hd.getMaHDFormatted(),
-                    hd.getMaNVFormatted(),
+                    FormatUtil.formatMa("HD", hd.getMaHD()),
+                    FormatUtil.formatMa("NV", hd.getMaNV()),
                     hd.getTenKhachHang(),
                     hd.getSoDienThoai(),
                     hd.getNgayLap() != null ? hd.getNgayLap().format(FMT) : "",

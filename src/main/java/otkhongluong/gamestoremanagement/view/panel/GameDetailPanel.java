@@ -3,7 +3,7 @@ package otkhongluong.gamestoremanagement.view.panel;
 import otkhongluong.gamestoremanagement.model.Game;
 import otkhongluong.gamestoremanagement.view.dialog.InvoiceAddDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentAddDialog;
-
+import otkhongluong.gamestoremanagement.util.FormatUtil;
 import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
@@ -255,13 +255,13 @@ public class GameDetailPanel extends JPanel {
         // ── Nút mua/thuê trên ảnh ──
         btnOverlay.removeAll();
         if (game.getGiaCD() != null && game.getGiaCD() > 0)
-            btnOverlay.add(makeBannerBtn("BUY CD", game.getGiaCDText(), BTN_CD,
+            btnOverlay.add(makeBannerBtn("BUY CD", FormatUtil.formatTien(game.getGiaCD()), BTN_CD,
                 e -> openBillAdd("CD")));
         if (game.getGiaROM() != null && game.getGiaROM() > 0)
-            btnOverlay.add(makeBannerBtn("BUY ROM", game.getGiaROMText(), BTN_ROM,
+            btnOverlay.add(makeBannerBtn("BUY ROM", FormatUtil.formatTien(game.getGiaROM()), BTN_ROM,
                 e -> openBillAdd("ROM")));
         if (game.getGiaThueNgay() != null && game.getGiaThueNgay() > 0)
-            btnOverlay.add(makeBannerBtn("RENT", game.getGiaThueText(), BTN_RENT,
+            btnOverlay.add(makeBannerBtn("RENT", FormatUtil.formatTienThue(game.getGiaThueNgay()), BTN_RENT,
                 e -> openRent()));
         btnOverlay.revalidate();
         btnOverlay.repaint();

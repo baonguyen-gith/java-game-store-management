@@ -1,5 +1,6 @@
 package otkhongluong.gamestoremanagement.view.panel;
 
+import otkhongluong.gamestoremanagement.model.TransactionDTO;
 import otkhongluong.gamestoremanagement.controller.TransactionController;
 import otkhongluong.gamestoremanagement.controller.TransactionController.PageResult;
 import otkhongluong.gamestoremanagement.view.dialog.InvoiceDetailDialog;
@@ -59,7 +60,7 @@ public class TransactionPanel extends JPanel {
     // ══════════════════════════════════════════════════════════
 
     /** Dữ liệu của trang đang hiển thị — dùng khi mở dialog. */
-    private List<Object[]> currentPageData = new ArrayList<>();
+    private List<TransactionDTO> currentPageData = new ArrayList<>();
 
     // ══════════════════════════════════════════════════════════
     // Components
@@ -323,19 +324,16 @@ public class TransactionPanel extends JPanel {
         // ── Điền bảng ──
         tableModel.setRowCount(0);
         currentPageData = new ArrayList<>(result.rows);
-
-        for (Object[] row : result.rows) {
-            String ngayStr = "";
-            if (row[4] instanceof Timestamp)
-                ngayStr = ((Timestamp) row[4]).toLocalDateTime().toLocalDate().format(FMT);
-
+        for (TransactionDTO row : result.rows) {
+            String ngayStr = row.getNgay() != null
+                ? row.getNgay().toLocalDate().format(FMT) : "";
             tableModel.addRow(new Object[]{
-                row[0],                                            // Mã GD
-                row[1],                                            // Loại
-                "NV" + String.format("%03d", (Integer) row[2]),   // Mã NV
-                row[3] != null ? row[3] : "",                      // Khách hàng
-                ngayStr,                                           // Ngày
-                String.format("%,.0f đ", (Double) row[5]),         // Tiền
+                row.getId(),
+                row.getLoai(),
+                "NV" + String.format("%03d", row.getMaNV()),
+                row.getTenKhachHang() != null ? row.getTenKhachHang() : "",
+                ngayStr,
+                String.format("%,.0f đ", row.getTien()),
                 "Xem"
             });
         }
@@ -398,9 +396,9 @@ public class TransactionPanel extends JPanel {
     }
 
     /** Mở dialog chi tiết đúng loại giao dịch. */
-    void openDetail(Object[] dataRow) {
-        String id   = (String) dataRow[0];
-        String loai = (String) dataRow[1];
+    void openDetail(TransactionDTO dataRow) {
+        String id   = dataRow.getId();
+        String loai = dataRow.getLoai();
         int numId   = Integer.parseInt(id.replaceAll("\\D", ""));
         Window parent = SwingUtilities.getWindowAncestor(this);
 

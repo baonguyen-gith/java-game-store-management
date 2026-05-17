@@ -7,6 +7,7 @@ import otkhongluong.gamestoremanagement.controller.EmployeeController.SaveResult
 import otkhongluong.gamestoremanagement.util.IconUtils;
 import otkhongluong.gamestoremanagement.view.dialog.EmployeeDialog;
 import otkhongluong.gamestoremanagement.util.RoundButton;
+import otkhongluong.gamestoremanagement.util.FormatUtil;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -383,7 +384,7 @@ public class EmployeePanel extends JPanel {
 
         for (Employee nv : result.data) {
             tableModel.addRow(new Object[]{
-                nv.getMaNVFormatted(),
+                FormatUtil.formatMa("NV", nv.getMaNV()),
                 nv.getHoTen(),
                 nv.getSdt()        != null ? nv.getSdt()                    : "",
                 nv.getCccd()       != null ? nv.getCccd()                   : "",

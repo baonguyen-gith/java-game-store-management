@@ -144,4 +144,18 @@ public class PointDAO {
 
         return d;
     }
+    
+    public int sumDiemTruByMaPT(int maPT) {
+        String sql = "SELECT COALESCE(SUM(SoDiem), 0) FROM DIEM_LICHSU WHERE MaPT = ? AND Loai = N'TRU'";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, maPT);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
 }

@@ -8,6 +8,7 @@
     import otkhongluong.gamestoremanagement.view.dialog.RentExtendDialog;
     import otkhongluong.gamestoremanagement.view.dialog.RentDetailDialog;
     import otkhongluong.gamestoremanagement.util.RoundButton;
+    import otkhongluong.gamestoremanagement.util.FormatUtil;
     import javax.swing.*;
     import javax.swing.border.*;
     import javax.swing.table.*;
@@ -465,8 +466,8 @@
 
             for (RentalOrder pt : result.rows) {
                 tableModel.addRow(new Object[]{
-                    pt.getMaPTFormatted(),
-                    pt.getMaNVFormatted(),
+                    FormatUtil.formatMa("PT", pt.getMaPT()),
+                    FormatUtil.formatMa("NV", pt.getMaNV()),
                     pt.getTenKhachHang(),
                     pt.getSoDienThoai(),
                     fmt(pt.getNgayThue()),

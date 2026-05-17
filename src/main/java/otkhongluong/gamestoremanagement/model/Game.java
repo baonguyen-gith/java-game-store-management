@@ -98,11 +98,6 @@ public class Game {
     public Double getGiaThueNgay()        { return giaThueNgay; }
     public void   setGiaThueNgay(Double v){ this.giaThueNgay = v; }
 
-    // ── Format helpers ────────────────────────────────────
-    public String getGiaCDText()      { return giaCD      == null ? "" : String.format("%,.0f đ", giaCD); }
-    public String getGiaROMText()     { return giaROM     == null ? "" : String.format("%,.0f đ", giaROM); }
-    public String getGiaThueText()    { return giaThueNgay== null ? "" : String.format("%,.0f đ/ngày", giaThueNgay); }
-
     @Override
     public String toString() {
         return "Game{maGame=" + maGame + ", tenGame='" + tenGame + "'}";

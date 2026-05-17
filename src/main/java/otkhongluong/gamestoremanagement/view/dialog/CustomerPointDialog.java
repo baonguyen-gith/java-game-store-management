@@ -4,7 +4,7 @@ import otkhongluong.gamestoremanagement.controller.PointController;
 import otkhongluong.gamestoremanagement.controller.PointController.ActionResult;
 import otkhongluong.gamestoremanagement.model.Customer;
 import otkhongluong.gamestoremanagement.model.Point;
-
+import otkhongluong.gamestoremanagement.util.FormatUtil;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -326,7 +326,7 @@ public class CustomerPointDialog extends JDialog {
         for (Point d : list) {
             tableModel.addRow(new Object[]{
                 d.getMaLS(),
-                d.getLoaiDisplay(),
+                FormatUtil.formatLoaiDiem(d.getLoai()),
                 d.getSoDiem(),
                 d.getNgay() != null ? d.getNgay().format(DTF) : "",
                 nvl(d.getGhiChu())

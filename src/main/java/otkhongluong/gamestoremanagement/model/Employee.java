@@ -34,11 +34,6 @@ public class Employee {
     public void setMaNV(int maNV) {
         this.maNV = maNV;
     }
-    
-    public String getMaNVFormatted() {
-        return "NV" + maNV;
-    }
-
 
     public String getHoTen() {
         return hoTen;

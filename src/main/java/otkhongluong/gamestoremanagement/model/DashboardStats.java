@@ -36,16 +36,4 @@ public class DashboardStats {
 
     public int getSoPhieuThueHomNay()              { return soPhieuThueHomNay; }
     public void setSoPhieuThueHomNay(int v)        { this.soPhieuThueHomNay = v; }
-
-    // ─── Helpers (dùng trong View) ─────────────────────────────────────────
-
-    /** Định dạng doanh thu hôm nay: "2,500,000 VNĐ" */
-    public String getDoanhThuHomNayFormatted() {
-        return String.format("%,d VNĐ", doanhThuHomNay);
-    }
-
-    /** Định dạng doanh thu tuần: "12,000,000 VNĐ" */
-    public String getDoanhThuTuanFormatted() {
-        return String.format("%,d VNĐ", doanhThuTuan);
-    }
 }

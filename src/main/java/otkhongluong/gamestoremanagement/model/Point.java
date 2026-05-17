@@ -46,9 +46,4 @@ public class Point {
 
     public String getGhiChu()               { return ghiChu; }
     public void setGhiChu(String ghiChu)    { this.ghiChu = ghiChu; }
-
-    /** Nhãn hiển thị thân thiện cho cột "Loại" */
-    public String getLoaiDisplay() {
-        return "cong".equalsIgnoreCase(loai) ? "➕ Cộng" : "➖ Trừ";
-    }
 }

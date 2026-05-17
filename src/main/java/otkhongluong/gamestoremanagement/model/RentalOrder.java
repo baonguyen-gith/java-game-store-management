@@ -9,15 +9,12 @@ public class RentalOrder {
     private int maPT;
     private int maKH;
     private int maNV;
-
     private LocalDateTime ngayThue;
     private LocalDateTime ngayTraDuKien;
     private LocalDateTime ngayTraThucTe;
-
     private double tienCoc;
     private double tienPhat;
     private String trangThai;
-
     private String tenKhachHang;
     private String tenNhanVien;
     private String soDienThoai;
@@ -28,12 +25,7 @@ public class RentalOrder {
 
     public int getMaPT() { return maPT; }
     public void setMaPT(int maPT) { this.maPT = maPT; }
-    public String getMaPTFormatted() {
-        return "PT" + maPT;
-    }
-    public String getMaNVFormatted() {
-        return "NV" + maNV;
-    }
+    
     public int getMaKH() { return maKH; }
     public void setMaKH(int maKH) { this.maKH = maKH; }
 
@@ -73,43 +65,5 @@ public class RentalOrder {
 
     public void setDanhSachChiTiet(List<CTPhieuThue> danhSachChiTiet) {
         this.danhSachChiTiet = danhSachChiTiet;
-    }
-
-    /* ================= DETAIL ================= */
-
-    public static class CTPhieuThue {
-
-        private int maCD;          // ⭐ QUAN TRỌNG
-        private int maNV;  
-        private String tenGame;
-        private String tinhTrang;
-        private double donGiaThue;
-        private double giaThueNgay;
-        
-        public CTPhieuThue(int maCD, String tenGame, double donGiaThue, String tinhTrang) {
-            this.maCD = maCD;
-            this.tenGame = tenGame;
-            this.donGiaThue = donGiaThue;
-            this.tinhTrang = tinhTrang;
-        }
-        
-        public int getMaNV() { return maNV; }
-        public void setMaNV(int maNV) { this.maNV = maNV; }
-
-        public int getMaCD() { return maCD; }
-        public void setMaCD(int maCD) { this.maCD = maCD; }
-
-        public String getTenGame() { return tenGame; }
-        public void setTenGame(String tenGame) { this.tenGame = tenGame; }
-
-        public String getTinhTrang() { return tinhTrang; }
-        public void setTinhTrang(String tinhTrang) { this.tinhTrang = tinhTrang; }
-
-        public double getDonGiaThue() { return donGiaThue; }
-        public void setDonGiaThue(double donGiaThue) {
-            this.donGiaThue = donGiaThue;
-        }
-        public double getGiaThueNgay() { return giaThueNgay; }
-        public void setGiaThueNgay(double giaThueNgay) { this.giaThueNgay = giaThueNgay; }
     }
 }

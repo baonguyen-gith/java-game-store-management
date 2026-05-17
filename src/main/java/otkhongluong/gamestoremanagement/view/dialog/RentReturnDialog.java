@@ -1,7 +1,9 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
+import otkhongluong.gamestoremanagement.model.CTPhieuThue;
 import otkhongluong.gamestoremanagement.model.RentalOrder;
-import otkhongluong.gamestoremanagement.service.RentalService;
+import otkhongluong.gamestoremanagement.controller.RentController;
+import otkhongluong.gamestoremanagement.controller.RentController.ActionResult;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -61,9 +63,9 @@ public class RentReturnDialog extends JDialog {
     private static final Font F_HINT         = new Font("Segoe UI", Font.ITALIC, 11);
 
     // =========================================================
-    // DAO / SERVICE
+    // Controller
     // =========================================================
-    private final RentalService service = new RentalService();
+    private final RentController ctrl = new RentController();
 
     // =========================================================
     // STATE
@@ -131,7 +133,7 @@ public class RentReturnDialog extends JDialog {
     }
 
     private void prefillFromMaPT(int id) {
-        RentalOrder pt = service.getById(id);
+        RentalOrder pt = ctrl.getById(id);
         if (pt != null && pt.getSoDienThoai() != null) {
             txtSDT.setText(pt.getSoDienThoai());
             doSearch();
@@ -281,12 +283,7 @@ public class RentReturnDialog extends JDialog {
         String sdt = txtSDT.getText().trim();
         if (sdt.isEmpty()) { showMsg("Vui lòng nhập số điện thoại!"); return; }
 
-        List<RentalOrder> all = service.getAll();
-        searchResults = all.stream()
-            .filter(pt -> pt.getSoDienThoai() != null
-                       && pt.getSoDienThoai().contains(sdt)
-                       && "DangThue".equalsIgnoreCase(pt.getTrangThai()))
-            .collect(Collectors.toList());
+        searchResults = ctrl.searchActiveRentalsBySdt(sdt);
 
         tblModel.setRowCount(0);
         if (searchResults.isEmpty()) {
@@ -396,14 +393,14 @@ public class RentReturnDialog extends JDialog {
     private void loadStep2Data() {
         if (selectedPhieu == null) return;
 
-        RentalOrder full = service.getById(selectedPhieu.getMaPT());
+        RentalOrder full = ctrl.getById(selectedPhieu.getMaPT());
         if (full == null) { showMsg("Không tải được thông tin phiếu thuê!"); return; }
         selectedPhieu = full;
 
         ngayTraThucTe = LocalDate.now().atStartOfDay();
 
         // ✅ Load điểm đã trừ từ DIEM_LICHSU thay vì parse TinhTrang
-        diemDaTruTheoMaPT = loadDiemDaTru(selectedPhieu.getMaPT());
+        diemDaTruTheoMaPT = ctrl.loadDiemDaTru(selectedPhieu.getMaPT());
 
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy");
         lblNgayThue.setText(selectedPhieu.getNgayThue() != null
@@ -421,7 +418,7 @@ public class RentReturnDialog extends JDialog {
         boolean diemHienThi = false;
         if (selectedPhieu.getDanhSachChiTiet() != null) {
             for (int idx = 0; idx < selectedPhieu.getDanhSachChiTiet().size(); idx++) {
-                RentalOrder.CTPhieuThue ct = selectedPhieu.getDanhSachChiTiet().get(idx);
+                CTPhieuThue ct = selectedPhieu.getDanhSachChiTiet().get(idx);
                 String raw = ct.getTinhTrang() != null ? ct.getTinhTrang() : "";
                 String tinhTrangHienThi = raw.split("\\|")[0];
 
@@ -465,21 +462,6 @@ public class RentReturnDialog extends JDialog {
             ngayDK.toLocalDate(), ngayTra.toLocalDate());
         if (days <= 0) days = 1;
         return days * 10_000;
-    }
-    private int loadDiemDaTru(int maPT) {
-        String sql = "SELECT COALESCE(SUM(SoDiem), 0) FROM DIEM_LICHSU "
-                   + "WHERE MaPT = ? AND Loai = 'TRU'";
-        try (java.sql.Connection con =
-                 otkhongluong.gamestoremanagement.util.DBConnection.getConnection();
-             java.sql.PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, maPT);
-            try (java.sql.ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getInt(1);
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-        return 0;
     }
 
     // =========================================================
@@ -559,7 +541,7 @@ public class RentReturnDialog extends JDialog {
         try {
             double tienThueGoc = 0;
             if (selectedPhieu.getDanhSachChiTiet() != null)
-                for (RentalOrder.CTPhieuThue ct : selectedPhieu.getDanhSachChiTiet())
+                for (CTPhieuThue ct : selectedPhieu.getDanhSachChiTiet())
                     tienThueGoc += ct.getDonGiaThue();
 
             int diemDaGiam = diemDaTruTheoMaPT; // ✅ lấy từ DIEM_LICHSU
@@ -722,7 +704,7 @@ public class RentReturnDialog extends JDialog {
         try {
             double tienThueGoc = 0;
             if (selectedPhieu.getDanhSachChiTiet() != null)
-                for (RentalOrder.CTPhieuThue ct : selectedPhieu.getDanhSachChiTiet())
+                for (CTPhieuThue ct : selectedPhieu.getDanhSachChiTiet())
                     tienThueGoc += ct.getDonGiaThue();
 
             int diemDaGiam = diemDaTruTheoMaPT; // ✅ lấy từ DIEM_LICHSU
@@ -770,70 +752,28 @@ public class RentReturnDialog extends JDialog {
                 "Xác nhận thanh toán", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
             if (confirm != JOptionPane.YES_OPTION) return;
 
-            boolean ok = service.returnCD(selectedPhieu.getMaPT(), ngayTraThucTe, chiPhiHuHong);
 
-            if (ok) {
-                boolean diemOk  = false;
-                String  diemMsg = "";
+            ActionResult ar = ctrl.returnCD(
+                selectedPhieu.getMaPT(),
+                ngayTraThucTe,
+                chiPhiHuHong,
+                selectedPhieu.getMaKH(),
+                diemTichLuy
+            );
 
-                if (selectedPhieu.getMaKH() > 0 && diemTichLuy > 0) {
-                    try (java.sql.Connection con =
-                             otkhongluong.gamestoremanagement.util.DBConnection.getConnection()) {
-
-                        con.setAutoCommit(false);
-
-                        // Cộng điểm vào KHACHHANG
-                        try (java.sql.PreparedStatement psUpdate = con.prepareStatement(
-                                "UPDATE KHACHHANG SET DiemTichLuy = COALESCE(DiemTichLuy, 0) + ? WHERE MaKH = ?")) {
-                            psUpdate.setInt(1, diemTichLuy);
-                            psUpdate.setInt(2, selectedPhieu.getMaKH());
-                            int rows = psUpdate.executeUpdate();
-                            if (rows == 0)
-                                throw new Exception("Không tìm thấy khách hàng MaKH=" + selectedPhieu.getMaKH());
-                        }
-
-                        // Ghi lịch sử vào DIEM_LICHSU (có MaPT)
-                        try (java.sql.PreparedStatement psLog = con.prepareStatement(
-                                "INSERT INTO DIEM_LICHSU (MaKH, Loai, SoDiem, GhiChu, MaPT) VALUES (?, 'CONG', ?, ?, ?)")) {
-                            psLog.setInt(1, selectedPhieu.getMaKH());
-                            psLog.setInt(2, diemTichLuy);
-                            psLog.setString(3, "Trả CD - PT" + selectedPhieu.getMaPT());
-                            psLog.setInt(4, selectedPhieu.getMaPT());
-                            psLog.executeUpdate();
-                        }
-
-                        con.commit();
-                        diemOk = true;
-
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
-                        diemMsg = "\n⚠ Cộng điểm thất bại: " + ex.getMessage()
-                                + "\nVui lòng cộng thủ công cho MaKH=" + selectedPhieu.getMaKH();
-                    }
-                } else if (diemTichLuy == 0) {
-                    diemOk  = true;
-                    diemMsg = "\n(Chưa đủ 100.000 VNĐ để tích điểm)";
-                } else {
-                    diemOk = true;
-                }
-
-                String finalMsg = String.format(
-                    "Trả CD thành công!\n\n"
-                  + "  Phiếu thuê → Đã Trả\n"
-                  + "  CD → Sẵn sàng\n"
-                  + "  Điểm tích lũy cộng: +%d điểm%s\n\n"
-                  + "  %s",
-                    diemTichLuy,
-                    diemOk ? (diemTichLuy > 0 ? " ✓" : "") : " ✗",
-                    ketQua + (diemOk ? "" : diemMsg));
-
-                JOptionPane.showMessageDialog(this, finalMsg,
-                    diemOk ? "Hoàn tất" : "Hoàn tất (có cảnh báo)",
-                    diemOk ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE);
+            if (ar.success) {
+                JOptionPane.showMessageDialog(this,
+                    String.format(
+                        "Trả CD thành công!\n\n"
+                      + "  Phiếu thuê → Đã Trả\n"
+                      + "  CD → Sẵn sàng\n"
+                      + "  Điểm tích lũy cộng: +%d điểm ✓\n\n"
+                      + "  %s",
+                        diemTichLuy, ketQua),
+                    "Hoàn tất", JOptionPane.INFORMATION_MESSAGE);
                 dispose();
-
             } else {
-                showMsg("Trả thất bại! Vui lòng thử lại hoặc liên hệ quản trị.");
+                showMsg(ar.message);
             }
 
         } catch (Exception ex) {

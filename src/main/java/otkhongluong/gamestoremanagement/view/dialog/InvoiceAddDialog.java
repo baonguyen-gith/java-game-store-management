@@ -1,46 +1,29 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.dao.CustomerDAO;
+import otkhongluong.gamestoremanagement.controller.InvoiceController;
+import otkhongluong.gamestoremanagement.controller.InvoiceController.ActionResult;
+import otkhongluong.gamestoremanagement.model.CartItem;
 import otkhongluong.gamestoremanagement.model.Customer;
-import otkhongluong.gamestoremanagement.util.DBConnection;
-import otkhongluong.gamestoremanagement.util.Session;
 
-import java.util.LinkedHashMap; // ✅ THÊM
-import java.util.Map;           // ✅ THÊM
+
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.RoundRectangle2D;
-import java.sql.*;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * InvoiceAddDialog — Wizard 2 bước tạo hóa đơn mua game
-
-Bước 1 : Chọn game + loại sản phẩm (CD / ROM), thêm vào giỏ hàng
-Bước 2 : Nhập thông tin KH, dùng điểm, xác nhận thanh toán
-
-LOGIC ĐIỂM:
-  Cộng điểm  : cứ 100.000 VNĐ (tổng gốc) = 1 điểm
-  Dùng điểm  : 1 điểm = 5.000 VNĐ giảm, không vượt quá tổng gốc
-
-DATABASE:
-  HOADON       : MaHD, MaKH, MaNV, NgayLap, TongTien, DiemSuDung, TienGiam, TrangThai
-  CTHOADON     : MaHD, MaSP, SoLuong, DonGia
-  CD           : TrangThai = 'DaBan' sau khi bán
-  ROM          : SoLuotBan++ sau khi bán
-  KHACHHANG    : DiemTichLuy cộng/trừ
-  DIEM_LICHSU  : ghi log cộng/trừ điểm
+ * InvoiceAddDialog — Wizard 2 bước tạo hóa đơn mua game.
+ * View thuần: không chứa SQL, DAO, hay Connection.
+ * Mọi nghiệp vụ đều đi qua InvoiceController.
  */
 public class InvoiceAddDialog extends JDialog {
 
     // =========================================================
-    // PALETTE — giữ nhất quán với RentAddDialog
+    // PALETTE
     // =========================================================
     private static final Color BG           = new Color(28, 16, 72);
     private static final Color BG_PANEL     = new Color(38, 24, 90);
@@ -58,67 +41,60 @@ public class InvoiceAddDialog extends JDialog {
     private static final Color GOLD         = new Color(255, 196, 64);
     private static final Color BTN_GREEN    = new Color(72, 199, 142);
     private static final Color BTN_RED      = new Color(240, 80, 80);
-    private static final Color BTN_ORANGE   = new Color(255, 160, 50);
 
     // =========================================================
     // FONTS
     // =========================================================
-    private static final Font F_TITLE    = new Font("Segoe UI", Font.BOLD, 15);
-    private static final Font F_SECTION  = new Font("Segoe UI", Font.BOLD, 12);
-    private static final Font F_LABEL    = new Font("Segoe UI", Font.PLAIN, 12);
-    private static final Font F_BOLD     = new Font("Segoe UI", Font.BOLD, 12);
-    private static final Font F_CELL     = new Font("Segoe UI", Font.PLAIN, 13);
-    private static final Font F_HDR      = new Font("Segoe UI", Font.BOLD, 12);
-    private static final Font F_VALUE    = new Font("Segoe UI", Font.BOLD, 14);
-    private static final Font F_MONEY    = new Font("Segoe UI", Font.BOLD, 16);
-    private static final Font F_BTN      = new Font("Segoe UI", Font.BOLD, 12);
-    private static final Font F_HINT     = new Font("Segoe UI", Font.ITALIC, 11);
-    private static final Font F_SMALL    = new Font("Segoe UI", Font.PLAIN, 11);
+    private static final Font F_TITLE   = new Font("Segoe UI", Font.BOLD, 15);
+    private static final Font F_SECTION = new Font("Segoe UI", Font.BOLD, 12);
+    private static final Font F_LABEL   = new Font("Segoe UI", Font.PLAIN, 12);
+    private static final Font F_CELL    = new Font("Segoe UI", Font.PLAIN, 13);
+    private static final Font F_HDR     = new Font("Segoe UI", Font.BOLD, 12);
+    private static final Font F_VALUE   = new Font("Segoe UI", Font.BOLD, 14);
+    private static final Font F_HINT    = new Font("Segoe UI", Font.ITALIC, 11);
+    private static final Font F_BTN     = new Font("Segoe UI", Font.BOLD, 12);
 
     // =========================================================
-    // CONSTANTS
+    // CONSTANTS (chỉ dùng cho UI — tính toán thực ở Service)
     // =========================================================
-    private static final int    VND_PER_DIEM  = 100_000; // 100k = 1 điểm tích lũy
-    private static final int    DIEM_TO_VND   = 5_000;   // 1 điểm = 5k giảm
+    private static final int DIEM_TO_VND  = 5_000;
+    private static final int VND_PER_DIEM = 100_000;
 
     // =========================================================
-    // DAO
+    // CONTROLLER — điểm liên lạc duy nhất với tầng dưới
     // =========================================================
-    private final CustomerDAO khDAO = new CustomerDAO();
+    private final InvoiceController ctrl = new InvoiceController();
 
     // =========================================================
     // STATE — Bước 1
     // =========================================================
-    /** Mỗi mục trong giỏ: {MaSP, MaCD_or_-1, TenGame, LoaiSP, DonGia, SoLuong, MaGame} */
     private final List<CartItem> cart = new ArrayList<>();
 
-    // Bảng game bên trái
-    private JTable          tblGame;
+    private JTable            tblGame;
     private DefaultTableModel tblGameModel;
-    List<Object[]>  gameList; // {MaGame, TenGame, TheLoai, NenTang}
+    List<Object[]>  gameList;   // {MaGame, TenGame, TheLoai, NenTang}
 
-    // Bảng sản phẩm bên phải (CD/ROM của game đang chọn)
-    private JTable          tblSP;
+    private JTable            tblSP;
     private DefaultTableModel tblSPModel;
-    List<Object[]>  spList;  // {MaSP, LoaiSP, GiaBan, TonKho_or_SoLuotBan, ThongTin}
+    List<Object[]>  spList;     // {MaSP, MaCD_or_-1, loaiSP, giaBan, thongTin, available, MaGame}
 
-    // Bảng giỏ hàng bên dưới
-    private JTable          tblCart;
+    private JTable            tblCart;
     private DefaultTableModel tblCartModel;
-
-    private JLabel          lblCartTotal;
+    private JLabel            lblCartTotal;
 
     // =========================================================
     // STATE — Bước 2
     // =========================================================
-    private JTextField      txtSDT;
-    private JLabel          lblTenKH, lblDiemHienCo;
-    private JTextField      txtDiemSuDung;
-    private JLabel          lblTongGoc, lblGiamDiem, lblTongPhaiTra, lblDiemSeSau;
+    private JTextField txtSDT;
+    private JLabel     lblTenKH, lblDiemHienCo;
+    private JTextField txtDiemSuDung;
+    private JLabel     lblTongGoc, lblGiamDiem, lblTongPhaiTra, lblDiemSeSau;
 
-    private Customer       currentKH   = null;
-    private int             maKH        = -1;
-    private int             diemHienCo  = 0;
+    private Customer currentKH  = null;
+    private int      maKH       = -1;
+    private int      diemHienCo = 0;
+
+    private DefaultTableModel summaryTableModel;
 
     // =========================================================
     // LAYOUT
@@ -147,7 +123,7 @@ public class InvoiceAddDialog extends JDialog {
         contentPanel.add(buildStep2(), "step2");
         add(contentPanel, BorderLayout.CENTER);
 
-        add(buildFooter(),   BorderLayout.SOUTH);
+        add(buildFooter(), BorderLayout.SOUTH);
         showStep(1);
     }
 
@@ -208,9 +184,17 @@ public class InvoiceAddDialog extends JDialog {
         for (Component c : stepIndicator.getComponents()) {
             if (c instanceof JLabel) {
                 JLabel lbl = (JLabel) c;
+
                 if (lbl.getName() != null && lbl.getName().startsWith("step_")) {
                     int s = Integer.parseInt(lbl.getName().split("_")[1]);
-                    lbl.setForeground(s == active ? ACCENT_LIGHT : (s < active ? SUCCESS : TEXT_MUTED));
+
+                    if (s == active) {
+                        lbl.setForeground(ACCENT_LIGHT);
+                    } else if (s < active) {
+                        lbl.setForeground(SUCCESS);
+                    } else {
+                        lbl.setForeground(TEXT_MUTED);
+                    }
                 }
             }
         }
@@ -225,7 +209,6 @@ public class InvoiceAddDialog extends JDialog {
         p.setBackground(BG);
         p.setBorder(new EmptyBorder(12, 20, 0, 20));
 
-        // === PHẦN TRÊN: game list (trái) + SP list (phải) ===
         JPanel topSection = new JPanel(new GridLayout(1, 2, 10, 0));
         topSection.setBackground(BG);
         topSection.setPreferredSize(new Dimension(0, 290));
@@ -281,15 +264,13 @@ public class InvoiceAddDialog extends JDialog {
         tblSP.getColumnModel().getColumn(2).setPreferredWidth(130);
         tblSP.getColumnModel().getColumn(3).setPreferredWidth(160);
 
-        // Tô màu dòng dựa trên tình trạng (hết hàng → đỏ nhạt)
         tblSP.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(
                     JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                 Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
                 if (!isSelected && spList != null && row < spList.size()) {
-                    Object[] sp = spList.get(row);
-                    boolean available = (boolean) sp[5];
+                    boolean available = (boolean) spList.get(row)[5];
                     if (!available) {
                         c.setBackground(new Color(255, 220, 220));
                         c.setForeground(new Color(180, 60, 60));
@@ -301,10 +282,8 @@ public class InvoiceAddDialog extends JDialog {
                 return c;
             }
         });
-
         spPanel.add(wrapScroll(tblSP), BorderLayout.CENTER);
 
-        // Nút Thêm vào giỏ
         PillButton btnAddCart = new PillButton("+ Thêm vào giỏ", BTN_GREEN, TEXT_DARK);
         btnAddCart.setPreferredSize(new Dimension(160, 32));
         btnAddCart.addActionListener(e -> doAddToCart());
@@ -317,7 +296,7 @@ public class InvoiceAddDialog extends JDialog {
         topSection.add(spPanel);
         p.add(topSection, BorderLayout.CENTER);
 
-        // === PHẦN DƯỚI: Giỏ hàng ===
+        // === Giỏ hàng ===
         JPanel cartSection = new JPanel(new BorderLayout(0, 6));
         cartSection.setBackground(BG);
         cartSection.setBorder(new EmptyBorder(4, 0, 0, 0));
@@ -325,7 +304,6 @@ public class InvoiceAddDialog extends JDialog {
 
         JPanel cartTopBar = new JPanel(new BorderLayout());
         cartTopBar.setBackground(BG);
-
         JLabel lblCart = new JLabel("🛒  Giỏ hàng");
         lblCart.setFont(F_SECTION);
         lblCart.setForeground(GOLD);
@@ -346,7 +324,7 @@ public class InvoiceAddDialog extends JDialog {
 
         String[] cartCols = {"STT", "Tên game", "Loại SP", "Mã SP / CD", "Đơn giá", "SL", "Thành tiền"};
         tblCartModel = new DefaultTableModel(cartCols, 0) {
-            public boolean isCellEditable(int r, int c) { return c == 5; } // SoLuong chỉ ROM
+            public boolean isCellEditable(int r, int c) { return c == 5; }
         };
         tblCart = makeTable(tblCartModel);
         tblCart.getColumnModel().getColumn(0).setPreferredWidth(40);
@@ -357,7 +335,6 @@ public class InvoiceAddDialog extends JDialog {
         tblCart.getColumnModel().getColumn(5).setPreferredWidth(50);
         tblCart.getColumnModel().getColumn(6).setPreferredWidth(130);
 
-        // Cho phép sửa số lượng của ROM trực tiếp trên bảng
         tblCart.getModel().addTableModelListener(e -> {
             int row = e.getFirstRow();
             int col = e.getColumn();
@@ -383,7 +360,6 @@ public class InvoiceAddDialog extends JDialog {
         lblCartTotal.setForeground(GOLD);
         lblCartTotal.setBorder(new EmptyBorder(4, 0, 0, 0));
         cartBottom.add(lblCartTotal, BorderLayout.WEST);
-
         JLabel hintCart = new JLabel("Mục ROM: sửa số lượng trực tiếp trong cột SL  |  CD: luôn SL = 1");
         hintCart.setFont(F_HINT);
         hintCart.setForeground(TEXT_MUTED);
@@ -391,43 +367,24 @@ public class InvoiceAddDialog extends JDialog {
 
         cartSection.add(wrapScroll(tblCart), BorderLayout.CENTER);
         cartSection.add(cartBottom, BorderLayout.SOUTH);
-
         p.add(cartSection, BorderLayout.SOUTH);
 
-        // Load dữ liệu ban đầu
         loadGameTable();
         return p;
     }
 
+    // ── Load game qua Controller ──────────────────────────────
     private void loadGameTable() {
         tblGameModel.setRowCount(0);
-        gameList = new ArrayList<>();
-        String sql = "SELECT g.MaGame, g.TenGame, g.TheLoai, g.NenTang " +
-                     "FROM GAME g " +
-                     "WHERE EXISTS (" +
-                     "  SELECT 1 FROM SANPHAM sp " +
-                     "  WHERE sp.MaGame = g.MaGame AND sp.GiaBan IS NOT NULL AND sp.GiaBan > 0" +
-                     ") " +
-                     "ORDER BY g.TenGame";
-        try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                int    maGame   = rs.getInt("MaGame");
-                String tenGame  = rs.getString("TenGame");
-                String theLoai  = rs.getString("TheLoai") != null ? rs.getString("TheLoai") : "";
-                String nenTang  = rs.getString("NenTang") != null ? rs.getString("NenTang") : "";
-                gameList.add(new Object[]{maGame, tenGame, theLoai, nenTang});
-                tblGameModel.addRow(new Object[]{"G" + maGame, tenGame, theLoai});
-            }
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            showMsg("Lỗi tải danh sách game: " + ex.getMessage());
+        gameList = ctrl.loadGameCatalog();
+        for (Object[] g : gameList) {
+            tblGameModel.addRow(new Object[]{"G" + g[0], g[1], g[2]});
         }
         tblSPModel.setRowCount(0);
         spList = null;
     }
 
+    // ── Load SP của game đang chọn qua Controller ─────────────
     private void loadSPTable() {
         tblSPModel.setRowCount(0);
         spList = new ArrayList<>();
@@ -435,119 +392,45 @@ public class InvoiceAddDialog extends JDialog {
         if (row < 0 || gameList == null || row >= gameList.size()) return;
         int maGame = (int) gameList.get(row)[0];
 
-        // Load CD còn sẵn sàng
-        String sqlCD = "SELECT sp.MaSP, cd.MaCD, sp.GiaBan, cd.TinhTrang " +
-                       "FROM SANPHAM sp JOIN CD cd ON sp.MaSP = cd.MaSP " +
-                       "WHERE sp.MaGame = ? AND cd.TrangThai = N'SanSang' AND sp.GiaBan IS NOT NULL AND sp.GiaBan > 0";
-        try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sqlCD)) {
-            ps.setInt(1, maGame);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                int    maSP      = rs.getInt("MaSP");
-                int    maCD      = rs.getInt("MaCD");
-                double giaBan    = rs.getDouble("GiaBan");
-                String tinhTrang = rs.getString("TinhTrang") != null ? rs.getString("TinhTrang") : "Tốt";
-                // {MaSP, MaCD_or_-1, loaiSP, giaBan, thongTin, available, MaGame}
-                spList.add(new Object[]{maSP, maCD, "CD", giaBan, "Tình trạng: " + tinhTrang, true, maGame});
+        spList = ctrl.loadSpCatalog(maGame);
+        for (Object[] sp : spList) {
+            boolean available = (boolean) sp[5];
+            if (available) {
                 tblSPModel.addRow(new Object[]{
-                    "SP" + maSP,
-                    "CD",
-                    String.format("%,.0f VNĐ", giaBan),
-                    "CD" + maCD + " — " + tinhTrang
+                    "SP" + sp[0],
+                    sp[2],
+                    String.format("%,.0f VNĐ", (double) sp[3]),
+                    sp[4]
                 });
+            } else {
+                tblSPModel.addRow(new Object[]{"—", sp[2], "—", sp[4]});
             }
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-        }
-
-        // Đếm CD hết hàng (TrangThai != SanSang)
-        String sqlCDHet =
-            "SELECT " +
-            "  SUM(CASE WHEN cd.TrangThai='DangThue' THEN 1 ELSE 0 END) as SoDangThue, " +
-            "  SUM(CASE WHEN cd.TrangThai='DaBan'    THEN 1 ELSE 0 END) as SoDaBan, " +
-            "  SUM(CASE WHEN cd.TrangThai='Hong'     THEN 1 ELSE 0 END) as SoHong " +
-            "FROM CD cd JOIN SANPHAM sp ON cd.MaSP = sp.MaSP " +
-            "WHERE sp.MaGame = ? AND cd.TrangThai != N'SanSang'";
-
-        try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sqlCDHet)) {
-            ps.setInt(1, maGame);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
-                int dangThue = rs.getInt("SoDangThue");
-                int daBan    = rs.getInt("SoDaBan");
-                int hong     = rs.getInt("SoHong");
-
-                if (dangThue > 0) {
-                    spList.add(new Object[]{-1, -1, "CD", 0.0, "DangThue", false, maGame});
-                    tblSPModel.addRow(new Object[]{"—", "CD", "—",
-                        "🔒 " + dangThue + " CD đang được thuê"});
-                }
-                if (daBan > 0) {
-                    spList.add(new Object[]{-1, -1, "CD", 0.0, "DaBan", false, maGame});
-                    tblSPModel.addRow(new Object[]{"—", "CD", "—",
-                        "💰 " + daBan + " CD đã bán"});
-                }
-                if (hong > 0) {
-                    spList.add(new Object[]{-1, -1, "CD", 0.0, "Hong", false, maGame});
-                    tblSPModel.addRow(new Object[]{"—", "CD", "—",
-                        "⚠ " + hong + " CD hỏng / mất"});
-                }
-            }
-        } catch (SQLException ex) { ex.printStackTrace(); }
-
-        // Load ROM
-        String sqlROM = "SELECT sp.MaSP, r.DungLuong, r.LinkLuuTru, sp.GiaBan " +
-                        "FROM SANPHAM sp JOIN ROM r ON sp.MaSP = r.MaSP " +
-                        "WHERE sp.MaGame = ? AND sp.GiaBan IS NOT NULL AND sp.GiaBan > 0";
-        try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sqlROM)) {
-            ps.setInt(1, maGame);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                int    maSP     = rs.getInt("MaSP");
-                String dungLuong = rs.getString("DungLuong") != null ? rs.getString("DungLuong") : "N/A";
-                double giaBan   = rs.getDouble("GiaBan");
-                spList.add(new Object[]{maSP, -1, "ROM", giaBan, dungLuong, true, maGame});
-                tblSPModel.addRow(new Object[]{
-                    "SP" + maSP,
-                    "ROM",
-                    String.format("%,.0f VNĐ", giaBan),
-                    "Tải về — " + dungLuong
-                });
-            }
-        } catch (SQLException ex) {
-            ex.printStackTrace();
         }
     }
 
+    // ── Thêm vào giỏ ─────────────────────────────────────────
     private void doAddToCart() {
         int gameRow = tblGame.getSelectedRow();
         int spRow   = tblSP.getSelectedRow();
         if (gameRow < 0) { showMsg("Vui lòng chọn game!"); return; }
-        if (spRow < 0)   { showMsg("Vui lòng chọn loại sản phẩm (CD hoặc ROM)!"); return; }
+        if (spRow   < 0) { showMsg("Vui lòng chọn loại sản phẩm (CD hoặc ROM)!"); return; }
         if (spList == null || spRow >= spList.size()) return;
 
-        Object[] sp = spList.get(spRow);
-        boolean available = (boolean) sp[5];
+        Object[] sp        = spList.get(spRow);
+        boolean  available = (boolean) sp[5];
         if (!available) {
             showMsg("Sản phẩm này đã hết hàng!\nVui lòng chọn CD khác hoặc chọn ROM.");
             return;
         }
 
-        int    maSP    = (int)    sp[0];
-        int    maCD    = (int)    sp[1];
-        String loai    = (String) sp[2];
-        double giaBan  = (double) sp[3];
-        int    maGame  = (int)    sp[6];
+        int    maSP   = (int)    sp[0];
+        int    maCD   = (int)    sp[1];
+        String loai   = (String) sp[2];
+        double giaBan = (double) sp[3];
+        int    maGame = (int)    sp[6];
         String tenGame = (String) gameList.get(gameRow)[1];
 
-        // Kiểm tra trùng: CD thì trùng theo MaSP+MaCD, ROM trùng theo MaSP
-        String newKey = "CD".equals(loai)
-            ? "CD_" + maCD          // CD: unique theo MaCD
-            : "ROM_" + maSP;        // ROM: unique theo MaSP
-
+        String newKey = "CD".equals(loai) ? "CD_" + maCD : "ROM_" + maSP;
         for (CartItem item : cart) {
             if (item.cartKey.equals(newKey)) {
                 if ("CD".equals(loai))
@@ -558,15 +441,7 @@ public class InvoiceAddDialog extends JDialog {
             }
         }
 
-        CartItem item = new CartItem();
-        item.maSP    = maSP;
-        item.maCD    = maCD;
-        item.maGame  = maGame;
-        item.tenGame = tenGame;
-        item.loaiSP  = loai;
-        item.donGia  = giaBan;
-        item.soLuong = 1;
-        item.cartKey = "CD".equals(loai) ? "CD_" + maCD : "ROM_" + maSP;  // ← gán key
+        CartItem item = new CartItem(maSP, maCD, maGame, 1, tenGame, loai, newKey, giaBan);
         cart.add(item);
         refreshCartTable();
     }
@@ -615,7 +490,6 @@ public class InvoiceAddDialog extends JDialog {
         p.setBackground(BG);
         p.setBorder(new EmptyBorder(14, 20, 0, 20));
 
-        // --- Tóm tắt giỏ hàng (bảng nhỏ) ---
         JPanel cartSummaryPanel = new JPanel(new BorderLayout(0, 4));
         cartSummaryPanel.setBackground(BG);
         JLabel lblCartSum = new JLabel("Giỏ hàng đã chọn:");
@@ -624,11 +498,10 @@ public class InvoiceAddDialog extends JDialog {
         cartSummaryPanel.add(lblCartSum, BorderLayout.NORTH);
 
         String[] summCols = {"Tên game", "Loại", "Đơn giá", "SL", "Thành tiền"};
-        DefaultTableModel summModel = new DefaultTableModel(summCols, 0) {
+        summaryTableModel = new DefaultTableModel(summCols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
-        // Sẽ được điền lúc loadStep2Data()
-        JTable tblSumm = makeTable(summModel);
+        JTable tblSumm = makeTable(summaryTableModel);
         tblSumm.getColumnModel().getColumn(0).setPreferredWidth(280);
         tblSumm.getColumnModel().getColumn(1).setPreferredWidth(60);
         tblSumm.getColumnModel().getColumn(2).setPreferredWidth(130);
@@ -637,13 +510,8 @@ public class InvoiceAddDialog extends JDialog {
         JScrollPane spSumm = wrapScroll(tblSumm);
         spSumm.setPreferredSize(new Dimension(0, 150));
         cartSummaryPanel.add(spSumm, BorderLayout.CENTER);
-
-        // Lưu ref để điền dữ liệu sau
-        this.summaryTableModel = summModel;
-
         p.add(cartSummaryPanel, BorderLayout.NORTH);
 
-        // --- Form KH & điểm ---
         JPanel form = new JPanel(new GridBagLayout());
         form.setBackground(BG);
         GridBagConstraints gc = new GridBagConstraints();
@@ -652,40 +520,34 @@ public class InvoiceAddDialog extends JDialog {
 
         int row = 0;
 
-        // SĐT + Tìm + Tạo
+        // SĐT + Tìm + Tạo + Bỏ qua
         txtSDT = makeInput();
-        PillButton btnTim = new PillButton("Tìm", ACCENT, WHITE);
+        PillButton btnTim  = new PillButton("Tìm",    ACCENT,                    WHITE);
+        PillButton btnTao  = new PillButton("Tạo mới", SUCCESS,                  TEXT_DARK);
+        PillButton btnSkip = new PillButton("Bỏ qua",  new Color(90, 70, 140),   WHITE);
         btnTim.setPreferredSize(new Dimension(80, 34));
-        btnTim.addActionListener(e -> doFindKH());
-        PillButton btnTao = new PillButton("Tạo mới", SUCCESS, TEXT_DARK);
         btnTao.setPreferredSize(new Dimension(100, 34));
-        btnTao.addActionListener(e -> doCreateKH());
-        PillButton btnSkip = new PillButton("Bỏ qua", new Color(90, 70, 140), WHITE);
         btnSkip.setPreferredSize(new Dimension(90, 34));
         btnSkip.setToolTipText("Khách không cung cấp SĐT — bỏ qua tích điểm");
+        btnTim.addActionListener(e  -> doFindKH());
+        btnTao.addActionListener(e  -> doCreateKH());
         btnSkip.addActionListener(e -> doSkipKH());
-
         txtSDT.addKeyListener(new KeyAdapter() {
             public void keyReleased(KeyEvent e) { doFindKH(); }
             public void keyPressed(KeyEvent e)  { if (e.getKeyCode() == KeyEvent.VK_ENTER) doFindKH(); }
         });
 
         addFormLabel(form, gc, "Số điện thoại KH:", row, 0, 140);
-        gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0;
-        form.add(txtSDT, gc);
-        gc.gridx = 2; gc.weightx = 0;
-        form.add(btnTim, gc);
-        gc.gridx = 3;
-        form.add(btnTao, gc);
-        gc.gridx = 4;
-        form.add(btnSkip, gc);
+        gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; form.add(txtSDT, gc);
+        gc.gridx = 2; gc.weightx = 0; form.add(btnTim,  gc);
+        gc.gridx = 3;                 form.add(btnTao,  gc);
+        gc.gridx = 4;                 form.add(btnSkip, gc);
         gc.gridwidth = 1;
 
         // Tên KH
         row++;
         lblTenKH = new JLabel("---");
-        lblTenKH.setFont(F_VALUE);
-        lblTenKH.setForeground(TEXT_MAIN);
+        lblTenKH.setFont(F_VALUE); lblTenKH.setForeground(TEXT_MAIN);
         addFormLabel(form, gc, "Tên khách hàng:", row, 0, 140);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 4;
         form.add(lblTenKH, gc);
@@ -694,16 +556,13 @@ public class InvoiceAddDialog extends JDialog {
         // Điểm hiện có
         row++;
         lblDiemHienCo = new JLabel("---");
-        lblDiemHienCo.setFont(F_VALUE);
-        lblDiemHienCo.setForeground(GOLD);
+        lblDiemHienCo.setFont(F_VALUE); lblDiemHienCo.setForeground(GOLD);
         addFormLabel(form, gc, "Điểm tích lũy:", row, 0, 140);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 4;
         form.add(lblDiemHienCo, gc);
         gc.gridwidth = 1; gc.weightx = 0;
 
-        // Divider
-        row++;
-        addDivider(form, gc, row, 5);
+        row++; addDivider(form, gc, row, 5);
 
         // Điểm sử dụng
         row++;
@@ -713,50 +572,39 @@ public class InvoiceAddDialog extends JDialog {
             public void keyReleased(KeyEvent e) { recalc(); }
         });
         JLabel lblHintDiem = new JLabel("(1 điểm = 5.000 VNĐ giảm, không vượt quá tổng gốc)");
-        lblHintDiem.setFont(F_HINT);
-        lblHintDiem.setForeground(TEXT_MUTED);
-
+        lblHintDiem.setFont(F_HINT); lblHintDiem.setForeground(TEXT_MUTED);
         addFormLabel(form, gc, "Điểm muốn dùng:", row, 0, 140);
-        gc.gridx = 1; gc.gridy = row; gc.weightx = 0.4;
-        form.add(txtDiemSuDung, gc);
-        gc.gridx = 2; gc.weightx = 0.6; gc.gridwidth = 3;
-        form.add(lblHintDiem, gc);
+        gc.gridx = 1; gc.gridy = row; gc.weightx = 0.4; form.add(txtDiemSuDung, gc);
+        gc.gridx = 2; gc.weightx = 0.6; gc.gridwidth = 3; form.add(lblHintDiem, gc);
         gc.gridwidth = 1; gc.weightx = 0;
 
-        // Divider
-        row++;
-        addDivider(form, gc, row, 5);
+        row++; addDivider(form, gc, row, 5);
 
         // Kết quả tính
         row++;
         lblTongGoc = resultLabel("---", TEXT_MAIN);
         addFormLabel(form, gc, "Tổng tiền gốc:", row, 0, 140);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 4;
-        form.add(lblTongGoc, gc);
-        gc.gridwidth = 1; gc.weightx = 0;
+        form.add(lblTongGoc, gc); gc.gridwidth = 1; gc.weightx = 0;
 
         row++;
         lblGiamDiem = resultLabel("---", SUCCESS);
         addFormLabel(form, gc, "Giảm từ điểm:", row, 0, 140);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 4;
-        form.add(lblGiamDiem, gc);
-        gc.gridwidth = 1; gc.weightx = 0;
+        form.add(lblGiamDiem, gc); gc.gridwidth = 1; gc.weightx = 0;
 
         row++;
         lblTongPhaiTra = resultLabel("---", ACCENT_LIGHT);
         addFormLabel(form, gc, "Tổng tiền phải trả:", row, 0, 140);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 4;
-        form.add(lblTongPhaiTra, gc);
-        gc.gridwidth = 1; gc.weightx = 0;
+        form.add(lblTongPhaiTra, gc); gc.gridwidth = 1; gc.weightx = 0;
 
         row++;
         lblDiemSeSau = resultLabel("---", GOLD);
         addFormLabel(form, gc, "Điểm sau giao dịch:", row, 0, 140);
         gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 4;
-        form.add(lblDiemSeSau, gc);
-        gc.gridwidth = 1; gc.weightx = 0;
+        form.add(lblDiemSeSau, gc); gc.gridwidth = 1; gc.weightx = 0;
 
-        // Filler
         row++;
         gc.gridx = 0; gc.gridy = row; gc.gridwidth = 5; gc.weighty = 1.0;
         gc.fill = GridBagConstraints.BOTH;
@@ -767,11 +615,7 @@ public class InvoiceAddDialog extends JDialog {
         return p;
     }
 
-    // ref để điền bảng tóm tắt giỏ hàng ở bước 2
-    private DefaultTableModel summaryTableModel;
-
     private void loadStep2Data() {
-        // Điền bảng tóm tắt
         summaryTableModel.setRowCount(0);
         for (CartItem item : cart) {
             summaryTableModel.addRow(new Object[]{
@@ -782,8 +626,6 @@ public class InvoiceAddDialog extends JDialog {
                 String.format("%,.0f VNĐ", item.donGia * item.soLuong)
             });
         }
-
-        // Reset KH
         txtSDT.setText("");
         txtDiemSuDung.setText("0");
         lblTenKH.setText("Chưa tìm kiếm — nhập SĐT hoặc nhấn \"Bỏ qua\"");
@@ -793,6 +635,7 @@ public class InvoiceAddDialog extends JDialog {
         recalc();
     }
 
+    // ── Tìm KH qua Controller ────────────────────────────────
     private void doFindKH() {
         String sdt = txtSDT.getText().trim();
         if (sdt.isEmpty()) {
@@ -802,7 +645,7 @@ public class InvoiceAddDialog extends JDialog {
             lblDiemHienCo.setText("---");
             recalc(); return;
         }
-        Customer kh = khDAO.findBySDT(sdt);
+        Customer kh = ctrl.findKHBySDT(sdt);
         if (kh != null) {
             currentKH = kh; maKH = kh.getMaKH(); diemHienCo = kh.getDiemTichLuy();
             lblTenKH.setText(kh.getHoTen());
@@ -828,11 +671,13 @@ public class InvoiceAddDialog extends JDialog {
         recalc();
     }
 
+    // ── Tạo KH mới qua Controller ────────────────────────────
     private void doCreateKH() {
         String sdt = txtSDT.getText().trim();
         if (sdt.isEmpty()) { showMsg("Vui lòng nhập số điện thoại trước!"); return; }
 
-        Customer existing = khDAO.findBySDT(sdt);
+        // Nếu đã tồn tại thì chỉ load lên
+        Customer existing = ctrl.findKHBySDT(sdt);
         if (existing != null) {
             showMsg("Khách hàng với SĐT " + sdt + " đã tồn tại!");
             currentKH = existing; maKH = existing.getMaKH(); diemHienCo = existing.getDiemTichLuy();
@@ -858,23 +703,25 @@ public class InvoiceAddDialog extends JDialog {
 
         String hoTen = fldTen.getText().trim();
         String email = fldEmail.getText().trim();
-        if (hoTen.isEmpty()) { showMsg("Họ và tên không được để trống!"); return; }
 
-        Customer kh = new Customer();
-        kh.setHoTen(hoTen); kh.setSdt(sdt); kh.setEmail(email.isEmpty() ? null : email);
-        kh.setDiemTichLuy(0);
-        if (khDAO.insert(kh)) {
-            currentKH = khDAO.findBySDT(sdt); maKH = currentKH.getMaKH(); diemHienCo = 0;
-            lblTenKH.setText(currentKH.getHoTen() + "  (mới tạo)");
-            lblTenKH.setForeground(SUCCESS);
-            lblDiemHienCo.setText("0 điểm");
+        // Gọi Controller — không gọi DAO trực tiếp
+        ActionResult ar = ctrl.createKH(hoTen, sdt, email.isEmpty() ? null : email);
+        if (ar.success) {
+            currentKH = ctrl.findKHAfterCreate(sdt);
+            if (currentKH != null) {
+                maKH = currentKH.getMaKH(); diemHienCo = 0;
+                lblTenKH.setText(currentKH.getHoTen() + "  (mới tạo)");
+                lblTenKH.setForeground(SUCCESS);
+                lblDiemHienCo.setText("0 điểm");
+            }
             showMsg("Tạo khách hàng thành công!");
         } else {
-            showMsg("Tạo khách hàng thất bại!");
+            showMsg(ar.message);
         }
         recalc();
     }
 
+    // ── Tính lại UI (không có SQL) ────────────────────────────
     private void recalc() {
         double tongGoc = calcTongGoc();
 
@@ -892,10 +739,8 @@ public class InvoiceAddDialog extends JDialog {
         giamTienDiem = diemThucDung * DIEM_TO_VND;
 
         double tongPhaiTra = Math.max(0, tongGoc - giamTienDiem);
-
-        // Điểm cộng sau mua = floor(tongGoc / VND_PER_DIEM)
-        int diemCong    = (int) Math.floor(tongGoc / VND_PER_DIEM);
-        int diemSauGD   = diemHienCo - diemThucDung + diemCong;
+        int    diemCong    = (int) Math.floor(tongGoc / VND_PER_DIEM);
+        int    diemSauGD   = diemHienCo - diemThucDung + diemCong;
 
         lblTongGoc.setText(String.format("%,.0f VNĐ", tongGoc));
         lblTongGoc.setForeground(TEXT_MAIN);
@@ -984,14 +829,15 @@ public class InvoiceAddDialog extends JDialog {
 
     private void goToStep2() {
         if (cart.isEmpty()) {
-            showMsg("Giỏ hàng đang trống!\nVui lòng chọn ít nhất một sản phẩm."); return;
+            showMsg("Giỏ hàng đang trống!\nVui lòng chọn ít nhất một sản phẩm.");
+            return;
         }
         loadStep2Data();
         showStep(2);
     }
 
     // =========================================================
-    // XÁC NHẬN — Tạo hóa đơn
+    // XÁC NHẬN THANH TOÁN — gọi Controller, không có SQL
     // =========================================================
     private void doConfirmPayment() {
         if (cart.isEmpty()) { showMsg("Giỏ hàng trống!"); return; }
@@ -1007,16 +853,15 @@ public class InvoiceAddDialog extends JDialog {
             recalc(); return;
         }
 
-        double tongGoc = calcTongGoc();
+        // Preview xác nhận (tính ở UI — transaction thực ở Service)
+        double tongGoc      = calcTongGoc();
         double giamTienDiem = Math.min((double) diemDung * DIEM_TO_VND, tongGoc);
         int    diemThucDung = (int) Math.floor(giamTienDiem / DIEM_TO_VND);
-        giamTienDiem = diemThucDung * DIEM_TO_VND;
+        giamTienDiem        = diemThucDung * DIEM_TO_VND;
         double tongPhaiTra  = Math.max(0, tongGoc - giamTienDiem);
         int    diemCong     = (int) Math.floor(tongGoc / VND_PER_DIEM);
 
-        // Popup xác nhận
-        StringBuilder sb = new StringBuilder();
-        sb.append("Xác nhận thanh toán hóa đơn?\n\n");
+        StringBuilder sb = new StringBuilder("Xác nhận thanh toán hóa đơn?\n\n");
         sb.append("  Khách hàng    : ").append(currentKH != null ? currentKH.getHoTen() : "Khách vãng lai").append("\n");
         sb.append(String.format("  Tổng gốc      : %,.0f VNĐ%n", tongGoc));
         if (diemThucDung > 0)
@@ -1026,195 +871,78 @@ public class InvoiceAddDialog extends JDialog {
             sb.append(String.format("  Điểm cộng     : +%d điểm (sau GD: %d điểm)%n",
                 diemCong, diemHienCo - diemThucDung + diemCong));
         sb.append("\nSản phẩm:\n");
-        for (CartItem item : cart) {
+        for (CartItem item : cart)
             sb.append("  • ").append(item.tenGame)
               .append(" [").append(item.loaiSP).append("]")
               .append(String.format("  x%d  %,.0f VNĐ%n", item.soLuong, item.donGia * item.soLuong));
-        }
 
         int confirm = JOptionPane.showConfirmDialog(this, sb.toString(),
             "Xác nhận thanh toán", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
         if (confirm != JOptionPane.YES_OPTION) return;
 
-        // Thực hiện tạo hóa đơn trong transaction
-        try (Connection con = DBConnection.getConnection()) {
-            con.setAutoCommit(false);
-            try {
-                // 1. Kiểm tra lại tình trạng các CD (phòng race condition)
+        // ── Gọi Controller — toàn bộ transaction ở Service/DAO ──
+        ActionResult result = ctrl.confirmPayment(maKH, diemThucDung, cart);
+
+        if (result.success) {
+            // result.message = "HĐ{id}"
+            StringBuilder doneMsg = new StringBuilder();
+            doneMsg.append(String.format("✅ Tạo hóa đơn thành công!  (%s)%n%n", result.message));
+            doneMsg.append(String.format("  Tổng tiền  : %,.0f VNĐ%n", tongPhaiTra));
+            if (diemCong > 0)
+                doneMsg.append(String.format("  Điểm cộng  : +%d điểm%n", diemCong));
+
+            boolean hasROM = cart.stream().anyMatch(i -> "ROM".equals(i.loaiSP));
+            boolean hasCD  = cart.stream().anyMatch(i -> "CD".equals(i.loaiSP));
+            if (hasCD)  doneMsg.append("\nCD: vui lòng giao đĩa cho khách.\n");
+            if (hasROM) {
+                doneMsg.append("\n📥 ROM — Link tải game:\n");
                 for (CartItem item : cart) {
-                    if ("CD".equals(item.loaiSP)) {
-                        String chkSQL = "SELECT TrangThai FROM CD WHERE MaCD = ?";
-                        try (PreparedStatement ps = con.prepareStatement(chkSQL)) {
-                            ps.setInt(1, item.maCD);
-                            ResultSet rs = ps.executeQuery();
-                            if (rs.next()) {
-                                String trangThai = rs.getString("TrangThai");
-                                if (!"SanSang".equals(trangThai)) {
-                                    con.rollback();
-                                    showMsg("CD" + item.maCD + " — \"" + item.tenGame + "\" vừa bị người khác mua!\n"
-                                           + "Vui lòng quay lại và chọn CD khác hoặc chọn ROM.");
-                                    return;
-                                }
-                            } else {
-                                con.rollback();
-                                showMsg("Không tìm thấy CD" + item.maCD + "!"); return;
-                            }
-                        }
+                    if ("ROM".equals(item.loaiSP)) {
+                        String link = ctrl.getROMLink(item.maSP);
+                        doneMsg.append("  • ").append(item.tenGame).append(": ")
+                               .append(link != null ? link : "(chưa có link)").append("\n");
                     }
                 }
-
-                // 2. Xử lý khách vãng lai nếu chưa có KH
-                // ✅ Khách vãng lai: chỉ reset điểm, không INSERT gì cả
-                if (maKH == -1) {
-                    diemThucDung = 0;
-                    giamTienDiem = 0;
-                }
-
-                // 3. Tạo HOADON
-                String insHD = "INSERT INTO HOADON (MaKH, MaNV, NgayLap, TongTien, DiemSuDung, TienGiam, TrangThai) " +
-               "VALUES (?, ?, GETDATE(), ?, ?, ?, N'DaThanhToan')";
-                int maHD = -1;   // ← khởi tạo mặc định
-                try (PreparedStatement ps = con.prepareStatement(insHD, Statement.RETURN_GENERATED_KEYS)) {
-                    if (maKH > 0) ps.setInt(1, maKH);
-                    else          ps.setNull(1, java.sql.Types.INTEGER);
-                    int maNV = Session.getMaNV();
-                    if (maNV > 0) ps.setInt(2, maNV);
-                    else          ps.setNull(2, java.sql.Types.INTEGER);
-                    ps.setDouble(3, tongPhaiTra);
-                    ps.setInt(4, diemThucDung);
-                    ps.setDouble(5, giamTienDiem);
-                    ps.executeUpdate();
-                    ResultSet gk = ps.getGeneratedKeys();
-                    if (!gk.next()) throw new SQLException("Không tạo được hóa đơn!");
-                    maHD = gk.getInt(1);   // gán vào biến đã khai báo ngoài
-                }
-                if (maHD == -1) throw new SQLException("Không lấy được mã hóa đơn!");
-
-                // ✅ FIX — gộp SoLuong của các CartItem cùng MaSP
-                // Bước 1: gộp cart theo MaSP
-                Map<Integer, double[]> spMap = new LinkedHashMap<>();
-                // key = MaSP, value = [tongSoLuong, donGia]
-                for (CartItem item : cart) {
-                    if (spMap.containsKey(item.maSP)) {
-                        spMap.get(item.maSP)[0] += item.soLuong;
-                    } else {
-                        spMap.put(item.maSP, new double[]{item.soLuong, item.donGia});
-                    }
-                }
-
-                // Bước 2: insert CTHOADON từ map (đã gộp, không còn duplicate)
-                String insCT = "INSERT INTO CTHOADON (MaHD, MaSP, SoLuong, DonGia) VALUES (?, ?, ?, ?)";
-                for (Map.Entry<Integer, double[]> entry : spMap.entrySet()) {
-                    try (PreparedStatement ps = con.prepareStatement(insCT)) {
-                        ps.setInt(1, maHD);
-                        ps.setInt(2, entry.getKey());               // MaSP
-                        ps.setInt(3, (int) entry.getValue()[0]);    // tổng SoLuong
-                        ps.setDouble(4, entry.getValue()[1]);        // DonGia
-                        ps.executeUpdate();
-                    }
-                }
-
-                // Bước 3: update CD/ROM vẫn dùng cart gốc (từng item riêng)
-                String updCD  = "UPDATE CD SET TrangThai = N'DaBan' WHERE MaCD = ?";
-                String updROM = "UPDATE ROM SET SoLuotBan = SoLuotBan + ? WHERE MaSP = ?";
-                for (CartItem item : cart) {
-                    if ("CD".equals(item.loaiSP)) {
-                        try (PreparedStatement ps = con.prepareStatement(updCD)) {
-                            ps.setInt(1, item.maCD);
-                            ps.executeUpdate();
-                        }
-                    } else {
-                        try (PreparedStatement ps = con.prepareStatement(updROM)) {
-                            ps.setInt(1, item.soLuong);
-                            ps.setInt(2, item.maSP);
-                            ps.executeUpdate();
-                        }
-                    }
-                }
-
-                // 5. Cập nhật điểm KH
-                if (maKH > 0 && currentKH != null) {
-                    // Trừ điểm đã dùng
-                    if (diemThucDung > 0) {
-                        khDAO.updatePoint(maKH, -diemThucDung);
-                        String logTru = "INSERT INTO DIEM_LICHSU (MaKH, Loai, SoDiem, GhiChu) VALUES (?, N'TRU', ?, ?)";
-                        try (PreparedStatement ps = con.prepareStatement(logTru)) {
-                            ps.setInt(1, maKH);
-                            ps.setInt(2, diemThucDung);
-                            ps.setNString(3, "Dùng điểm mua game — HĐ" + maHD);
-                            ps.executeUpdate();
-                        }
-                    }
-                    // Cộng điểm mới
-                    if (diemCong > 0) {
-                        khDAO.updatePoint(maKH, diemCong);
-                        String logCong = "INSERT INTO DIEM_LICHSU (MaKH, Loai, SoDiem, GhiChu) VALUES (?, N'CONG', ?, ?)";
-                        try (PreparedStatement ps = con.prepareStatement(logCong)) {
-                            ps.setInt(1, maKH);
-                            ps.setInt(2, diemCong);
-                            ps.setNString(3, "Mua game — HĐ" + maHD + String.format(" (tổng %,.0f VNĐ)", tongGoc));
-                            ps.executeUpdate();
-                        }
-                    }
-                }
-
-                con.commit();
-
-                // 6. Thông báo hoàn tất + hiển thị link ROM nếu có
-                StringBuilder doneMsg = new StringBuilder();
-                doneMsg.append(String.format("✅ Tạo hóa đơn thành công!  (HĐ%d)%n%n", maHD));
-                doneMsg.append(String.format("  Tổng tiền  : %,.0f VNĐ%n", tongPhaiTra));
-                if (diemCong > 0)
-                    doneMsg.append(String.format("  Điểm cộng  : +%d điểm%n", diemCong));
-
-                boolean hasROM = cart.stream().anyMatch(i -> "ROM".equals(i.loaiSP));
-                boolean hasCD  = cart.stream().anyMatch(i -> "CD".equals(i.loaiSP));
-
-                if (hasCD)  doneMsg.append("%nCD: vui lòng giao đĩa cho khách.%n".formatted());
-                if (hasROM) {
-                    doneMsg.append("%n📥 ROM — Link tải game:%n".formatted());
-                    for (CartItem item : cart) {
-                        if ("ROM".equals(item.loaiSP)) {
-                            String link = getROMLink(item.maSP);
-                            doneMsg.append("  • ").append(item.tenGame).append(": ")
-                                   .append(link != null ? link : "(chưa có link)").append("%n".formatted());
-                        }
-                    }
-                }
-
-                JOptionPane.showMessageDialog(this, doneMsg.toString(),
-                    "Thanh toán thành công", JOptionPane.INFORMATION_MESSAGE);
-                dispose();
-
-            } catch (Exception ex) {
-                con.rollback();
-                ex.printStackTrace();
-                showMsg("Thanh toán thất bại!\n" + ex.getMessage() + "\nVui lòng thử lại.");
             }
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            showMsg("Lỗi kết nối cơ sở dữ liệu: " + ex.getMessage());
+            JOptionPane.showMessageDialog(this, doneMsg.toString(),
+                "Thanh toán thành công", JOptionPane.INFORMATION_MESSAGE);
+            dispose();
+        } else {
+            showMsg("Thanh toán thất bại!\n" + result.message);
         }
     }
 
-    private String getROMLink(int maSP) {
-        String sql = "SELECT LinkLuuTru FROM ROM WHERE MaSP = ?";
-        try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, maSP);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) return rs.getString("LinkLuuTru");
-        } catch (SQLException ignored) {}
-        return null;
-    }
-
     // =========================================================
-    // HELPER MODEL
+    // STATIC HELPER — mở dialog và chọn sẵn game
     // =========================================================
-    private static class CartItem {
-        int    maSP, maCD, maGame, soLuong;
-        String tenGame, loaiSP, cartKey;   // ← thêm cartKey
-        double donGia;
+    public static void openAndPreselectGame(Frame parent, int maGame, String loaiSP) {
+        InvoiceAddDialog dlg = new InvoiceAddDialog(parent);
+        SwingUtilities.invokeLater(() -> {
+            int gameRow = -1;
+            if (dlg.gameList != null) {
+                for (int i = 0; i < dlg.gameList.size(); i++) {
+                    if ((int) dlg.gameList.get(i)[0] == maGame) { gameRow = i; break; }
+                }
+            }
+            if (gameRow >= 0) {
+                final int row = gameRow;
+                dlg.tblGame.setRowSelectionInterval(row, row);
+                dlg.tblGame.scrollRectToVisible(dlg.tblGame.getCellRect(row, 0, true));
+                SwingUtilities.invokeLater(() -> {
+                    if (dlg.spList != null) {
+                        for (int j = 0; j < dlg.spList.size(); j++) {
+                            Object[] sp = dlg.spList.get(j);
+                            if (loaiSP.equals(sp[2]) && (boolean) sp[5]) {
+                                dlg.tblSP.setRowSelectionInterval(j, j);
+                                dlg.tblSP.scrollRectToVisible(dlg.tblSP.getCellRect(j, 0, true));
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+        });
+        dlg.setVisible(true);
     }
 
     // =========================================================
@@ -1226,21 +954,16 @@ public class InvoiceAddDialog extends JDialog {
 
     private JTextField makeInput() {
         JTextField tf = new JTextField();
-        tf.setBackground(INPUT_BG);
-        tf.setForeground(TEXT_DARK);
-        tf.setCaretColor(ACCENT);
-        tf.setFont(F_CELL);
+        tf.setBackground(INPUT_BG); tf.setForeground(TEXT_DARK);
+        tf.setCaretColor(ACCENT); tf.setFont(F_CELL);
         tf.setBorder(new CompoundBorder(
-            new LineBorder(DIVIDER, 1, true),
-            new EmptyBorder(5, 8, 5, 8)
-        ));
+            new LineBorder(DIVIDER, 1, true), new EmptyBorder(5, 8, 5, 8)));
         return tf;
     }
 
     private JLabel resultLabel(String text, Color color) {
         JLabel l = new JLabel(text);
-        l.setFont(F_VALUE);
-        l.setForeground(color);
+        l.setFont(F_VALUE); l.setForeground(color);
         return l;
     }
 
@@ -1248,8 +971,7 @@ public class InvoiceAddDialog extends JDialog {
                                String text, int row, int col, int w) {
         gc.gridx = col; gc.gridy = row; gc.weightx = 0; gc.gridwidth = 1;
         JLabel l = new JLabel(text);
-        l.setFont(F_LABEL);
-        l.setForeground(TEXT_MUTED);
+        l.setFont(F_LABEL); l.setForeground(TEXT_MUTED);
         l.setPreferredSize(new Dimension(w, 30));
         form.add(l, gc);
     }
@@ -1271,35 +993,27 @@ public class InvoiceAddDialog extends JDialog {
                     c.setBackground(row % 2 == 0 ? new Color(248, 246, 255) : WHITE);
                     c.setForeground(TEXT_DARK);
                 } else {
-                    c.setBackground(ACCENT);
-                    c.setForeground(WHITE);
+                    c.setBackground(ACCENT); c.setForeground(WHITE);
                 }
                 return c;
             }
         };
-        t.setFont(F_CELL);
-        t.setRowHeight(32);
-        t.setShowGrid(false);
-        t.setIntercellSpacing(new Dimension(0, 0));
-        t.setSelectionBackground(ACCENT);
-        t.setSelectionForeground(WHITE);
+        t.setFont(F_CELL); t.setRowHeight(32);
+        t.setShowGrid(false); t.setIntercellSpacing(new Dimension(0, 0));
+        t.setSelectionBackground(ACCENT); t.setSelectionForeground(WHITE);
         t.setBackground(WHITE);
-
         JTableHeader h = t.getTableHeader();
         h.setDefaultRenderer(new DefaultTableCellRenderer() {
             public Component getTableCellRendererComponent(
                     JTable tbl, Object v, boolean sel, boolean foc, int r, int c) {
                 JLabel lbl = new JLabel(v == null ? "" : v.toString());
-                lbl.setFont(F_HDR);
-                lbl.setForeground(WHITE);
-                lbl.setBackground(ACCENT);
-                lbl.setOpaque(true);
+                lbl.setFont(F_HDR); lbl.setForeground(WHITE);
+                lbl.setBackground(ACCENT); lbl.setOpaque(true);
                 lbl.setBorder(new EmptyBorder(6, 10, 6, 10));
                 return lbl;
             }
         });
-        h.setBackground(ACCENT);
-        h.setPreferredSize(new Dimension(0, 34));
+        h.setBackground(ACCENT); h.setPreferredSize(new Dimension(0, 34));
         return t;
     }
 
@@ -1316,13 +1030,9 @@ public class InvoiceAddDialog extends JDialog {
     static class PillButton extends JButton {
         private final Color bg, fg;
         PillButton(String text, Color bg, Color fg) {
-            super(text);
-            this.bg = bg; this.fg = fg;
-            setFocusPainted(false);
-            setContentAreaFilled(false);
-            setBorderPainted(false);
-            setForeground(fg);
-            setFont(new Font("Segoe UI", Font.BOLD, 12));
+            super(text); this.bg = bg; this.fg = fg;
+            setFocusPainted(false); setContentAreaFilled(false); setBorderPainted(false);
+            setForeground(fg); setFont(F_BTN);
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         }
         protected void paintComponent(Graphics g) {
@@ -1330,50 +1040,7 @@ public class InvoiceAddDialog extends JDialog {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(getModel().isRollover() ? bg.darker() : bg);
             g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
-            super.paintComponent(g2);
-            g2.dispose();
+            super.paintComponent(g2); g2.dispose();
         }
-    }
-    
-    public static void openAndPreselectGame(Frame parent, int maGame, String loaiSP) {
-        InvoiceAddDialog dlg = new InvoiceAddDialog(parent);
- 
-        SwingUtilities.invokeLater(() -> {
-            // Bước 1: tìm & chọn dòng game
-            int gameRow = -1;
-            if (dlg.gameList != null) {
-                for (int i = 0; i < dlg.gameList.size(); i++) {
-                    if ((int) dlg.gameList.get(i)[0] == maGame) {
-                        gameRow = i;
-                        break;
-                    }
-                }
-            }
- 
-            if (gameRow >= 0) {
-                final int row = gameRow;
-                dlg.tblGame.setRowSelectionInterval(row, row);
-                dlg.tblGame.scrollRectToVisible(dlg.tblGame.getCellRect(row, 0, true));
-                // ListSelectionListener sẽ gọi loadSPTable() tự động
- 
-                // Bước 2: chờ loadSPTable() xong rồi chọn SP
-                SwingUtilities.invokeLater(() -> {
-                    if (dlg.spList != null) {
-                        for (int j = 0; j < dlg.spList.size(); j++) {
-                            Object[] sp = dlg.spList.get(j);
-                            boolean typeMatch     = loaiSP.equals(sp[2]);
-                            boolean available     = (boolean) sp[5];
-                            if (typeMatch && available) {
-                                dlg.tblSP.setRowSelectionInterval(j, j);
-                                dlg.tblSP.scrollRectToVisible(dlg.tblSP.getCellRect(j, 0, true));
-                                break;
-                            }
-                        }
-                    }
-                });
-            }
-        });
- 
-        dlg.setVisible(true);   // modal — luồng dừng ở đây cho đến khi đóng dialog
     }
 }

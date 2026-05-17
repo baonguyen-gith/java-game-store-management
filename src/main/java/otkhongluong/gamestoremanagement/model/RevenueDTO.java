@@ -1,32 +1,28 @@
 package otkhongluong.gamestoremanagement.model;
 
 public class RevenueDTO {
-    private String ThoiGian; 
-    private int SoDonHang;
-    private double TongDoanhThu;
+    private String thoiGian;
+    private int soDonHang;
+    private double tongDoanhThu;
 
-    public RevenueDTO() {
+    public RevenueDTO() {}
+
+    public RevenueDTO(String thoiGian, int soDonHang, double tongDoanhThu) {
+        this.thoiGian = thoiGian;
+        this.soDonHang = soDonHang;
+        this.tongDoanhThu = tongDoanhThu;
     }
 
-    public RevenueDTO(String ThoiGian, int SoDonHang, double TongDoanhThu) {
-        this.ThoiGian = ThoiGian;
-        this.SoDonHang = SoDonHang;
-        this.TongDoanhThu = TongDoanhThu;
-    }
-
-    public String getThoiGian() {return ThoiGian;}
-    public void setThoiGian(String ThoiGian) {this.ThoiGian = ThoiGian;}
-    public int getSoDonHang() {return SoDonHang;}
-    public void setSoDonHang(int SoDonHang) {this.SoDonHang = SoDonHang;}
-    public double getTongDoanhThu() {return TongDoanhThu;}
-    public void setTongDoanhThu(double TongDoanhThu) {this.TongDoanhThu = TongDoanhThu;}
+    public String getThoiGian() { return thoiGian; }
+    public void setThoiGian(String thoiGian) { this.thoiGian = thoiGian; }
+    public int getSoDonHang() { return soDonHang; }
+    public void setSoDonHang(int soDonHang) { this.soDonHang = soDonHang; }
+    public double getTongDoanhThu() { return tongDoanhThu; }
+    public void setTongDoanhThu(double tongDoanhThu) { this.tongDoanhThu = tongDoanhThu; }
 
     @Override
     public String toString() {
-        return "RevenueDTO{" +
-                "ThoiGian='" + ThoiGian + '\'' +
-                ", SoDonHang=" + SoDonHang +
-                ", TongDoanhThu=" + TongDoanhThu +
-                '}';
+        return "RevenueDTO{thoiGian='" + thoiGian + "', soDonHang=" + soDonHang
+             + ", tongDoanhThu=" + tongDoanhThu + '}';
     }
 }

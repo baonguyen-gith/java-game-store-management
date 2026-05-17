@@ -4,7 +4,7 @@ import otkhongluong.gamestoremanagement.controller.EmployeeDashboardController;
 import otkhongluong.gamestoremanagement.model.DashboardStats;
 import otkhongluong.gamestoremanagement.model.Employee;
 import otkhongluong.gamestoremanagement.model.User;
-
+import otkhongluong.gamestoremanagement.util.FormatUtil;
 import javax.swing.*;
 import java.awt.*;
 
@@ -128,7 +128,7 @@ public class EmployeeDashboardPanel extends JPanel {
     /** Điền thông tin nhân viên vào UI. Phải gọi trên EDT. */
     public void setEmployeeInfo(Employee emp) {
         lblName.setText(emp.getHoTen());
-        lblMaNV.setText(emp.getMaNVFormatted());
+        lblMaNV.setText(FormatUtil.formatMa("NV", emp.getMaNV()));
         lblNgaySinh.setText(emp.getNgaySinh() != null
                 ? formatDate(emp.getNgaySinh().getDayOfMonth(),
                              emp.getNgaySinh().getMonthValue(),
@@ -141,8 +141,8 @@ public class EmployeeDashboardPanel extends JPanel {
     /** Cập nhật các ô thống kê. Phải gọi trên EDT. */
     public void setStats(DashboardStats stats) {
         if (stats == null) return;
-        lblDoanhThuHomNay.setText(stats.getDoanhThuHomNayFormatted());
-        lblDoanhThuTuan.setText(stats.getDoanhThuTuanFormatted());
+        lblDoanhThuHomNay.setText(FormatUtil.formatDoanhThu(stats.getDoanhThuHomNay()));
+        lblDoanhThuTuan.setText(FormatUtil.formatDoanhThu(stats.getDoanhThuTuan()));
         lblSoHoaDon.setText(String.valueOf(stats.getSoHoaDonHomNay()));
         lblSoPhieuThue.setText(String.valueOf(stats.getSoPhieuThueHomNay()));
     }

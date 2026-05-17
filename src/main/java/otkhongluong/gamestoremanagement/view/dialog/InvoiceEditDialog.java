@@ -1,48 +1,36 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
-import otkhongluong.gamestoremanagement.dao.InvoiceDAO;
-import otkhongluong.gamestoremanagement.dao.CustomerDAO;
-import otkhongluong.gamestoremanagement.dao.EmployeeDAO;
-import otkhongluong.gamestoremanagement.model.Invoice;
+import otkhongluong.gamestoremanagement.controller.InvoiceController;
+import otkhongluong.gamestoremanagement.controller.InvoiceController.ActionResult;
+import otkhongluong.gamestoremanagement.model.SpRow;
 import otkhongluong.gamestoremanagement.model.Customer;
 import otkhongluong.gamestoremanagement.model.Employee;
-import otkhongluong.gamestoremanagement.service.InvoiceService;
-import otkhongluong.gamestoremanagement.util.DBConnection;
+import otkhongluong.gamestoremanagement.model.Invoice;
+
 
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
 import java.awt.*;
-import java.awt.event.*;
 import java.awt.geom.RoundRectangle2D;
-import java.sql.*;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * BillEditDialog — Sửa thông tin hóa đơn.
+ * InvoiceEditDialog — Sửa thông tin hóa đơn.
  *
- * Tab 1 "Thông tin đầu phiếu":
- *   - Đổi Khách hàng (tìm theo SĐT) -> tự động chuyển điểm sang KH mới
- *   - Đổi Nhân viên  (tìm theo mã NV)
- *   - Đổi Ngày lập   (dd/MM/yyyy)
- *
- * Tab 2 "Chi tiết sản phẩm":
- *   - Xem danh sách SP hiện có (read-only rows)
- *   - Xóa SP: rollback CD->SanSang hoặc ROM SoLuotBan--
- *   - Thêm SP: chọn từ catalog game/SP còn hàng, CD -> DaBan, ROM SoLuotBan++
- *   - TongTien tự động tính lại và cập nhật HOADON
- *
- * Tất cả thay đổi chỉ được áp vào DB khi nhấn "Lưu tất cả".
+ * Đã refactor theo chuẩn MVC:
+ *   - Không import DAO, Connection, PreparedStatement, ResultSet.
+ *   - Mọi nghiệp vụ (lookup KH/NV, load catalog, load working items,
+ *     lưu thay đổi) đều uỷ quyền cho InvoiceController.
+ *   - View chỉ còn: render UI, thu thập input, hiển thị kết quả.
  */
 public class InvoiceEditDialog extends JDialog {
 
     /* ══════════════════════════════════════════════════════
-       PALETTE — đồng bộ RentEditDialog
+       PALETTE
     ══════════════════════════════════════════════════════ */
     private static final Color BG           = new Color(35, 20, 85);
     private static final Color CARD_BG      = new Color(50, 30, 105);
@@ -74,38 +62,33 @@ public class InvoiceEditDialog extends JDialog {
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     /* ══════════════════════════════════════════════════════
-       DAO / SERVICE
+       MVC — chỉ giữ Controller; không giữ DAO/Service
     ══════════════════════════════════════════════════════ */
-    private final CustomerDAO khDAO = new CustomerDAO();
-    private final EmployeeDAO  nvDAO = new EmployeeDAO();
-    private final InvoiceService hdSvc = new InvoiceService();
+    private final InvoiceController controller;
 
     /* ══════════════════════════════════════════════════════
-       STATE — bản gốc
+       STATE — bản gốc hóa đơn (read-only sau khi load)
     ══════════════════════════════════════════════════════ */
     private final Invoice hd;
 
     /* ══════════════════════════════════════════════════════
-       STATE — Tab 1
+       STATE — Tab 1 (kết quả lookup, chưa lưu)
     ══════════════════════════════════════════════════════ */
-    private Customer foundKH   = null;
-    private Employee  foundNV   = null;
-    private LocalDate newNgayLap = null;
+    private Customer  foundKH    = null;   // null = không đổi KH
+    private Employee  foundNV    = null;   // null = không đổi NV
+    private LocalDate newNgayLap = null;   // null = không đổi ngày
 
     /* ══════════════════════════════════════════════════════
-       STATE — Tab 2
+       STATE — Tab 2 (working list, chưa lưu DB)
     ══════════════════════════════════════════════════════ */
-    /** Working copy của các SP trong HĐ (chưa lưu DB). */
     private final List<SpRow> workingItems = new ArrayList<>();
-    /** SP mới thêm trong phiên này. */
     private final List<SpRow> addedItems   = new ArrayList<>();
-    /** SP bị xóa trong phiên này (cần rollback khi lưu). */
     private final List<SpRow> removedItems = new ArrayList<>();
-    /** Catalog dùng trong popup "Thêm SP". */
+
+    /** Catalog dùng trong popup "Thêm SP" — lưu tạm để map row → data. */
     private List<Object[]> gameList = new ArrayList<>();
     private List<Object[]> spList   = new ArrayList<>();
-    private static final double DIEM_PER_DONG = 100_000.0;
-    
+
     /* ══════════════════════════════════════════════════════
        COMPONENTS — Tab 1
     ══════════════════════════════════════════════════════ */
@@ -120,34 +103,20 @@ public class InvoiceEditDialog extends JDialog {
     private JLabel            lblTongTien;
 
     /* ══════════════════════════════════════════════════════
-       INNER MODEL
-    ══════════════════════════════════════════════════════ */
-    private static class SpRow {
-        int    maSP, maCD;
-        String tenGame, loai;
-        double donGia;
-        int    soLuong;
-        boolean isNew;
-
-        SpRow(int maSP, int maCD, String tenGame, String loai,
-              double donGia, int soLuong, boolean isNew) {
-            this.maSP = maSP; this.maCD = maCD;
-            this.tenGame = tenGame; this.loai = loai;
-            this.donGia = donGia; this.soLuong = soLuong;
-            this.isNew = isNew;
-        }
-        double thanhTien() { return donGia * soLuong; }
-        /** Unique key to detect duplicates in working list. */
-        String key() { return "CD".equals(loai) ? "CD_" + maCD : "ROM_" + maSP; }
-    }
-
-    /* ══════════════════════════════════════════════════════
        CONSTRUCTOR
     ══════════════════════════════════════════════════════ */
     public InvoiceEditDialog(Frame parent, int maHD) {
-        super(parent, "Sửa Hóa Đơn", true);
+        this(parent, maHD, new InvoiceController());
+    }
 
-        Invoice loaded = hdSvc.getHoaDonById(maHD);
+    /** Constructor chính — controller có thể inject từ ngoài. */
+    public InvoiceEditDialog(Frame parent, int maHD, InvoiceController controller) {
+        super(parent, "Sửa Hóa Đơn", true);
+        this.controller = controller;
+
+        // ▼ Thay: new InvoiceService().getHoaDonById(maHD)
+        //   bằng: controller.getHoaDonById(maHD)
+        Invoice loaded = controller.getHoaDonById(maHD);
         if (loaded == null) {
             JOptionPane.showMessageDialog(parent,
                 "Không tìm thấy hóa đơn HD" + String.format("%03d", maHD),
@@ -238,9 +207,8 @@ public class InvoiceEditDialog extends JDialog {
         JPanel row = new JPanel(new GridLayout(1, 3, 10, 0));
         row.setBackground(BG);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
-
         row.add(infoCard("Ngày lập",
-            hd.getNgayLap() != null ? hd.getNgayLap().format(FMT) : "—"));
+             hd.getNgayLap() != null ? hd.getNgayLap().toLocalDate().format(FMT) : "—"));
         row.add(infoCard("Tổng tiền",
             String.format("%,.0f đ", hd.getTongTien())));
         row.add(infoCard("Nhân viên",
@@ -334,7 +302,6 @@ public class InvoiceEditDialog extends JDialog {
         p.setBackground(BG);
         p.setBorder(new EmptyBorder(12, 18, 8, 18));
 
-        /* toolbar */
         JPanel toolbar = new JPanel(new BorderLayout());
         toolbar.setBackground(BG);
         JLabel lbl = new JLabel("Sản phẩm trong hóa đơn");
@@ -354,13 +321,13 @@ public class InvoiceEditDialog extends JDialog {
         toolbar.add(btnBar, BorderLayout.EAST);
         p.add(toolbar, BorderLayout.NORTH);
 
-        /* table */
         String[] cols = {"Tên game", "Loại", "Mã CD/SP", "Đơn giá", "SL", "Thành tiền", "Trạng thái"};
         detailModel = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
         detailTable = new JTable(detailModel) {
-            @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
+            @Override
+            public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
                 if (isRowSelected(row)) {
                     c.setBackground(ACCENT); c.setForeground(WHITE);
@@ -383,7 +350,8 @@ public class InvoiceEditDialog extends JDialog {
 
         JTableHeader hdr = detailTable.getTableHeader();
         hdr.setDefaultRenderer(new DefaultTableCellRenderer() {
-            @Override public Component getTableCellRendererComponent(
+            @Override
+            public Component getTableCellRendererComponent(
                     JTable t, Object v, boolean sel, boolean foc, int row, int col) {
                 JLabel l = new JLabel(v == null ? "" : v.toString());
                 l.setFont(F_HDR); l.setForeground(WHITE);
@@ -405,7 +373,6 @@ public class InvoiceEditDialog extends JDialog {
         sp.getViewport().setBackground(WHITE);
         p.add(sp, BorderLayout.CENTER);
 
-        /* bottom bar */
         JPanel bottom = new JPanel(new BorderLayout());
         bottom.setBackground(BG);
         bottom.setBorder(new EmptyBorder(6, 0, 0, 0));
@@ -452,35 +419,15 @@ public class InvoiceEditDialog extends JDialog {
     /* ══════════════════════════════════════════════════════
        INIT DATA
     ══════════════════════════════════════════════════════ */
+
+    /**
+     * Load danh sách SP hiện có trong HĐ vào working list.
+     * ▼ Thay: truy vấn SQL trực tiếp trong Dialog
+     *   bằng: controller.loadWorkingItems(maHD)
+     */
     private void loadWorkingItems() {
         workingItems.clear();
-        if (hd.getDanhSachChiTiet() == null) return;
-
-        // For each line, look up MaCD (if CD) from CTHOADON+CD
-        String sqlCD =
-            "SELECT cd.MaCD FROM CTHOADON ct " +
-            "JOIN CD cd ON cd.MaSP = ct.MaSP " +
-            "WHERE ct.MaHD = ? AND ct.MaSP = ? AND cd.TrangThai = N'DaBan' " +
-            "ORDER BY cd.MaCD ASC";
-
-        try (Connection con = DBConnection.getConnection()) {
-            for (Invoice.ChiTietHoaDon ct : hd.getDanhSachChiTiet()) {
-                int maCD = -1;
-                if ("CD".equalsIgnoreCase(ct.getLoaiSanPham())) {
-                    try (PreparedStatement ps = con.prepareStatement(sqlCD)) {
-                        ps.setInt(1, hd.getMaHD());
-                        ps.setInt(2, ct.getMaSP());
-                        ResultSet rs = ps.executeQuery();
-                        if (rs.next()) maCD = rs.getInt("MaCD");
-                    }
-                }
-                workingItems.add(new SpRow(
-                    ct.getMaSP(), maCD,
-                    ct.getTenGame(), ct.getLoaiSanPham(),
-                    ct.getDonGia(), ct.getSoLuong(), false
-                ));
-            }
-        } catch (SQLException ex) { ex.printStackTrace(); }
+        workingItems.addAll(controller.loadWorkingItems(hd.getMaHD()));
         refreshDetailTable();
     }
 
@@ -492,21 +439,28 @@ public class InvoiceEditDialog extends JDialog {
         txtMaNV.setText("NV" + String.format("%03d", hd.getMaNV()));
         lookupNhanVien();
         if (hd.getNgayLap() != null) {
-            txtNgayLap.setText(hd.getNgayLap().format(FMT));
-            setResult(lblNgayResult, "Ngày hiện tại: " + hd.getNgayLap().format(FMT), MUTED);
+            txtNgayLap.setText(hd.getNgayLap().toLocalDate().format(FMT));
+            setResult(lblNgayResult, "Ngày hiện tại: " + hd.getNgayLap().toLocalDate().format(FMT), MUTED);
         }
     }
 
     /* ══════════════════════════════════════════════════════
-       TAB 1 — LOGIC
+       TAB 1 — LOGIC (View chỉ gọi controller, không gọi DAO)
     ══════════════════════════════════════════════════════ */
+
+    /**
+     * Tìm khách hàng theo SĐT.
+     * ▼ Thay: new CustomerDAO().findBySDT(sdt)
+     *   bằng: controller.findKHBySDT(sdt)
+     */
     private void lookupKhachHang() {
         String sdt = txtSdt.getText().trim();
         if (sdt.isEmpty()) {
             setResult(lblKHResult, "⚠  Nhập số điện thoại trước!", MUTED);
-            foundKH = null; return;
+            foundKH = null;
+            return;
         }
-        Customer kh = khDAO.findBySDT(sdt);
+        Customer kh = controller.findKHBySDT(sdt);
         if (kh == null) {
             setResult(lblKHResult, "✗  Không tìm thấy khách hàng với SĐT: " + sdt, RED);
             foundKH = null;
@@ -517,21 +471,21 @@ public class InvoiceEditDialog extends JDialog {
         }
     }
 
+    /**
+     * Tìm nhân viên theo mã.
+     * ▼ Thay: new EmployeeDAO().findById(maNV)
+     *   bằng: controller.findNVByMa(raw)
+     */
     private void lookupNhanVien() {
-        String raw = txtMaNV.getText().trim().replaceAll("(?i)nv", "");
+        String raw = txtMaNV.getText().trim();
         if (raw.isEmpty()) {
             setResult(lblNVResult, "⚠  Nhập mã nhân viên trước!", MUTED);
-            foundNV = null; return;
+            foundNV = null;
+            return;
         }
-        int maNV;
-        try { maNV = Integer.parseInt(raw); }
-        catch (NumberFormatException ex) {
-            setResult(lblNVResult, "✗  Mã NV phải là số (VD: NV001 hoặc 1)", RED);
-            foundNV = null; return;
-        }
-        Employee nv = nvDAO.findById(maNV);
+        Employee nv = controller.findNVByMa(raw);
         if (nv == null) {
-            setResult(lblNVResult, "✗  Không tìm thấy nhân viên mã: " + maNV, RED);
+            setResult(lblNVResult, "✗  Không tìm thấy nhân viên: " + raw, RED);
             foundNV = null;
         } else {
             setResult(lblNVResult,
@@ -540,25 +494,31 @@ public class InvoiceEditDialog extends JDialog {
         }
     }
 
+    /**
+     * Validate ngày lập.
+     * ▼ Thay: LocalDate.parse() inline
+     *   bằng: controller.parseDate(raw)  (logic tập trung ở Controller)
+     */
     private void validateNgayLap() {
         String raw = txtNgayLap.getText().trim();
         if (raw.isEmpty()) {
             setResult(lblNgayResult, "⚠  Nhập ngày lập trước!", MUTED);
-            newNgayLap = null; return;
+            newNgayLap = null;
+            return;
         }
-        try {
-            LocalDate d = LocalDate.parse(raw, FMT);
-            LocalDate old = hd.getNgayLap() != null ? hd.getNgayLap().toLocalDate() : null;
-            if (d.equals(old)) {
-                setResult(lblNgayResult, "ℹ  Ngày không đổi: " + d.format(FMT), MUTED);
-                newNgayLap = null;
-            } else {
-                newNgayLap = d;
-                setResult(lblNgayResult, "✓  Ngày mới: " + d.format(FMT), GREEN);
-            }
-        } catch (DateTimeParseException ex) {
+        LocalDate d = controller.parseDate(raw);
+        if (d == null) {
             setResult(lblNgayResult, "✗  Định dạng không hợp lệ. Vui lòng nhập dd/MM/yyyy", RED);
             newNgayLap = null;
+            return;
+        }
+        LocalDate old = hd.getNgayLap() != null ? hd.getNgayLap().toLocalDate() : null;
+        if (d.equals(old)) {
+            setResult(lblNgayResult, "ℹ  Ngày không đổi: " + d.format(FMT), MUTED);
+            newNgayLap = null;
+        } else {
+            newNgayLap = d;
+            setResult(lblNgayResult, "✓  Ngày mới: " + d.format(FMT), GREEN);
         }
     }
 
@@ -607,7 +567,7 @@ public class InvoiceEditDialog extends JDialog {
 
         workingItems.remove(row);
         if (!sp.isNew) removedItems.add(sp);
-        else addedItems.remove(sp); // hủy luôn, không cần rollback
+        else           addedItems.remove(sp);
         refreshDetailTable();
     }
 
@@ -621,7 +581,6 @@ public class InvoiceEditDialog extends JDialog {
         popup.setLayout(new BorderLayout(0, 0));
         popup.getContentPane().setBackground(BG);
 
-        /* Game table */
         DefaultTableModel gModel = new DefaultTableModel(
             new String[]{"Mã", "Tên game", "Thể loại"}, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
@@ -631,7 +590,6 @@ public class InvoiceEditDialog extends JDialog {
         tblGame.getColumnModel().getColumn(1).setPreferredWidth(210);
         tblGame.getColumnModel().getColumn(2).setPreferredWidth(100);
 
-        /* SP table */
         DefaultTableModel sModel = new DefaultTableModel(
             new String[]{"Mã SP", "Loại", "Giá bán", "Tình trạng / Dung lượng"}, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
@@ -644,7 +602,8 @@ public class InvoiceEditDialog extends JDialog {
 
         // Tô đỏ dòng hết hàng
         tblSP.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
-            @Override public Component getTableCellRendererComponent(
+            @Override
+            public Component getTableCellRendererComponent(
                     JTable t, Object v, boolean sel, boolean foc, int row, int col) {
                 Component c = super.getTableCellRendererComponent(t, v, sel, foc, row, col);
                 if (!sel && spList != null && row < spList.size()) {
@@ -661,12 +620,14 @@ public class InvoiceEditDialog extends JDialog {
             }
         });
 
+        // ▼ Thay: truy vấn SQL trực tiếp trong Dialog
+        //   bằng: controller.loadGameCatalog()
         gameList = new ArrayList<>();
         spList   = new ArrayList<>();
-        loadGameCatalog(gModel);
+        loadGameCatalogIntoTable(gModel);
 
         tblGame.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) loadSpCatalog(tblGame, sModel);
+            if (!e.getValueIsAdjusting()) loadSpCatalogIntoTable(tblGame, sModel);
         });
 
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
@@ -680,7 +641,6 @@ public class InvoiceEditDialog extends JDialog {
         center.add(split, BorderLayout.CENTER);
         popup.add(center, BorderLayout.CENTER);
 
-        /* Footer */
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
         footer.setBackground(BG);
         footer.setBorder(new EmptyBorder(0, 12, 8, 12));
@@ -691,12 +651,14 @@ public class InvoiceEditDialog extends JDialog {
             int gameRow = tblGame.getSelectedRow();
             int spRow   = tblSP.getSelectedRow();
             if (gameRow < 0 || spRow < 0) {
-                JOptionPane.showMessageDialog(popup, "Chọn game và sản phẩm trước!"); return;
+                JOptionPane.showMessageDialog(popup, "Chọn game và sản phẩm trước!");
+                return;
             }
             if (spList == null || spRow >= spList.size()) return;
             Object[] sp = spList.get(spRow);
             if (!(boolean) sp[5]) {
-                JOptionPane.showMessageDialog(popup, "Sản phẩm này đã hết hàng!"); return;
+                JOptionPane.showMessageDialog(popup, "Sản phẩm này đã hết hàng!");
+                return;
             }
             int    maSP   = (int)    sp[0];
             int    maCD   = (int)    sp[1];
@@ -705,11 +667,10 @@ public class InvoiceEditDialog extends JDialog {
             String ten    = (String) sp[7];
 
             SpRow newRow = new SpRow(maSP, maCD, ten, loai, giaBan, 1, true);
-            // Kiểm tra trùng với working list
             for (SpRow ex : workingItems) {
                 if (ex.key().equals(newRow.key())) {
-                    JOptionPane.showMessageDialog(popup,
-                        "Sản phẩm này đã có trong hóa đơn!"); return;
+                    JOptionPane.showMessageDialog(popup, "Sản phẩm này đã có trong hóa đơn!");
+                    return;
                 }
             }
             workingItems.add(newRow);
@@ -728,79 +689,58 @@ public class InvoiceEditDialog extends JDialog {
         popup.setVisible(true);
     }
 
-    private void loadGameCatalog(DefaultTableModel model) {
-        model.setRowCount(0); gameList.clear();
-        String sql =
-            "SELECT g.MaGame, g.TenGame, g.TheLoai FROM GAME g " +
-            "WHERE EXISTS (" +
-            "  SELECT 1 FROM SANPHAM sp WHERE sp.MaGame = g.MaGame " +
-            "  AND sp.GiaBan IS NOT NULL AND sp.GiaBan > 0" +
-            ") ORDER BY g.TenGame";
-        try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                int mg = rs.getInt("MaGame");
-                String tn = rs.getString("TenGame");
-                String tl = nvl(rs.getString("TheLoai"));
-                gameList.add(new Object[]{mg, tn, tl});
-                model.addRow(new Object[]{"G" + mg, tn, tl});
-            }
-        } catch (SQLException ex) { ex.printStackTrace(); }
+    /**
+     * Load danh sách game vào bảng trong popup.
+     * ▼ Thay: SQL trực tiếp
+     *   bằng: controller.loadGameCatalog()
+     */
+    private void loadGameCatalogIntoTable(DefaultTableModel model) {
+        model.setRowCount(0);
+        gameList.clear();
+        gameList.addAll(controller.loadGameCatalog());
+        for (Object[] row : gameList)
+            model.addRow(new Object[]{"G" + row[0], row[1], row[2]});
     }
 
-    private void loadSpCatalog(JTable tblGame, DefaultTableModel model) {
-        model.setRowCount(0); spList = new ArrayList<>();
+    /**
+     * Load SP của game đang chọn vào bảng trong popup.
+     * ▼ Thay: SQL trực tiếp
+     *   bằng: controller.loadSpCatalogForEdit(maGame, tenGame)
+     */
+    private void loadSpCatalogIntoTable(JTable tblGame, DefaultTableModel model) {
+        model.setRowCount(0);
+        spList = new ArrayList<>();
         int row = tblGame.getSelectedRow();
         if (row < 0 || row >= gameList.size()) return;
+
         int    maGame  = (int)    gameList.get(row)[0];
         String tenGame = (String) gameList.get(row)[1];
 
-        // CD còn SanSang
-        String sqlCD =
-            "SELECT sp.MaSP, cd.MaCD, sp.GiaBan, cd.TinhTrang " +
-            "FROM SANPHAM sp JOIN CD cd ON sp.MaSP = cd.MaSP " +
-            "WHERE sp.MaGame = ? AND cd.TrangThai = N'SanSang' " +
-            "  AND sp.GiaBan IS NOT NULL AND sp.GiaBan > 0";
-        try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sqlCD)) {
-            ps.setInt(1, maGame);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                int maSP = rs.getInt("MaSP"), maCD = rs.getInt("MaCD");
-                double g = rs.getDouble("GiaBan");
-                String tt = nvl(rs.getString("TinhTrang"));
-                spList.add(new Object[]{maSP, maCD, "CD", g,
-                    "CD" + maCD + " — " + tt, true, maGame, tenGame});
-                model.addRow(new Object[]{"SP" + maSP, "CD",
-                    String.format("%,.0f VNĐ", g), "CD" + maCD + " — " + tt});
-            }
-        } catch (SQLException ex) { ex.printStackTrace(); }
-
-        // ROM
-        String sqlROM =
-            "SELECT sp.MaSP, r.DungLuong, sp.GiaBan " +
-            "FROM SANPHAM sp JOIN ROM r ON sp.MaSP = r.MaSP " +
-            "WHERE sp.MaGame = ? AND sp.GiaBan IS NOT NULL AND sp.GiaBan > 0";
-        try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sqlROM)) {
-            ps.setInt(1, maGame);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                int maSP = rs.getInt("MaSP");
-                String dl = nvl(rs.getString("DungLuong"));
-                double g  = rs.getDouble("GiaBan");
-                spList.add(new Object[]{maSP, -1, "ROM", g,
-                    "Tải về — " + dl, true, maGame, tenGame});
-                model.addRow(new Object[]{"SP" + maSP, "ROM",
-                    String.format("%,.0f VNĐ", g), "Tải về — " + dl});
-            }
-        } catch (SQLException ex) { ex.printStackTrace(); }
+        spList.addAll(controller.loadSpCatalogForEdit(maGame, tenGame));
+        for (Object[] sp : spList) {
+            model.addRow(new Object[]{
+                "SP" + sp[0],
+                sp[2],
+                String.format("%,.0f VNĐ", sp[3]),
+                sp[4]
+            });
+        }
     }
 
     /* ══════════════════════════════════════════════════════
-       SAVE ALL  (single transaction)
+       SAVE ALL — uỷ quyền hoàn toàn cho Controller
     ══════════════════════════════════════════════════════ */
+
+    /**
+     * Lưu toàn bộ thay đổi.
+     * ▼ Thay: transaction SQL trực tiếp trong Dialog (80+ dòng)
+     *   bằng: controller.saveEditInvoice(...)  — 1 lời gọi duy nhất
+     *
+     * View chỉ còn trách nhiệm:
+     *   1. Kiểm tra có thay đổi không (hiển thị thông báo nếu không)
+     *   2. Xây confirm message cho người dùng xác nhận
+     *   3. Gọi controller rồi hiển thị kết quả
+     */
     private void doSaveAll() {
         boolean khChanged   = foundKH    != null && foundKH.getMaKH() != hd.getMaKH();
         boolean nvChanged   = foundNV    != null && foundNV.getMaNV() != hd.getMaNV();
@@ -813,18 +753,10 @@ public class InvoiceEditDialog extends JDialog {
             return;
         }
 
-        // Tổng tiền mới (từ working list)
-        double tongMoi = workingItems.stream().mapToDouble(SpRow::thanhTien).sum();
+        // Confirm dialog — View tự tính để hiển thị cho user
         double tongCu  = hd.getTongTien();
+        double tongMoi = workingItems.stream().mapToDouble(SpRow::thanhTien).sum();
 
-        // Điểm theo tổng tiền (làm tròn xuống)
-        int diemCu  = (int)(tongCu  / DIEM_PER_DONG);
-        int diemMoi = (int)(tongMoi / DIEM_PER_DONG);
-
-        int maKHCu  = hd.getMaKH();
-        int maKHMoi = khChanged ? foundKH.getMaKH() : maKHCu;
-
-        // ── Confirm dialog ──
         StringBuilder sb = new StringBuilder("Xác nhận cập nhật HD")
             .append(String.format("%03d", hd.getMaHD())).append("?\n\n");
         if (khChanged)
@@ -835,7 +767,7 @@ public class InvoiceEditDialog extends JDialog {
               .append("  →  NV").append(String.format("%03d", foundNV.getMaNV())).append("\n");
         if (ngayChanged)
             sb.append("• Ngày lập   : ")
-              .append(hd.getNgayLap() != null ? hd.getNgayLap().format(FMT) : "—")
+              .append(hd.getNgayLap() != null ? hd.getNgayLap().toLocalDate().format(FMT) : "—")
               .append("  →  ").append(newNgayLap.format(FMT)).append("\n");
         if (spChanged) {
             if (!removedItems.isEmpty())
@@ -844,184 +776,34 @@ public class InvoiceEditDialog extends JDialog {
                 sb.append("• Thêm SP    : ").append(addedItems.size()).append(" sản phẩm\n");
             sb.append(String.format("• Tổng tiền  : %,.0f đ  →  %,.0f đ%n", tongCu, tongMoi));
         }
-        // Thông báo điểm
-        if (khChanged) {
-            sb.append(String.format(
-                "• Điểm TL    : KH%03d trừ %d điểm  |  KH%03d +%d điểm%n",
-                maKHCu, diemCu, maKHMoi, diemMoi));
-        } else if (diemMoi != diemCu) {
-            sb.append(String.format(
-                "• Điểm TL    : %d  →  %d điểm (KH%03d)%n",
-                diemCu, diemMoi, maKHCu));
-        }
 
         int yn = JOptionPane.showConfirmDialog(this, sb.toString(),
             "Xác nhận sửa", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
         if (yn != JOptionPane.YES_OPTION) return;
 
-        try (Connection con = DBConnection.getConnection()) {
-            con.setAutoCommit(false);
-            try {
+        // ▼ Thay: ~80 dòng transaction SQL trực tiếp
+        //   bằng: 1 lời gọi controller duy nhất
+        ActionResult result = controller.saveEditInvoice(
+            hd.getMaHD(),
+            khChanged   ? foundKH  : null,
+            nvChanged   ? (Integer) foundNV.getMaNV() : null,
+            newNgayLap,
+            hd.getMaKH(),
+            tongCu,
+            removedItems,
+            addedItems,
+            workingItems
+        );
 
-                /* ── 1. Cập nhật KH / NV ── */
-                if (khChanged || nvChanged) {
-                    try (PreparedStatement ps = con.prepareStatement(
-                            "UPDATE HOADON SET MaKH=?, MaNV=? WHERE MaHD=?")) {
-                        ps.setInt(1, maKHMoi);
-                        ps.setInt(2, nvChanged ? foundNV.getMaNV() : hd.getMaNV());
-                        ps.setInt(3, hd.getMaHD());
-                        ps.executeUpdate();
-                    }
-                    if (khChanged) {
-                        // KH cũ: trừ điểm theo tổng tiền CŨ
-                        adjustDiem(con, maKHCu, -diemCu);
-                        // KH mới: cộng điểm theo tổng tiền MỚI
-                        adjustDiem(con, maKHMoi, +diemMoi);
-                        // Chuyển log điểm sang KH mới
-                        transferPointLogs(con, hd.getMaHD(), maKHCu, maKHMoi);
-                    }
-                }
-
-                /* ── 2. Ngày lập ── */
-                if (ngayChanged) {
-                    try (PreparedStatement ps = con.prepareStatement(
-                            "UPDATE HOADON SET NgayLap=? WHERE MaHD=?")) {
-                        ps.setTimestamp(1, Timestamp.valueOf(newNgayLap.atStartOfDay()));
-                        ps.setInt(2, hd.getMaHD());
-                        ps.executeUpdate();
-                    }
-                }
-
-                /* ── 3. Xóa SP (rollback tồn kho) ── */
-                for (SpRow sp : removedItems) {
-                    try (PreparedStatement ps = con.prepareStatement(
-                            "DELETE FROM CTHOADON WHERE MaHD=? AND MaSP=?")) {
-                        ps.setInt(1, hd.getMaHD()); ps.setInt(2, sp.maSP);
-                        ps.executeUpdate();
-                    }
-                    if ("CD".equals(sp.loai) && sp.maCD > 0) {
-                        try (PreparedStatement ps = con.prepareStatement(
-                                "UPDATE CD SET TrangThai=N'SanSang' WHERE MaCD=?")) {
-                            ps.setInt(1, sp.maCD); ps.executeUpdate();
-                        }
-                    } else if ("ROM".equals(sp.loai)) {
-                        try (PreparedStatement ps = con.prepareStatement(
-                                "UPDATE ROM SET SoLuotBan=" +
-                                "CASE WHEN SoLuotBan-?<0 THEN 0 ELSE SoLuotBan-? END WHERE MaSP=?")) {
-                            ps.setInt(1, sp.soLuong); ps.setInt(2, sp.soLuong);
-                            ps.setInt(3, sp.maSP); ps.executeUpdate();
-                        }
-                    }
-                }
-
-                /* ── 4. Thêm SP mới ── */
-                for (SpRow sp : addedItems) {
-                    if ("CD".equals(sp.loai)) {
-                        try (PreparedStatement ps = con.prepareStatement(
-                                "SELECT TrangThai FROM CD WHERE MaCD=?")) {
-                            ps.setInt(1, sp.maCD);
-                            ResultSet rs = ps.executeQuery();
-                            if (rs.next() && !"SanSang".equals(rs.getString("TrangThai"))) {
-                                con.rollback();
-                                JOptionPane.showMessageDialog(this,
-                                    "CD" + sp.maCD + " — \"" + sp.tenGame + "\" vừa bị bán mất!\n"
-                                    + "Vui lòng chọn lại.", "Xung đột dữ liệu", JOptionPane.ERROR_MESSAGE);
-                                return;
-                            }
-                        }
-                    }
-                    String upsert =
-                        "IF EXISTS (SELECT 1 FROM CTHOADON WHERE MaHD=? AND MaSP=?) " +
-                        "  UPDATE CTHOADON SET SoLuong=SoLuong+?,DonGia=? WHERE MaHD=? AND MaSP=? " +
-                        "ELSE " +
-                        "  INSERT INTO CTHOADON(MaHD,MaSP,SoLuong,DonGia) VALUES(?,?,?,?)";
-                    try (PreparedStatement ps = con.prepareStatement(upsert)) {
-                        ps.setInt(1, hd.getMaHD()); ps.setInt(2, sp.maSP);
-                        ps.setInt(3, sp.soLuong);   ps.setDouble(4, sp.donGia);
-                        ps.setInt(5, hd.getMaHD()); ps.setInt(6, sp.maSP);
-                        ps.setInt(7, hd.getMaHD()); ps.setInt(8, sp.maSP);
-                        ps.setInt(9, sp.soLuong);   ps.setDouble(10, sp.donGia);
-                        ps.executeUpdate();
-                    }
-                    if ("CD".equals(sp.loai) && sp.maCD > 0) {
-                        try (PreparedStatement ps = con.prepareStatement(
-                                "UPDATE CD SET TrangThai=N'DaBan' WHERE MaCD=?")) {
-                            ps.setInt(1, sp.maCD); ps.executeUpdate();
-                        }
-                    } else if ("ROM".equals(sp.loai)) {
-                        try (PreparedStatement ps = con.prepareStatement(
-                                "UPDATE ROM SET SoLuotBan=SoLuotBan+? WHERE MaSP=?")) {
-                            ps.setInt(1, sp.soLuong); ps.setInt(2, sp.maSP);
-                            ps.executeUpdate();
-                        }
-                    }
-                }
-
-                /* ── 5. Cập nhật TongTien + điểm KH (nếu SP thay đổi, KH không đổi) ── */
-                if (spChanged) {
-                    try (PreparedStatement ps = con.prepareStatement(
-                            "UPDATE HOADON SET TongTien=? WHERE MaHD=?")) {
-                        ps.setDouble(1, tongMoi); ps.setInt(2, hd.getMaHD());
-                        ps.executeUpdate();
-                    }
-                    // Chỉ cập nhật điểm KH nếu KH không đổi
-                    // (nếu KH đổi thì bước 1 đã xử lý rồi)
-                    if (!khChanged && diemMoi != diemCu) {
-                        adjustDiem(con, maKHCu, diemMoi - diemCu);
-                    }
-                }
-
-                con.commit();
-                JOptionPane.showMessageDialog(this,
-                    "✅ Cập nhật hóa đơn HD" + String.format("%03d", hd.getMaHD()) + " thành công!",
-                    "Thành công", JOptionPane.INFORMATION_MESSAGE);
-                dispose();
-
-            } catch (Exception ex) {
-                con.rollback();
-                ex.printStackTrace();
-                JOptionPane.showMessageDialog(this,
-                    "❌ Lỗi khi lưu:\n" + ex.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
-            }
-        } catch (SQLException ex) {
-            ex.printStackTrace();
+        if (result.success) {
             JOptionPane.showMessageDialog(this,
-                "❌ Lỗi kết nối:\n" + ex.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
+                "✅ " + result.message, "Thành công", JOptionPane.INFORMATION_MESSAGE);
+            dispose();
+        } else {
+            JOptionPane.showMessageDialog(this,
+                "❌ " + result.message, "Lỗi", JOptionPane.ERROR_MESSAGE);
         }
     }
-
-    /**
-     * Chuyển điểm từ KH cũ sang KH mới cho các log điểm liên quan HĐ này.
-     * Đảo ngược hiệu ứng điểm ở KH cũ, áp lại cho KH mới.
-     */
-    /**
- * Điều chỉnh DiemTichLuy của KH — delta dương = cộng, âm = trừ.
- * Không cho xuống dưới 0.
- */
-        private void adjustDiem(Connection con, int maKH, int delta) throws SQLException {
-            if (delta == 0) return;
-            try (PreparedStatement ps = con.prepareStatement(
-                    "UPDATE KHACHHANG SET DiemTichLuy = " +
-                    "CASE WHEN DiemTichLuy+?<0 THEN 0 ELSE DiemTichLuy+? END " +
-                    "WHERE MaKH=?")) {
-                ps.setInt(1, delta); ps.setInt(2, delta); ps.setInt(3, maKH);
-                ps.executeUpdate();
-            }
-        }
-
-        /**
-         * Chuyển ownership các log điểm liên quan HĐ này từ KH cũ sang KH mới.
-         * Không tính lại điểm vì adjustDiem() đã làm ở bước 1.
-         */
-        private void transferPointLogs(Connection con, int maHD, int maKHCu, int maKHMoi)
-                throws SQLException {
-            try (PreparedStatement ps = con.prepareStatement(
-                    "UPDATE DIEM_LICHSU SET MaKH=? " +
-                    "WHERE MaKH=? AND MaPT IS NULL AND GhiChu LIKE N'%HĐ" + maHD + "%'")) {
-                ps.setInt(1, maKHMoi); ps.setInt(2, maKHCu);
-                ps.executeUpdate();
-            }
-        }
 
     /* ══════════════════════════════════════════════════════
        UI HELPERS
@@ -1038,7 +820,7 @@ public class InvoiceEditDialog extends JDialog {
         JPanel row = new JPanel(new BorderLayout(8, 0));
         row.setBackground(BG);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
-        row.add(tf, BorderLayout.CENTER);
+        row.add(tf,  BorderLayout.CENTER);
         row.add(btn, BorderLayout.EAST);
         return row;
     }
@@ -1062,7 +844,8 @@ public class InvoiceEditDialog extends JDialog {
 
     private JTextField styledInput(String placeholder) {
         JTextField tf = new JTextField() {
-            @Override protected void paintComponent(Graphics g) {
+            @Override
+            protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 if (getText().isEmpty()) {
                     Graphics2D g2 = (Graphics2D) g;
@@ -1073,7 +856,7 @@ public class InvoiceEditDialog extends JDialog {
             }
         };
         tf.setBackground(INPUT_BG); tf.setForeground(TEXT_DARK);
-        tf.setCaretColor(ACCENT); tf.setFont(F_INPUT);
+        tf.setCaretColor(ACCENT);   tf.setFont(F_INPUT);
         tf.setBorder(new CompoundBorder(
             new LineBorder(ACCENT, 1, true), new EmptyBorder(6, 10, 6, 10)));
         tf.setPreferredSize(new Dimension(0, 40));
@@ -1082,12 +865,15 @@ public class InvoiceEditDialog extends JDialog {
 
     private JTable makeTable(DefaultTableModel model) {
         JTable t = new JTable(model) {
-            @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
+            @Override
+            public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
                 if (!isRowSelected(row)) {
                     c.setBackground(row % 2 == 0 ? ROW_ODD : WHITE);
                     c.setForeground(TEXT_DARK);
-                } else { c.setBackground(ACCENT); c.setForeground(WHITE); }
+                } else {
+                    c.setBackground(ACCENT); c.setForeground(WHITE);
+                }
                 return c;
             }
         };
@@ -1097,7 +883,8 @@ public class InvoiceEditDialog extends JDialog {
         t.setBackground(WHITE);
         JTableHeader h = t.getTableHeader();
         h.setDefaultRenderer(new DefaultTableCellRenderer() {
-            @Override public Component getTableCellRendererComponent(
+            @Override
+            public Component getTableCellRendererComponent(
                     JTable tbl, Object v, boolean sel, boolean foc, int row, int col) {
                 JLabel l = new JLabel(v == null ? "" : v.toString());
                 l.setFont(F_HDR); l.setForeground(WHITE); l.setBackground(TBL_HDR);
@@ -1120,7 +907,7 @@ public class InvoiceEditDialog extends JDialog {
     private String nvl(String s) { return s == null ? "" : s; }
 
     /* ══════════════════════════════════════════════════════
-       ROUND BUTTON — đồng bộ RentEditDialog
+       ROUND BUTTON
     ══════════════════════════════════════════════════════ */
     static class RoundBtn extends JButton {
         private final Color bg, fg;
@@ -1130,7 +917,8 @@ public class InvoiceEditDialog extends JDialog {
             setForeground(fg); setFont(new Font("Segoe UI", Font.BOLD, 13));
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         }
-        @Override protected void paintComponent(Graphics g) {
+        @Override
+        protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(getModel().isRollover() ? bg.brighter() : bg);

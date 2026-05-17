@@ -4,6 +4,7 @@ import otkhongluong.gamestoremanagement.model.Game;
 import otkhongluong.gamestoremanagement.controller.GameController;
 import otkhongluong.gamestoremanagement.view.dialog.InvoiceAddDialog;
 import otkhongluong.gamestoremanagement.view.dialog.RentAddDialog;
+import otkhongluong.gamestoremanagement.util.FormatUtil;
 import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
@@ -237,7 +238,7 @@ public class GamePanel extends JPanel {
 
         // ── Mua CD — chỉ hiện khi GiaCD > 0 ──────────────────────
         if (game.getGiaCD() != null && game.getGiaCD() > 0) {
-            JButton btnCD = makeActionButton("Mua CD", game.getGiaCDText(), BTN_CD);
+            JButton btnCD = makeActionButton("Mua CD", FormatUtil.formatTien(game.getGiaCD()), BTN_CD);
             btnCD.addActionListener(e -> {
                 Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
                 InvoiceAddDialog.openAndPreselectGame(f, game.getMaGame(), "CD");
@@ -249,7 +250,7 @@ public class GamePanel extends JPanel {
         // ── Mua ROM — chỉ hiện khi GiaROM > 0 ────────────────────
         if (game.getGiaROM() != null && game.getGiaROM() > 0) {
             if (hasAnyBtn) right.add(Box.createVerticalStrut(6));
-            JButton btnROM = makeActionButton("Mua ROM", game.getGiaROMText(), BTN_ROM);
+            JButton btnROM = makeActionButton("Mua ROM", FormatUtil.formatTien(game.getGiaROM()), BTN_ROM);
             btnROM.addActionListener(e -> {
                 Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
                 InvoiceAddDialog.openAndPreselectGame(f, game.getMaGame(), "ROM");
@@ -261,7 +262,7 @@ public class GamePanel extends JPanel {
         // ── Thuê CD — chỉ hiện khi GiaThueNgay > 0 (TÁCH RIÊNG, KHÔNG dùng GiaCD) ──
         if (game.getGiaThueNgay() != null && game.getGiaThueNgay() > 0) {
             if (hasAnyBtn) right.add(Box.createVerticalStrut(6));
-            JButton btnRent = makeActionButton("Thuê CD", game.getGiaThueText(), BTN_RENT);
+            JButton btnRent = makeActionButton("Thuê CD", FormatUtil.formatTienThue(game.getGiaThueNgay()), BTN_RENT);
             btnRent.addActionListener(e -> {
                 Frame f = (Frame) SwingUtilities.getWindowAncestor(GamePanel.this);
                 RentAddDialog.openAndPreselectByGameName(f, game.getTenGame());

@@ -1,47 +1,36 @@
 package otkhongluong.gamestoremanagement.model;
 
 public class User {
-    private int    MaUser;
-    private String Username;
-    private String Password;
-    private int    MaRole;
-    private int    MaNV;   // ✅ THÊM — link sang bảng NHANVIEN (0 nếu chưa gắn NV)
+    private int    maUser;
+    private String username;
+    private String password;   // ⭐ lưu ý: nên hash password, không lưu plaintext
+    private int    maRole;
+    private int    maNV;
 
     public User() {}
 
-    // ✅ Constructor cũ giữ nguyên để không break code cũ
-    public User(int MaUser, String Username, String Password, int MaRole) {
-        this.MaUser   = MaUser;
-        this.Username = Username;
-        this.Password = Password;
-        this.MaRole   = MaRole;
+    public User(int maUser, String username, String password, int maRole) {
+        this.maUser    = maUser;
+        this.username  = username;
+        this.password  = password;
+        this.maRole    = maRole;
     }
 
-    // ✅ Constructor mới có MaNV
-    public User(int MaUser, String Username, String Password, int MaRole, int MaNV) {
-        this.MaUser   = MaUser;
-        this.Username = Username;
-        this.Password = Password;
-        this.MaRole   = MaRole;
-        this.MaNV     = MaNV;
+    public User(int maUser, String username, String password, int maRole, int maNV) {
+        this(maUser, username, password, maRole);
+        this.maNV = maNV;
     }
 
-    public int    getMaUser()                { return MaUser;   }
-    public void   setMaUser(int MaUser)      { this.MaUser = MaUser; }
+    public int    getMaUser()               { return maUser; }
+    public void   setMaUser(int maUser)     { this.maUser = maUser; }
+    public String getUsername()             { return username; }
+    public void   setUsername(String u)     { this.username = u; }
+    public String getPassword()             { return password; }
+    public void   setPassword(String p)     { this.password = p; }
+    public int    getMaRole()               { return maRole; }
+    public void   setMaRole(int maRole)     { this.maRole = maRole; }
+    public int    getMaNV()                 { return maNV; }
+    public void   setMaNV(int maNV)         { this.maNV = maNV; }
 
-    public String getUsername()              { return Username; }
-    public void   setUsername(String u)      { this.Username = u; }
-
-    public String getPassword()              { return Password; }
-    public void   setPassword(String p)      { this.Password = p; }
-
-    public int    getMaRole()                { return MaRole;   }
-    public void   setMaRole(int MaRole)      { this.MaRole = MaRole; }
-
-    // ✅ MaNV — 0 nghĩa là user chưa được gắn với nhân viên nào (VD: tài khoản system)
-    public int    getMaNV()                  { return MaNV; }
-    public void   setMaNV(int MaNV)          { this.MaNV = MaNV; }
-
-    /** Tiện ích: kiểm tra user có gắn với nhân viên không */
-    public boolean hasEmployee()             { return MaNV > 0; }
+    public boolean hasEmployee()            { return maNV > 0; }
 }

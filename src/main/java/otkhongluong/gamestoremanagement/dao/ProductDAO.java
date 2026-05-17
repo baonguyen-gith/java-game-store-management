@@ -82,10 +82,8 @@ public class ProductDAO {
 
             ps.setInt(1, maSP);
 
-            ResultSet rs = ps.executeQuery();
-
-            if (rs.next()) {
-                return map(rs);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return map(rs);
             }
 
         } catch (SQLException e) {
@@ -127,10 +125,8 @@ public class ProductDAO {
 
             ps.setInt(1, maGame);
 
-            ResultSet rs = ps.executeQuery();
-
-            while (rs.next()) {
-                list.add(map(rs));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) list.add(map(rs));
             }
 
         } catch (SQLException e) {

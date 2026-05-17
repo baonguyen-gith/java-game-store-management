@@ -1,7 +1,9 @@
 package otkhongluong.gamestoremanagement.view.dialog;
 
+import otkhongluong.gamestoremanagement.controller.RentController;
+import otkhongluong.gamestoremanagement.controller.RentController.ActionResult;
 import otkhongluong.gamestoremanagement.model.RentalOrder;
-import otkhongluong.gamestoremanagement.service.RentalService;
+import otkhongluong.gamestoremanagement.model.CTPhieuThue;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -13,19 +15,17 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * RentExtendDialog — Gia hạn phiếu thuê (wizard 3 bước).
  *
- * Logic tiền khi gia hạn:
- *   - phatTre   = số ngày trễ × 10.000 đ  (0 nếu chưa trễ)
- *   - phiGiaHan = tổng đơn giá thuê các CD × số ngày gia hạn thêm
- *   - tongThuKhach = phatTre + phiGiaHan  → thu tiền mặt tại quầy
+ * MVC: Dialog chỉ gọi RentController —
+ * không import RentalService, DAO, DBConnection, hay stream filter trực tiếp.
  *
- * Cập nhật DB sau khi xác nhận:
- *   - NgayTraDuKien += soNgay   ← CÓ cập nhật
- *   - TienPhat, TienCoc         ← KHÔNG thay đổi (thu tiền mặt ngoài hệ thống)
+ * Logic tiền khi gia hạn:
+ *   phatTre   = số ngày trễ × 10.000 đ  (0 nếu chưa trễ)
+ *   phiGiaHan = tổng GiaThueNgay × số ngày gia hạn thêm
+ *   tongThuKhach = phatTre + phiGiaHan
  */
 public class RentExtendDialog extends JDialog {
 
@@ -35,7 +35,6 @@ public class RentExtendDialog extends JDialog {
     private static final Color BG_INPUT      = new Color(255, 255, 255);
     private static final Color ACCENT        = new Color(139, 92, 246);
     private static final Color ACCENT_LIGHT  = new Color(196, 181, 253);
-    private static final Color ACCENT_DARK   = new Color(91, 33, 182);
     private static final Color SUCCESS       = new Color(52, 211, 153);
     private static final Color DANGER        = new Color(248, 113, 113);
     private static final Color WARNING       = new Color(251, 191, 36);
@@ -58,8 +57,10 @@ public class RentExtendDialog extends JDialog {
 
     private static final DateTimeFormatter FMT_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
+    /* ===== CONTROLLER (MVC) ===== */
+    private final RentController ctrl = new RentController();
+
     /* ===== TRẠNG THÁI ===== */
-    private final RentalService service = new RentalService();
     private int currentStep = 1;
 
     // Bước 1
@@ -110,8 +111,9 @@ public class RentExtendDialog extends JDialog {
     }
 
     /* ══════════════════ PRE-FILL ══════════════════ */
+    /** MVC: dùng ctrl.getById() thay vì service.getById() trực tiếp */
     private void tienDienMaPT(int maPT) {
-        RentalOrder pt = service.getById(maPT);
+        RentalOrder pt = ctrl.getById(maPT);
         if (pt == null || pt.getSoDienThoai() == null) return;
         txtSDT.setText(pt.getSoDienThoai());
         thucHienTimKiem();
@@ -138,7 +140,6 @@ public class RentExtendDialog extends JDialog {
         p.add(title, BorderLayout.WEST);
         p.add(stepIndicator, BorderLayout.EAST);
 
-        // Đường kẻ dưới header
         JPanel sep = new JPanel();
         sep.setBackground(BORDER_COLOR);
         sep.setPreferredSize(new Dimension(0, 1));
@@ -168,15 +169,10 @@ public class RentExtendDialog extends JDialog {
 
     private void capNhatStepIndicator(int active) {
         for (Component c : stepIndicator.getComponents()) {
-
             if (c instanceof JLabel) {
-
                 JLabel lbl = (JLabel) c;
-
                 if (lbl.getName() != null && lbl.getName().startsWith("step_")) {
-
                     int s = Integer.parseInt(lbl.getName().split("_")[1]);
-
                     lbl.setForeground(
                         s == active ? ACCENT_LIGHT :
                         (s < active ? SUCCESS : TEXT_MUTED)
@@ -193,7 +189,6 @@ public class RentExtendDialog extends JDialog {
         p.setBackground(BG_MAIN);
         p.setBorder(new EmptyBorder(14, 22, 4, 22));
 
-        // ── Thanh tìm kiếm ──
         JLabel lblSDT = new JLabel("Số điện thoại khách hàng:");
         lblSDT.setFont(F_HEADER);
         lblSDT.setForeground(TEXT_SECONDARY);
@@ -223,7 +218,6 @@ public class RentExtendDialog extends JDialog {
         topBlock.add(rowInput, BorderLayout.CENTER);
         p.add(topBlock, BorderLayout.NORTH);
 
-        // ── Bảng kết quả ──
         String[] cols = {"Mã PT", "Ngày thuê", "Ngày trả dự kiến", "Trạng thái"};
         tblModel = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
@@ -235,8 +229,7 @@ public class RentExtendDialog extends JDialog {
         tblPhieu.getColumnModel().getColumn(3).setPreferredWidth(100);
         tblPhieu.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2 && tblPhieu.getSelectedRow() >= 0)
-                    sangBuoc2();
+                if (e.getClickCount() == 2 && tblPhieu.getSelectedRow() >= 0) sangBuoc2();
             }
         });
         p.add(taoStyledScroll(tblPhieu), BorderLayout.CENTER);
@@ -249,15 +242,15 @@ public class RentExtendDialog extends JDialog {
         return p;
     }
 
+    /**
+     * MVC: dùng ctrl.searchActiveRentalsBySdt() thay vì
+     * service.getAll() + stream filter trực tiếp trong dialog.
+     */
     private void thucHienTimKiem() {
         String sdt = txtSDT.getText().trim();
         if (sdt.isEmpty()) { hienThongBao("Vui lòng nhập số điện thoại!"); return; }
 
-        searchResults = service.getAll().stream()
-            .filter(pt -> pt.getSoDienThoai() != null
-                       && pt.getSoDienThoai().contains(sdt)
-                       && "DangThue".equalsIgnoreCase(pt.getTrangThai()))
-            .collect(Collectors.toList());
+        searchResults = ctrl.searchActiveRentalsBySdt(sdt);
 
         tblModel.setRowCount(0);
         if (searchResults.isEmpty()) {
@@ -281,22 +274,20 @@ public class RentExtendDialog extends JDialog {
         p.setBackground(BG_MAIN);
         p.setBorder(new EmptyBorder(14, 22, 4, 22));
 
-        // ── 3 thẻ thông tin phiếu ──
         JPanel rowCards = new JPanel(new GridLayout(1, 3, 10, 0));
         rowCards.setBackground(BG_MAIN);
         rowCards.setPreferredSize(new Dimension(0, 72));
         lblInfoNgayThue  = new JLabel("—");
         lblInfoNgayDK    = new JLabel("—");
         lblInfoTrangThai = new JLabel("—");
-        rowCards.add(taoInfoCard("Ngày thuê",           lblInfoNgayThue));
+        rowCards.add(taoInfoCard("Ngày thuê",             lblInfoNgayThue));
         rowCards.add(taoInfoCard("Ngày trả dự kiến (cũ)", lblInfoNgayDK));
-        rowCards.add(taoInfoCard("Trạng thái",           lblInfoTrangThai));
+        rowCards.add(taoInfoCard("Trạng thái",            lblInfoTrangThai));
         p.add(rowCards, BorderLayout.NORTH);
 
         JPanel centerBlock = new JPanel(new BorderLayout(0, 10));
         centerBlock.setBackground(BG_MAIN);
 
-        // ── Cảnh báo quá hạn ──
         pnlCanhBaoTre = taoCanhBaoBox(
             "⚠  Phiếu đang quá hạn!",
             "Phí phạt trễ sẽ được tính và thu ngay khi gia hạn.",
@@ -305,7 +296,6 @@ public class RentExtendDialog extends JDialog {
         pnlCanhBaoTre.setVisible(false);
         centerBlock.add(pnlCanhBaoTre, BorderLayout.NORTH);
 
-        // ── Input số ngày + hiển thị ngày mới ──
         JPanel pnlInput = new JPanel(new BorderLayout(20, 0));
         pnlInput.setBackground(BG_CARD);
         pnlInput.setBorder(new CompoundBorder(
@@ -313,7 +303,6 @@ public class RentExtendDialog extends JDialog {
             new EmptyBorder(14, 18, 14, 18)
         ));
 
-        // Cột trái: spinner
         JPanel colLeft = new JPanel(new BorderLayout(0, 6));
         colLeft.setBackground(BG_CARD);
         JLabel lblNgayLbl = new JLabel("Số ngày gia hạn thêm:");
@@ -329,10 +318,9 @@ public class RentExtendDialog extends JDialog {
             new EmptyBorder(4, 8, 4, 8)
         ));
         spinnerSoNgay.setPreferredSize(new Dimension(0, 38));
-        colLeft.add(lblNgayLbl,   BorderLayout.NORTH);
+        colLeft.add(lblNgayLbl,    BorderLayout.NORTH);
         colLeft.add(spinnerSoNgay, BorderLayout.CENTER);
 
-        // Cột phải: ngày trả mới
         JPanel colRight = new JPanel(new BorderLayout(0, 6));
         colRight.setBackground(BG_CARD);
         JLabel lblNgayMoiLabel = new JLabel("Ngày trả dự kiến mới:");
@@ -347,7 +335,6 @@ public class RentExtendDialog extends JDialog {
         pnlInput.add(colLeft,  BorderLayout.CENTER);
         pnlInput.add(colRight, BorderLayout.EAST);
 
-        // ── Bảng phí ──
         JPanel pnlPhi = new JPanel(new GridLayout(3, 2, 0, 0));
         pnlPhi.setBackground(BG_CARD);
         pnlPhi.setBorder(new CompoundBorder(
@@ -355,15 +342,15 @@ public class RentExtendDialog extends JDialog {
             new EmptyBorder(0, 0, 0, 0)
         ));
 
-        lblPhatTre  = new JLabel("0 VNĐ");
+        lblPhatTre   = new JLabel("0 VNĐ");
         lblPhiGiaHan = new JLabel("0 VNĐ");
         lblTongThu   = new JLabel("0 VNĐ");
 
-        pnlPhi.add(taoPhiRow("Phạt trễ (nếu có):",     false));
+        pnlPhi.add(taoPhiRow("Phạt trễ (nếu có):",    false));
         pnlPhi.add(taoPhiValue(lblPhatTre,  false));
-        pnlPhi.add(taoPhiRow("Phí gia hạn thêm:",       false));
+        pnlPhi.add(taoPhiRow("Phí gia hạn thêm:",      false));
         pnlPhi.add(taoPhiValue(lblPhiGiaHan, false));
-        pnlPhi.add(taoPhiRow("TỔNG THU TỪ KHÁCH:",      true));
+        pnlPhi.add(taoPhiRow("TỔNG THU TỪ KHÁCH:",     true));
         pnlPhi.add(taoPhiValue(lblTongThu,  true));
 
         lblPhatTre.setFont(F_HEADER);   lblPhatTre.setForeground(TEXT_PRIMARY);
@@ -388,7 +375,6 @@ public class RentExtendDialog extends JDialog {
         return p;
     }
 
-    /* Helper: tạo ô nhãn trong bảng phí */
     private JPanel taoPhiRow(String text, boolean isTotal) {
         JPanel cell = new JPanel(new BorderLayout());
         cell.setBackground(isTotal ? new Color(88, 28, 135) : BG_CARD);
@@ -431,11 +417,11 @@ public class RentExtendDialog extends JDialog {
         contentPanel.repaint();
     }
 
-    // ✅ SỬA THÀNH
+    /** Tính phí gia hạn từ GiaThueNgay trong danh sách chi tiết */
     private double tinhPhiGiaHan(RentalOrder pt, int soNgay) {
         if (pt.getDanhSachChiTiet() == null) return 0;
         double tong = pt.getDanhSachChiTiet().stream()
-            .mapToDouble(RentalOrder.CTPhieuThue::getGiaThueNgay)  // ← lấy từ SANPHAM
+            .mapToDouble(CTPhieuThue::getGiaThueNgay)
             .sum();
         return tong * soNgay;
     }
@@ -450,9 +436,10 @@ public class RentExtendDialog extends JDialog {
         return Math.max(days, 1) * 10_000;
     }
 
+    /** MVC: dùng ctrl.getById() thay vì service.getById() trực tiếp */
     private void nnapDuLieuBuoc2() {
         if (selectedPhieu == null) return;
-        RentalOrder full = service.getById(selectedPhieu.getMaPT());
+        RentalOrder full = ctrl.getById(selectedPhieu.getMaPT());
         if (full == null) { hienThongBao("Không tải được thông tin phiếu thuê!"); return; }
         selectedPhieu = full;
 
@@ -481,7 +468,6 @@ public class RentExtendDialog extends JDialog {
         lblSum_TongThu   = new JLabel("—");
         lblSum_TienCoc   = new JLabel("—");
 
-        // Thẻ tóm tắt
         JPanel card = new JPanel();
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBackground(BG_CARD);
@@ -490,27 +476,26 @@ public class RentExtendDialog extends JDialog {
             new EmptyBorder(16, 22, 16, 22)
         ));
 
-        card.add(taoSummaryRow("Phiếu thuê:",          lblSum_PT,      false));
+        card.add(taoSummaryRow("Phiếu thuê:",         lblSum_PT,        false));
         card.add(Box.createVerticalStrut(8));
-        card.add(taoSummaryRow("Ngày trả cũ:",         lblSum_NgayCu,  false));
+        card.add(taoSummaryRow("Ngày trả cũ:",        lblSum_NgayCu,    false));
         card.add(Box.createVerticalStrut(4));
-        card.add(taoSummaryRow("Ngày trả mới:",        lblSum_NgayMoi, false));
+        card.add(taoSummaryRow("Ngày trả mới:",       lblSum_NgayMoi,   false));
         card.add(Box.createVerticalStrut(12));
         card.add(taoDuongKe());
         card.add(Box.createVerticalStrut(12));
-        card.add(taoSummaryRow("Phạt trễ (thu ngay):",     lblSum_PhatTre,   false));
+        card.add(taoSummaryRow("Phạt trễ (thu ngay):",    lblSum_PhatTre,   false));
         card.add(Box.createVerticalStrut(4));
-        card.add(taoSummaryRow("Phí gia hạn (thu ngay):",  lblSum_PhiGiaHan, false));
+        card.add(taoSummaryRow("Phí gia hạn (thu ngay):", lblSum_PhiGiaHan, false));
         card.add(Box.createVerticalStrut(12));
         card.add(taoDuongKe());
         card.add(Box.createVerticalStrut(12));
-        card.add(taoSummaryRow("TỔNG THU TỪ KHÁCH:",   lblSum_TongThu,  true));
+        card.add(taoSummaryRow("TỔNG THU TỪ KHÁCH:",  lblSum_TongThu,   true));
         card.add(Box.createVerticalStrut(12));
         card.add(taoDuongKe());
         card.add(Box.createVerticalStrut(12));
         card.add(taoSummaryRow("Tiền cọc (giữ nguyên):", lblSum_TienCoc, false));
 
-        // Ghi chú cập nhật DB
         JLabel note = new JLabel(
             "<html><center>"
           + "DB sẽ cập nhật: <b>NgayTraDuKien += số ngày</b>"
@@ -541,9 +526,7 @@ public class RentExtendDialog extends JDialog {
         lbl.setFont(isTotal ? F_HEADER : F_BODY);
         lbl.setForeground(isTotal ? ACCENT_LIGHT : TEXT_MUTED);
 
-        valueLabel.setFont(isTotal
-            ? new Font("Segoe UI", Font.BOLD, 16)
-            : F_HEADER);
+        valueLabel.setFont(isTotal ? new Font("Segoe UI", Font.BOLD, 16) : F_HEADER);
         valueLabel.setForeground(isTotal ? SUCCESS : TEXT_PRIMARY);
         valueLabel.setHorizontalAlignment(SwingConstants.RIGHT);
 
@@ -572,10 +555,8 @@ public class RentExtendDialog extends JDialog {
 
         lblSum_PT.setText("PT" + selectedPhieu.getMaPT()
             + " — " + nvl(selectedPhieu.getTenKhachHang(), ""));
-
         lblSum_NgayCu.setText(selectedPhieu.getNgayTraDuKien().format(FMT_DATE));
         lblSum_NgayCu.setForeground(TEXT_PRIMARY);
-
         lblSum_NgayMoi.setText(ngayMoi.format(FMT_DATE) + "  (+" + soNgay + " ngày)");
         lblSum_NgayMoi.setForeground(SUCCESS);
 
@@ -589,9 +570,7 @@ public class RentExtendDialog extends JDialog {
 
         lblSum_PhiGiaHan.setText(String.format("%,.0f VNĐ", phiGiaHan));
         lblSum_PhiGiaHan.setForeground(TEXT_PRIMARY);
-
         lblSum_TongThu.setText(String.format("%,.0f VNĐ", tongThu));
-
         lblSum_TienCoc.setText(String.format("%,.0f VNĐ  (không thay đổi)", tienCoc));
         lblSum_TienCoc.setForeground(TEXT_MUTED);
         lblSum_TienCoc.setFont(F_BODY);
@@ -669,11 +648,8 @@ public class RentExtendDialog extends JDialog {
 
     /* ══════════════════ XÁC NHẬN GIA HẠN ══════════════════ */
     /**
-     * Xác nhận gia hạn:
-     *   - Thu tiền mặt từ khách: tongThu = phatTre + phiGiaHan
-     *   - Cập nhật DB:
-     *       NgayTraDuKien += soNgay   ← CÓ cập nhật
-     *       TienPhat, TienCoc         ← KHÔNG thay đổi
+     * MVC: dùng ctrl.extendRental() thay vì service.extendRental() trực tiếp.
+     * Dialog không gọi bất kỳ DAO/SQL nào.
      */
     private void xacNhanGiaHan() {
         if (selectedPhieu == null) return;
@@ -702,24 +678,10 @@ public class RentExtendDialog extends JDialog {
             "Xác nhận gia hạn", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
         if (xacNhan != JOptionPane.YES_OPTION) return;
 
-        /*
-         * service.extendRental cập nhật DB:
-         *   SET NgayTraDuKien = NgayTraDuKien + soNgay DAYS
-         *   -- TienPhat, TienCoc: KHÔNG cập nhật
-         *   WHERE MaPT = ?
-         *
-         * Tham số phatTre và phiGiaHan được truyền vào chỉ để
-         * service có thể ghi log / lịch sử nếu cần,
-         * KHÔNG dùng để thay đổi TienPhat hay TienCoc.
-         */
-        boolean ok = service.extendRental(
-            selectedPhieu.getMaPT(),
-            soNgay,
-            phatTre,
-            phiGiaHan
-        );
+        // MVC: 1 lời gọi controller — không có DAO/SQL trong dialog
+        ActionResult ar = ctrl.extendRental(selectedPhieu.getMaPT(), soNgay, phatTre, phiGiaHan);
 
-        if (ok) {
+        if (ar.success) {
             JOptionPane.showMessageDialog(this,
                 String.format(
                     "Gia hạn thành công!\n\n"
@@ -734,7 +696,7 @@ public class RentExtendDialog extends JDialog {
                 "Hoàn tất", JOptionPane.INFORMATION_MESSAGE);
             dispose();
         } else {
-            hienThongBao("Gia hạn thất bại! Vui lòng thử lại.");
+            hienThongBao(ar.message);
         }
     }
 
@@ -754,8 +716,8 @@ public class RentExtendDialog extends JDialog {
 
         JPanel txtPnl = new JPanel(new GridLayout(2, 1, 0, 2));
         txtPnl.setBackground(bg);
-        JLabel t = new JLabel(tieuDe);   t.setFont(F_HEADER); t.setForeground(mauTieuDe);
-        JLabel m = new JLabel(noiDung);  m.setFont(F_SMALL);  m.setForeground(mauNoiDung);
+        JLabel t = new JLabel(tieuDe);  t.setFont(F_HEADER); t.setForeground(mauTieuDe);
+        JLabel m = new JLabel(noiDung); m.setFont(F_SMALL);  m.setForeground(mauNoiDung);
         txtPnl.add(t); txtPnl.add(m);
 
         box.add(icon,   BorderLayout.WEST);

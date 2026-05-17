@@ -6,31 +6,21 @@ import java.util.List;
 
 public class Invoice {
 
-    private int maHD;
+     private int maHD;
     private int maKH;
     private int maNV;
     private LocalDateTime ngayLap;
     private double tongTien;
     private String trangThai;
-
-    // ⭐ thêm để HIỂN THỊ TABLE
     private String tenKhachHang;
     private String soDienThoai;
 
-    private List<ChiTietHoaDon> danhSachChiTiet =
-            new ArrayList<>();
+    private List<ChiTietHoaDon> danhSachChiTiet = new ArrayList<>();
 
     // ================= GET SET =================
 
     public int getMaHD() { return maHD; }
     public void setMaHD(int maHD) { this.maHD = maHD; }
-    
-    public String getMaHDFormatted() {
-        return "HD" + maHD;
-    }
-    public String getMaNVFormatted() {
-        return "NV" + maNV;
-    }
 
     public int getMaKH() { return maKH; }
     public void setMaKH(int maKH) { this.maKH = maKH; }
@@ -76,60 +66,5 @@ public class Invoice {
 
     public void setDanhSachChiTiet(List<ChiTietHoaDon> list) {
         this.danhSachChiTiet = list;
-    }
-
-    // =====================================================
-    // ================= CHI TIẾT HÓA ĐƠN ==================
-    // =====================================================
-
-    public static class ChiTietHoaDon {
-
-        private int maSP;
-        private int soLuong;
-        private double donGia;
-
-        // ⭐ ADD FIELD HIỂN THỊ (KHÔNG ẢNH HƯỞNG DB)
-        private String tenGame;
-        private String loaiSanPham; // CD / ROM
-        
-        public ChiTietHoaDon(String tenGame, String loaiSanPham, int soLuong, double donGia) {
-        this.tenGame = tenGame;
-        this.loaiSanPham = loaiSanPham;
-        this.soLuong = soLuong;
-        this.donGia = donGia;
-    }
-        
-
-        public int getMaSP() { return maSP; }
-        public void setMaSP(int maSP) {
-            this.maSP = maSP;
-        }
-
-        public int getSoLuong() { return soLuong; }
-        public void setSoLuong(int soLuong) {
-            this.soLuong = soLuong;
-        }
-
-        public double getDonGia() { return donGia; }
-        public void setDonGia(double donGia) {
-            this.donGia = donGia;
-        }
-
-        // ⭐ VIEW ONLY
-        public String getTenGame() {
-            return tenGame;
-        }
-
-        public void setTenGame(String tenGame) {
-            this.tenGame = tenGame;
-        }
-
-        public String getLoaiSanPham() {
-            return loaiSanPham;
-        }
-
-        public void setLoaiSanPham(String loaiSanPham) {
-            this.loaiSanPham = loaiSanPham;
-        }
     }
 }

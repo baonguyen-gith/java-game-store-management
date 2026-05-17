@@ -1,8 +1,8 @@
 package otkhongluong.gamestoremanagement.service;
 
 import otkhongluong.gamestoremanagement.dao.TransactionDAO;
+import otkhongluong.gamestoremanagement.model.TransactionDTO;
 
-import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Comparator;
@@ -11,15 +11,7 @@ import java.util.stream.Collectors;
 
 /**
  * Service layer cho Transaction (Lịch sử giao dịch).
- *
- * Mỗi Object[] trong list đại diện 1 giao dịch, cấu trúc:
- *   [0] String   — Mã GD  ("HD001", "PT001", ...)
- *   [1] String   — Loại   ("Hóa đơn", "Phiếu thuê")
- *   [2] int      — Mã NV
- *   [3] String   — Tên khách hàng
- *   [4] Timestamp— Ngày giao dịch
- *   [5] double   — Tiền
- *   [6] String   — "Xem" (placeholder cho nút)
+ * ✅ FIX: dùng TransactionDTO thay vì Object[] thô.
  */
 public class TransactionService {
 
@@ -36,7 +28,7 @@ public class TransactionService {
     /**
      * Lấy toàn bộ lịch sử giao dịch (hóa đơn + phiếu thuê) từ DB.
      */
-    public List<Object[]> getAll() {
+    public List<TransactionDTO> getAll() {
         return dao.findAll();
     }
 
@@ -54,35 +46,33 @@ public class TransactionService {
      * @param loai    "Tất cả" | "Hóa đơn" | "Phiếu thuê"
      * @return danh sách đã lọc
      */
-    public List<Object[]> filter(List<Object[]> source,
-                                  LocalDate from, LocalDate to,
-                                  String keyword, String loai) {
+    public List<TransactionDTO> filter(List<TransactionDTO> source,
+                                       LocalDate from, LocalDate to,
+                                       String keyword, String loai) {
         if (source == null) return Collections.emptyList();
 
         final String kw    = (keyword == null) ? "" : keyword.trim().toLowerCase();
         final String loaiF = (loai    == null) ? "Tất cả" : loai;
 
-        return source.stream().filter(row -> {
-            String maGD   = nvl((String) row[0]);
-            String loaiGD = nvl((String) row[1]);
-            String tenKH  = nvl((String) row[3]);
-            Timestamp ts  = (Timestamp) row[4];
+        return source.stream().filter(dto -> {
 
             // ── Lọc loại ──────────────────────────────────────
             if (!"Tất cả".equals(loaiF)) {
-                if (!loaiGD.equalsIgnoreCase(loaiF)) return false;
+                if (!nvl(dto.getLoai()).equalsIgnoreCase(loaiF)) return false;
             }
 
             // ── Lọc ngày ──────────────────────────────────────
-            if (ts != null && (from != null || to != null)) {
-                LocalDate ngay = ts.toLocalDateTime().toLocalDate();
+            if (dto.getNgay() != null && (from != null || to != null)) {
+                LocalDate ngay = dto.getNgay().toLocalDate();
                 if (from != null && ngay.isBefore(from)) return false;
                 if (to   != null && ngay.isAfter(to))   return false;
             }
 
             // ── Lọc keyword ───────────────────────────────────
             if (!kw.isEmpty()) {
-                String searchTarget = (maGD + " " + loaiGD + " " + tenKH).toLowerCase();
+                String searchTarget = (nvl(dto.getId()) + " "
+                        + nvl(dto.getLoai()) + " "
+                        + nvl(dto.getTenKhachHang())).toLowerCase();
                 if (!searchTarget.contains(kw)) return false;
             }
 
@@ -105,29 +95,29 @@ public class TransactionService {
      * @param colIndex  chỉ số cột; -1 = không sort
      * @param ascending true = tăng dần
      */
-    public void sort(List<Object[]> source, int colIndex, boolean ascending) {
+    public void sort(List<TransactionDTO> source, int colIndex, boolean ascending) {
         if (source == null || source.isEmpty() || colIndex < 0) return;
 
-        Comparator<Object[]> cmp;
+        Comparator<TransactionDTO> cmp;
         switch (colIndex) {
-            case 0:  // Mã GD – so sánh chuỗi
-                cmp = Comparator.comparing(r -> nvl((String) r[0]));
+            case 0:  // Mã GD
+                cmp = Comparator.comparing(dto -> nvl(dto.getId()));
                 break;
             case 1:  // Loại
-                cmp = Comparator.comparing(r -> nvl((String) r[1]));
+                cmp = Comparator.comparing(dto -> nvl(dto.getLoai()));
                 break;
-            case 2:  // Mã NV – so sánh int
-                cmp = Comparator.comparingInt(r -> (Integer) r[2]);
+            case 2:  // Mã NV
+                cmp = Comparator.comparingInt(TransactionDTO::getMaNV);
                 break;
             case 3:  // Tên KH
-                cmp = Comparator.comparing(r -> nvl((String) r[3]));
+                cmp = Comparator.comparing(dto -> nvl(dto.getTenKhachHang()));
                 break;
-            case 4:  // Ngày – so sánh Timestamp (null đẩy xuống cuối)
-                cmp = Comparator.comparingLong(
-                    r -> r[4] instanceof Timestamp ? ((Timestamp) r[4]).getTime() : Long.MAX_VALUE);
+            case 4:  // Ngày – null đẩy xuống cuối
+                cmp = Comparator.comparing(
+                    dto -> dto.getNgay() != null ? dto.getNgay() : java.time.LocalDateTime.MAX);
                 break;
-            case 5:  // Tiền – so sánh double
-                cmp = Comparator.comparingDouble(r -> (Double) r[5]);
+            case 5:  // Tiền
+                cmp = Comparator.comparingDouble(TransactionDTO::getTien);
                 break;
             default:
                 return;
@@ -140,6 +130,7 @@ public class TransactionService {
     // ══════════════════════════════════════════════════════════
     // HELPER
     // ══════════════════════════════════════════════════════════
+
     private String nvl(String s) {
         return s == null ? "" : s;
     }

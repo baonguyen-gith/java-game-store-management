@@ -1,6 +1,6 @@
 package otkhongluong.gamestoremanagement.service;
 
-import otkhongluong.gamestoremanagement.dao.IUserDAO;
+import otkhongluong.gamestoremanagement.dao.UserDAO;
 import otkhongluong.gamestoremanagement.model.User;
 import org.mindrot.jbcrypt.BCrypt;
 
@@ -11,15 +11,13 @@ import org.mindrot.jbcrypt.BCrypt;
  *   1. Password đã hash BCrypt ($2a$... / $2b$...) → dùng BCrypt.checkpw()
  *   2. Password vẫn còn plaintext (chưa migrate kịp) → so sánh trực tiếp
  *      và TỰ ĐỘNG hash lại ngay sau khi login thành công
- *
- * Sau khi PasswordMigration.run() chạy xong và toàn bộ DB đã hash,
- * nhánh plaintext sẽ không bao giờ được kích hoạt nữa — an toàn để giữ lại.
  */
 public class AuthService {
 
-    private final IUserDAO userDAO;
+    // ✅ FIX: inject UserDAO, không phải User
+    private final UserDAO userDAO;
 
-    public AuthService(IUserDAO userDAO) {
+    public AuthService(UserDAO userDAO) {
         this.userDAO = userDAO;
     }
 
@@ -33,32 +31,30 @@ public class AuthService {
         validateNotEmpty(username, "Tài khoản");
         validateNotEmpty(password, "Mật khẩu");
 
+        // ✅ FIX: gọi đúng method trên UserDAO
         User user = userDAO.findByUsername(username);
         if (user == null) return null;
 
         String stored = user.getPassword();
 
         if (isHashed(stored)) {
-            // ── Trường hợp 1: đã hash → dùng BCrypt ──────────────
+            // Trường hợp 1: đã hash → dùng BCrypt
             return BCrypt.checkpw(password, stored) ? user : null;
-
         } else {
-            // ── Trường hợp 2: vẫn plaintext → so sánh rồi tự migrate
+            // Trường hợp 2: vẫn plaintext → so sánh rồi tự migrate
             if (!password.equals(stored)) return null;
 
-            // Tự động hash lại ngay sau khi login thành công
             String hashed = BCrypt.hashpw(password, BCrypt.gensalt(12));
             user.setPassword(hashed);
+            // ✅ FIX: gọi đúng method trên UserDAO
             userDAO.update(user);
             System.out.println("[AUTH] Auto-migrated password for: " + username);
-
             return user;
         }
     }
 
     /**
      * Hash password khi tạo user mới.
-     * Luôn gọi method này thay vì BCrypt trực tiếp để dễ thay thuật toán sau.
      */
     public static String hashPassword(String rawPassword) {
         if (rawPassword == null || rawPassword.trim().isEmpty()) {
@@ -79,7 +75,6 @@ public class AuthService {
 
     // ── Private helpers ───────────────────────────────────────
 
-    /** Kiểm tra password đã được hash BCrypt chưa */
     private boolean isHashed(String password) {
         return password != null
             && (password.startsWith("$2a$") || password.startsWith("$2b$"))
