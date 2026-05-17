@@ -47,15 +47,13 @@ public class RentalOrderDAO {
 
     public boolean insertWithConnection(RentalOrder pt, Connection con) throws SQLException {
         String sql =
-            "INSERT INTO PHIEUTHUE (MaKH, MaNV, NgayThue, NgayTraDuKien, TienCoc, TienPhat, TrangThai) " +
-            "VALUES (?, ?, GETDATE(), ?, ?, 0, N'DangThue')";
+            "INSERT INTO PHIEUTHUE (MaKH, NgayThue, NgayTraDuKien, TienCoc, TienPhat, TrangThai) " +
+            "VALUES (?, GETDATE(), ?, ?, 0, N'DangThue')";
 
         try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, pt.getMaKH());
-            if (pt.getMaNV() > 0) ps.setInt(2, pt.getMaNV());
-            else                  ps.setNull(2, Types.INTEGER);
-            ps.setTimestamp(3, Timestamp.valueOf(pt.getNgayTraDuKien()));
-            ps.setDouble(4, pt.getTienCoc());
+            ps.setTimestamp(2, Timestamp.valueOf(pt.getNgayTraDuKien()));
+            ps.setDouble(3, pt.getTienCoc());
             ps.executeUpdate();
 
             try (ResultSet gk = ps.getGeneratedKeys()) {

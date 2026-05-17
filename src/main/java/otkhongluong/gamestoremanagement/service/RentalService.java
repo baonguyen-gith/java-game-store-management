@@ -48,9 +48,16 @@ public class RentalService {
                     try (PreparedStatement ps = con.prepareStatement(chk)) {
                         ps.setInt(1, ct.getMaCD());
                         ResultSet rs = ps.executeQuery();
-                        if (!rs.next() || !"SanSang".equals(rs.getString("TrangThai"))) {
+                        if (!rs.next()) {
+                            System.out.println("[DEBUG] MaCD=" + ct.getMaCD() + " → KHÔNG TÌM THẤY TRONG DB");
                             con.rollback();
                             return false;
+                        }
+                        String trangThai = rs.getString("TrangThai");
+                        System.out.println("[DEBUG] MaCD=" + ct.getMaCD() + " → TrangThai='" + trangThai + "'");
+                        if (!"SanSang".equals(trangThai)) {
+                            con.rollback();
+                            // xử lý lyDo...
                         }
                     }
                 }

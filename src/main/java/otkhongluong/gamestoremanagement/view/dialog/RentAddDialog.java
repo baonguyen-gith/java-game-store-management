@@ -765,6 +765,7 @@ public class RentAddDialog extends JDialog {
     // =========================================================
     private void showStep(int step) {
         currentStep = step;
+        if (step == 1) loadCDTable(); // ← thêm dòng này: luôn refresh khi về bước 1
         ((CardLayout) contentPanel.getLayout()).show(contentPanel, "step" + step);
         btnBack.setVisible(step > 1);
         btnNext.setVisible(step < 3);

@@ -215,7 +215,11 @@ public class RentController {
      */
     public ActionResult createPhieuThue(RentalOrder pt, int diemThucDung) {
         boolean ok = service.createPhieuThue(pt);
-        if (!ok) return ActionResult.fail("Tạo phiếu thuê thất bại!\nCD có thể đã được thuê bởi giao dịch khác.");
+        if (!ok) return ActionResult.fail(
+            "CD" + pt.getDanhSachChiTiet().get(0).getMaCD() + 
+            " không còn sẵn sàng!\n" +
+            "Có thể đã được bán hoặc thuê bởi giao dịch khác.\n" +
+            "Vui lòng nhấn \"Làm mới\" ở Bước 1 để cập nhật danh sách.");
 
         // Trừ điểm + ghi log — uỷ quyền cho Service
         if (pt.getMaKH() > 0 && diemThucDung > 0) {
