@@ -189,7 +189,7 @@ public class InvoiceDAO {
             "SELECT hd.MaHD, hd.MaKH, hd.MaNV, hd.NgayLap, hd.TongTien, " +
             "       kh.HoTen, kh.SDT " +
             "FROM HOADON hd " +
-            "JOIN KHACHHANG kh ON hd.MaKH = kh.MaKH " +
+            "LEFT JOIN KHACHHANG kh ON hd.MaKH = kh.MaKH " +
             "ORDER BY hd.MaHD DESC";
 
         try (Connection con = DBConnection.getConnection();
@@ -215,7 +215,11 @@ public class InvoiceDAO {
         FIND BY ID + DETAIL  (tên cũ: findById)
      ===================================================== */
     public Invoice getHoaDonById(int maHD) {
-        String sql = "SELECT * FROM HOADON WHERE MaHD=?";
+        String sql =
+            "SELECT hd.*, kh.HoTen, kh.SDT " +
+            "FROM HOADON hd " +
+            "LEFT JOIN KHACHHANG kh ON hd.MaKH = kh.MaKH " +
+            "WHERE hd.MaHD=?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, maHD);
@@ -487,6 +491,9 @@ public class InvoiceDAO {
         if (ts != null) hd.setNgayLap(ts.toLocalDateTime());
         hd.setTongTien(rs.getDouble("TongTien"));
         hd.setTrangThai(rs.getString("TrangThai"));
+        // THÊM:
+        hd.setTenKhachHang(rs.getString("HoTen"));
+        hd.setSoDienThoai(rs.getString("SDT"));
         return hd;
     }
 
