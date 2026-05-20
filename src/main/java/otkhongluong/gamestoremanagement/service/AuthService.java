@@ -72,6 +72,10 @@ public class AuthService {
     public boolean isStaff(User user) {
         return user != null && user.getMaRole() == 2;
     }
+    /** @return true nếu user là Manager (MaRole == 3) */
+    public boolean isManager(User user) {
+        return user != null && user.getMaRole() == 3;
+    }
 
     // ── Private helpers ───────────────────────────────────────
 

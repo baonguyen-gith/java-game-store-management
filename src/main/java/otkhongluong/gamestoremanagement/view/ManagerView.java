@@ -11,17 +11,17 @@ import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
 
 /**
- * StaffView — màn hình chính dành cho nhân viên (MaRole == 2).
+ * ManagerView — màn hình chính dành cho Quản lý (MaRole == 3).
  *
- * Tabs:
- *   ✅ Trang chủ
- *   ✅ Game
- *   ✅ Bán hàng
- *   ✅ Quản trị (quản lý khách hàng, game, sản phẩm — KHÔNG có quản lý user/role)
- *   ❌ Điểm tích lũy (đã bỏ)
- *   ❌ Thống kê toàn hệ thống (dữ liệu nhạy cảm)
+ * Chuẩn MVC:
+ *   ✅ Nhận Navigator qua constructor — không biết LoginController hay LoginView
+ *   ✅ handleLogout() chỉ gọi navigator.goToLogin()
+ *   ✅ View KHÔNG chứa business logic, KHÔNG gọi DBConnection
+ *
+ * Tabs: Trang chủ | Game | Quản trị | Bán hàng | Thống kê
+ * Quản trị = ManagerPanel (Khách hàng + Game + Sản phẩm, KHÔNG có Nhân viên)
  */
-public class StaffView extends JFrame {
+public class ManagerView extends JFrame {
 
     private CardLayout cardLayout;
     private JPanel     contentPanel;
@@ -30,19 +30,17 @@ public class StaffView extends JFrame {
     private JButton    activeButton;
     private JButton    btnHome;
 
-    private JButton    activeAdminBtn;
-
-    public StaffView(User user, Navigator navigator) {
+    public ManagerView(User user, Navigator navigator) {
         this.currentUser = user;
         this.navigator   = navigator;
 
-        if (user.getMaRole() != 2) {
-            JOptionPane.showMessageDialog(this, "Không có quyền truy cập!");
+        if (user.getMaRole() != 3) {
+            JOptionPane.showMessageDialog(this, "Không có quyền!");
             dispose();
             return;
         }
 
-        setTitle("QABAP GAMING — Nhân viên");
+        setTitle("QABAP GAMING — Quản lý");
         setSize(1300, 800);
         setMinimumSize(new Dimension(1000, 640));
         setLocationRelativeTo(null);
@@ -57,7 +55,7 @@ public class StaffView extends JFrame {
     }
 
     // ══════════════════════════════════════════════════════════
-    // LOGOUT
+    // LOGOUT — chỉ gọi navigator, không biết View cụ thể nào
     // ══════════════════════════════════════════════════════════
 
     private void handleLogout() {
@@ -150,7 +148,7 @@ public class StaffView extends JFrame {
         logoPanel.setBackground(UIStyle.BG_SIDEBAR);
         logoPanel.setBorder(new EmptyBorder(22, 20, 18, 16));
 
-        JLabel logo = new JLabel("QABAP");
+        JLabel logo    = new JLabel("QABAP");
         logo.setFont(new Font("Segoe UI", Font.BOLD, 22));
         logo.setForeground(Color.WHITE);
 
@@ -172,34 +170,22 @@ public class StaffView extends JFrame {
 
         JPanel logoWrap = new JPanel(new BorderLayout());
         logoWrap.setBackground(UIStyle.BG_SIDEBAR);
-        logoWrap.add(logoPanel, BorderLayout.CENTER);
+        logoWrap.add(logoPanel,             BorderLayout.CENTER);
         logoWrap.add(UIStyle.accentSeparator(), BorderLayout.SOUTH);
 
-        // Badge role
-        JLabel roleLabel = new JLabel("Welcome!", JLabel.LEFT);
-        roleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        roleLabel.setForeground(new Color(160, 200, 255));
-        roleLabel.setBorder(new EmptyBorder(6, 20, 6, 0));
-        roleLabel.setOpaque(true);
-        roleLabel.setBackground(UIStyle.BG_SIDEBAR);
-
-        JPanel logoAndBadge = new JPanel(new BorderLayout());
-        logoAndBadge.setBackground(UIStyle.BG_SIDEBAR);
-        logoAndBadge.add(logoWrap,  BorderLayout.CENTER);
-        logoAndBadge.add(roleLabel, BorderLayout.SOUTH);
-
-        // Menu
+        // Menu items — giống AdminView nhưng KHÔNG có tab Quản lý nhân viên
         JPanel menu = new JPanel();
         menu.setLayout(new BoxLayout(menu, BoxLayout.Y_AXIS));
         menu.setBackground(UIStyle.BG_SIDEBAR);
         menu.setBorder(new EmptyBorder(12, 8, 8, 8));
 
-        btnHome                  = createMenuButton("Trang chủ", "/icons/home_icon.png");
-        JButton btnGame          = createMenuButton("Game",       "/icons/game_icon.png");
-        JButton btnSales         = createMenuButton("Bán hàng",   "/icons/sales_icon.png");
-        JButton btnStaffAdmin    = createMenuButton("Quản trị",   "/icons/manage_icon.png");
+        btnHome               = createMenuButton("Trang chủ", "/icons/home_icon.png");
+        JButton btnGame       = createMenuButton("Game",      "/icons/game_icon.png");
+        JButton btnManager    = createMenuButton("Quản trị",  "/icons/manage_icon.png");
+        JButton btnSales      = createMenuButton("Bán hàng",  "/icons/sales_icon.png");
+        JButton btnReport     = createMenuButton("Thống kê",  "/icons/statistic_icon.png");
 
-        for (JButton b : new JButton[]{btnHome, btnGame, btnSales, btnStaffAdmin}) {
+        for (JButton b : new JButton[]{btnHome, btnGame, btnManager, btnSales, btnReport}) {
             b.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
             menu.add(b);
             menu.add(Box.createVerticalStrut(2));
@@ -221,15 +207,16 @@ public class StaffView extends JFrame {
         bottomPanel.add(sepWrap,   BorderLayout.NORTH);
         bottomPanel.add(btnLogout, BorderLayout.CENTER);
 
-        sidebar.add(logoAndBadge, BorderLayout.NORTH);
-        sidebar.add(menu,         BorderLayout.CENTER);
-        sidebar.add(bottomPanel,  BorderLayout.SOUTH);
+        sidebar.add(logoWrap,    BorderLayout.NORTH);
+        sidebar.add(menu,        BorderLayout.CENTER);
+        sidebar.add(bottomPanel, BorderLayout.SOUTH);
 
-        btnHome.addActionListener(e       -> switchTab(btnHome,       "HOME"));
-        btnGame.addActionListener(e       -> switchTab(btnGame,       "GAME"));
-        btnSales.addActionListener(e      -> switchTab(btnSales,      "SALES"));
-        btnStaffAdmin.addActionListener(e -> switchTab(btnStaffAdmin, "STAFF_ADMIN"));
-        btnLogout.addActionListener(e     -> handleLogout());
+        btnHome.addActionListener(e    -> switchTab(btnHome,    "HOME"));
+        btnGame.addActionListener(e    -> switchTab(btnGame,    "GAME"));
+        btnManager.addActionListener(e -> switchTab(btnManager, "MANAGER"));
+        btnSales.addActionListener(e   -> switchTab(btnSales,   "SALES"));
+        btnReport.addActionListener(e  -> switchTab(btnReport,  "REPORT"));
+        btnLogout.addActionListener(e  -> handleLogout());
 
         return sidebar;
     }
@@ -257,34 +244,25 @@ public class StaffView extends JFrame {
         contentPanel = new JPanel(cardLayout);
         contentPanel.setBackground(UIStyle.BG_MAIN);
 
-        contentPanel.add(createDashboardPanel(),    "HOME");
-        contentPanel.add(createGameWrapper(),       "GAME");
-        contentPanel.add(new SalesPanel(),          "SALES");
-        contentPanel.add(createStaffAdminPanel(),   "STAFF_ADMIN");
+        contentPanel.add(createDashboardPanel(), "HOME");
+        contentPanel.add(createGameWrapper(),    "GAME");
+        contentPanel.add(createManagerPanel(),   "MANAGER");
+        contentPanel.add(new SalesPanel(),       "SALES");
+        contentPanel.add(new ReportPanel(),      "REPORT");
 
         main.add(contentPanel, BorderLayout.CENTER);
         return main;
     }
 
     // ══════════════════════════════════════════════════════════
-    // STAFF ADMIN PANEL
-    // Tab "Quản trị" của nhân viên: khách hàng, game, sản phẩm
-    // KHÔNG có quản lý user/role như AdminPanel
+    // MANAGER PANEL — wrapper có TopBar + ManagerPanel
     // ══════════════════════════════════════════════════════════
 
-    private JPanel createStaffAdminPanel() {
+    private JPanel createManagerPanel() {
         JPanel wrapper = new JPanel(new BorderLayout());
         wrapper.setBackground(UIStyle.BG_MAIN);
-        wrapper.add(createTopBar(), BorderLayout.NORTH);
-
-        JTabbedPane tabbedPane = new JTabbedPane();
-        tabbedPane.setBackground(new Color(13, 13, 35));
-        tabbedPane.setOpaque(true);
-        tabbedPane.setUI(new CustomTabbedPaneUI());
-
-        tabbedPane.addTab("Khách hàng", new CustomerPanel());
-
-        wrapper.add(tabbedPane, BorderLayout.CENTER);
+        wrapper.add(createTopBar(),      BorderLayout.NORTH);
+        wrapper.add(new ManagerPanel(),  BorderLayout.CENTER);
         return wrapper;
     }
 
@@ -307,23 +285,21 @@ public class StaffView extends JFrame {
         topBar.setPreferredSize(new Dimension(0, 62));
         topBar.setBorder(new EmptyBorder(10, 18, 10, 18));
 
-        // Bỏ toàn bộ phần txtGameSearch / searchBox / searchWrap
-
         JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         rightPanel.setOpaque(false);
 
-        JLabel roleBadge = new JLabel("Nhân viên");
+        JLabel roleBadge = new JLabel("Quản lý");
         roleBadge.setFont(new Font("Segoe UI", Font.BOLD, 11));
-        roleBadge.setForeground(new Color(100, 200, 255));
-        roleBadge.setBackground(new Color(30, 60, 100));
+        roleBadge.setForeground(new Color(160, 220, 160));
+        roleBadge.setBackground(new Color(30, 70, 40));
         roleBadge.setOpaque(true);
         roleBadge.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(60, 120, 180), 1, true),
+            BorderFactory.createLineBorder(new Color(60, 160, 80), 1, true),
             BorderFactory.createEmptyBorder(2, 8, 2, 8)
         ));
 
         JLabel lblUser = new JLabel(
-            currentUser.getUsername() != null ? currentUser.getUsername() : "Staff");
+            currentUser.getUsername() != null ? currentUser.getUsername() : "Manager");
         lblUser.setFont(UIStyle.FONT_BODY);
         lblUser.setForeground(UIStyle.TEXT_MUTED);
 
@@ -364,7 +340,7 @@ public class StaffView extends JFrame {
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
         content.setBorder(new EmptyBorder(22, 22, 22, 22));
 
-        JLabel heading = new JLabel("Trang chủ");
+        JLabel heading = new JLabel("Dashboard");
         heading.setFont(UIStyle.FONT_HEADING);
         heading.setForeground(Color.WHITE);
         heading.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -395,10 +371,8 @@ public class StaffView extends JFrame {
         panel.setBackground(UIStyle.BG_MAIN);
         GamePanel gamePanel = new GamePanel();
 
-        // Top bar riêng cho tab Game, có search box
         JPanel topBar = createTopBar();
 
-        // Tạo search box riêng chỉ cho tab này
         JTextField txtSearch = new JTextField(22);
         txtSearch.setText("Tìm kiếm game...");
         txtSearch.setForeground(UIStyle.TEXT_MUTED);
@@ -435,8 +409,8 @@ public class StaffView extends JFrame {
 
         topBar.add(searchWrap, BorderLayout.WEST);
 
-        panel.add(topBar,     BorderLayout.NORTH);
-        panel.add(gamePanel,  BorderLayout.CENTER);
+        panel.add(topBar,    BorderLayout.NORTH);
+        panel.add(gamePanel, BorderLayout.CENTER);
         return panel;
     }
 

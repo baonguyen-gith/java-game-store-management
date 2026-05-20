@@ -12,4 +12,5 @@ public interface Navigator {
     void goToLogin();
     void goToAdmin(User user);
     void goToStaff(User user);
+    void goToManager(User user);
 }

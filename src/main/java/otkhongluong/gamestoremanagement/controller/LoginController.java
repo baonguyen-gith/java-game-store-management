@@ -16,13 +16,7 @@ public class LoginController {
     private final AuthService authService;
     private final Navigator   navigator;
     private LoginView view;
-
-    // ✅ FIX: tự tạo UserDAO và truyền vào AuthService thay vì truyền User
-    public LoginController(Navigator navigator) {
-        this.authService = new AuthService(new UserDAO());
-        this.navigator   = navigator;
-    }
-
+    
     /** Dependency Injection đầy đủ — dùng khi test hoặc cần mock AuthService. */
     public LoginController(AuthService authService, Navigator navigator) {
         this.authService = authService;
@@ -47,6 +41,7 @@ public class LoginController {
 
             if      (authService.isAdmin(user)) navigator.goToAdmin(user);
             else if (authService.isStaff(user)) navigator.goToStaff(user);
+            else if (authService.isManager(user)) navigator.goToManager(user);
             else                                view.showError("Không xác định được quyền truy cập!");
 
         } catch (IllegalArgumentException e) {

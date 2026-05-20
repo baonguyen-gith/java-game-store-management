@@ -8,6 +8,7 @@ import otkhongluong.gamestoremanagement.service.AuthService;
 import otkhongluong.gamestoremanagement.view.AdminView;
 import otkhongluong.gamestoremanagement.view.LoginView;
 import otkhongluong.gamestoremanagement.view.StaffView;
+import otkhongluong.gamestoremanagement.view.ManagerView;
 
 import javax.swing.*;
 
@@ -57,6 +58,14 @@ public class AppNavigator implements Navigator {
     public void goToStaff(User user) {
         SwingUtilities.invokeLater(() -> {
             StaffView view = new StaffView(user, this);
+            view.setVisible(true);
+        });
+    }
+    
+    @Override
+    public void goToManager(User user) {
+        SwingUtilities.invokeLater(() -> {
+            ManagerView view = new ManagerView(user, this);
             view.setVisible(true);
         });
     }

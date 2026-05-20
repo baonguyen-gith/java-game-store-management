@@ -6,7 +6,7 @@ import otkhongluong.gamestoremanagement.view.AdminView;
 
 import javax.swing.UIManager;
 
-public class TestUI {
+public class TestAdmin {
     public static void main(String[] args) {
         try {
             UIManager.setLookAndFeel(
