@@ -367,7 +367,7 @@ public class TransactionPanel extends JPanel {
 
         lblPageInfo.setText(
             "Trang " + result.currentPage + " / " + result.totalPages
-            + "  (" + result.totalRows + " bản ghi)"
+            + "  (" + result.totalRows + " giao dịch)"
         );
 
         paginationPanel.revalidate();

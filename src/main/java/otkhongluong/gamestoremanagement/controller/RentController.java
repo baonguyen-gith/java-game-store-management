@@ -323,8 +323,8 @@ public class RentController {
      * Gia hạn phiếu thuê.
      * ▼ Thay: service.extendRental(...) trực tiếp trong Dialog
      */
-    public ActionResult extendRental(int maPT, int soNgay, double phatTre, double phiGiaHan) {
-        boolean ok = service.extendRental(maPT, soNgay, phatTre, phiGiaHan);
+    public ActionResult extendRental(int maPT, LocalDateTime ngayTraMoi, double phatTre, double phiGiaHan) {
+        boolean ok = service.extendRental(maPT, ngayTraMoi, phatTre, phiGiaHan);
         return ok ? ActionResult.ok("Gia hạn thành công!")
                   : ActionResult.fail("Gia hạn thất bại! Vui lòng thử lại.");
     }

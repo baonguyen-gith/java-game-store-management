@@ -149,13 +149,13 @@ public class InvoiceEditDialog extends JDialog {
         p.setBackground(BG);
         p.setBorder(new EmptyBorder(20, 24, 0, 24));
 
-        JLabel title = new JLabel("✏  Sửa Hóa Đơn  —  HD" + String.format("%03d", hd.getMaHD()));
+        JLabel title = new JLabel("Sửa Hóa Đơn  —  HD" + String.format("%03d", hd.getMaHD()));
         title.setFont(F_TITLE);
         title.setForeground(WHITE);
         p.add(title, BorderLayout.WEST);
 
         boolean paid = "DaThanhToan".equalsIgnoreCase(hd.getTrangThai());
-        JLabel badge = new JLabel(paid ? "✔ Đã thanh toán" : "⏳ Chưa thanh toán");
+        JLabel badge = new JLabel(paid ? "Đã thanh toán" : "Chưa thanh toán!");
         badge.setFont(new Font("Segoe UI", Font.BOLD, 11));
         badge.setForeground(paid ? GREEN : YELLOW);
         p.add(badge, BorderLayout.EAST);
@@ -176,8 +176,8 @@ public class InvoiceEditDialog extends JDialog {
         tabs.setBackground(BG);
         tabs.setForeground(WHITE);
         tabs.setBorder(new EmptyBorder(10, 16, 0, 16));
-        tabs.addTab("📋  Thông tin đầu phiếu", buildTab1());
-        tabs.addTab("🛒  Chi tiết sản phẩm",   buildTab2());
+        tabs.addTab("Thông tin đầu phiếu", buildTab1());
+        tabs.addTab("Chi tiết sản phẩm",   buildTab2());
         return tabs;
     }
 
@@ -310,10 +310,10 @@ public class InvoiceEditDialog extends JDialog {
 
         JPanel btnBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         btnBar.setBackground(BG);
-        RoundBtn btnAdd = new RoundBtn("+  Thêm SP", GREEN, TEXT_DARK);
+        RoundBtn btnAdd = new RoundBtn("+ Thêm SP", GREEN, TEXT_DARK);
         btnAdd.setPreferredSize(new Dimension(110, 34));
         btnAdd.addActionListener(e -> openAddSpDialog());
-        RoundBtn btnDel = new RoundBtn("✕  Xóa SP", RED, WHITE);
+        RoundBtn btnDel = new RoundBtn("- Xóa SP", RED, WHITE);
         btnDel.setPreferredSize(new Dimension(100, 34));
         btnDel.addActionListener(e -> removeSelectedSp());
         btnBar.add(btnAdd);
@@ -376,10 +376,10 @@ public class InvoiceEditDialog extends JDialog {
         JPanel bottom = new JPanel(new BorderLayout());
         bottom.setBackground(BG);
         bottom.setBorder(new EmptyBorder(6, 0, 0, 0));
-        JLabel hint = new JLabel("  🟢 Xanh = SP mới thêm  •  Chưa lưu vào DB cho đến khi nhấn Lưu tất cả");
+        JLabel hint = new JLabel("Xanh = SP mới thêm  •  Chưa lưu vào DB cho đến khi nhấn Lưu tất cả");
         hint.setFont(F_HINT); hint.setForeground(MUTED);
         bottom.add(hint, BorderLayout.WEST);
-        lblTongTien = new JLabel("Tổng tiền: —");
+        lblTongTien = new JLabel("Tổng tiền: --");
         lblTongTien.setFont(F_MONEY); lblTongTien.setForeground(new Color(80, 200, 160));
         bottom.add(lblTongTien, BorderLayout.EAST);
         p.add(bottom, BorderLayout.SOUTH);
@@ -401,11 +401,11 @@ public class InvoiceEditDialog extends JDialog {
         JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
         btnRow.setBackground(BG);
 
-        RoundBtn btnCancel = new RoundBtn("✕  Hủy", RED, WHITE);
+        RoundBtn btnCancel = new RoundBtn("Hủy!", RED, WHITE);
         btnCancel.setPreferredSize(new Dimension(110, 40));
         btnCancel.addActionListener(e -> dispose());
 
-        RoundBtn btnSave = new RoundBtn("✔  Lưu tất cả", GREEN, TEXT_DARK);
+        RoundBtn btnSave = new RoundBtn("Lưu tất cả!", GREEN, TEXT_DARK);
         btnSave.setPreferredSize(new Dimension(140, 40));
         btnSave.addActionListener(e -> doSaveAll());
 
@@ -456,17 +456,17 @@ public class InvoiceEditDialog extends JDialog {
     private void lookupKhachHang() {
         String sdt = txtSdt.getText().trim();
         if (sdt.isEmpty()) {
-            setResult(lblKHResult, "⚠  Nhập số điện thoại trước!", MUTED);
+            setResult(lblKHResult, "!Nhập số điện thoại trước!", MUTED);
             foundKH = null;
             return;
         }
         Customer kh = controller.findKHBySDT(sdt);
         if (kh == null) {
-            setResult(lblKHResult, "✗  Không tìm thấy khách hàng với SĐT: " + sdt, RED);
+            setResult(lblKHResult, "!Không tìm thấy khách hàng với SĐT: " + sdt, RED);
             foundKH = null;
         } else {
             setResult(lblKHResult,
-                "✓  " + kh.getHoTen() + "  (KH" + String.format("%03d", kh.getMaKH()) + ")", GREEN);
+                "" + kh.getHoTen() + "  (KH" + String.format("%03d", kh.getMaKH()) + ")", GREEN);
             foundKH = kh;
         }
     }
@@ -479,17 +479,17 @@ public class InvoiceEditDialog extends JDialog {
     private void lookupNhanVien() {
         String raw = txtMaNV.getText().trim();
         if (raw.isEmpty()) {
-            setResult(lblNVResult, "⚠  Nhập mã nhân viên trước!", MUTED);
+            setResult(lblNVResult, "Nhập mã nhân viên trước!", MUTED);
             foundNV = null;
             return;
         }
         Employee nv = controller.findNVByMa(raw);
         if (nv == null) {
-            setResult(lblNVResult, "✗  Không tìm thấy nhân viên: " + raw, RED);
+            setResult(lblNVResult, "!Không tìm thấy nhân viên: " + raw, RED);
             foundNV = null;
         } else {
             setResult(lblNVResult,
-                "✓  " + nv.getHoTen() + "  (NV" + String.format("%03d", nv.getMaNV()) + ")", GREEN);
+                "" + nv.getHoTen() + "  (NV" + String.format("%03d", nv.getMaNV()) + ")", GREEN);
             foundNV = nv;
         }
     }
@@ -502,23 +502,23 @@ public class InvoiceEditDialog extends JDialog {
     private void validateNgayLap() {
         String raw = txtNgayLap.getText().trim();
         if (raw.isEmpty()) {
-            setResult(lblNgayResult, "⚠  Nhập ngày lập trước!", MUTED);
+            setResult(lblNgayResult, "Nhập ngày lập trước!", MUTED);
             newNgayLap = null;
             return;
         }
         LocalDate d = controller.parseDate(raw);
         if (d == null) {
-            setResult(lblNgayResult, "✗  Định dạng không hợp lệ. Vui lòng nhập dd/MM/yyyy", RED);
+            setResult(lblNgayResult, "Định dạng không hợp lệ. Vui lòng nhập dd/MM/yyyy", RED);
             newNgayLap = null;
             return;
         }
         LocalDate old = hd.getNgayLap() != null ? hd.getNgayLap().toLocalDate() : null;
         if (d.equals(old)) {
-            setResult(lblNgayResult, "ℹ  Ngày không đổi: " + d.format(FMT), MUTED);
+            setResult(lblNgayResult, "Ngày không đổi: " + d.format(FMT), MUTED);
             newNgayLap = null;
         } else {
             newNgayLap = d;
-            setResult(lblNgayResult, "✓  Ngày mới: " + d.format(FMT), GREEN);
+            setResult(lblNgayResult, "Ngày mới: " + d.format(FMT), GREEN);
         }
     }
 
@@ -539,7 +539,7 @@ public class InvoiceEditDialog extends JDialog {
                 String.format("%,.0f đ", row.donGia),
                 row.soLuong,
                 String.format("%,.0f đ", row.thanhTien()),
-                row.isNew ? "🟢 Mới thêm" : "✔ Hiện có"
+                row.isNew ? "Mới thêm" : "Hiện có"
             });
             total += row.thanhTien();
         }
@@ -761,20 +761,20 @@ public class InvoiceEditDialog extends JDialog {
             .append(String.format("%03d", hd.getMaHD())).append("?\n\n");
         if (khChanged)
             sb.append("• Khách hàng : ").append(nvl(hd.getTenKhachHang()))
-              .append("  →  ").append(foundKH.getHoTen()).append("\n");
+              .append("  ->  ").append(foundKH.getHoTen()).append("\n");
         if (nvChanged)
             sb.append("• Nhân viên  : NV").append(String.format("%03d", hd.getMaNV()))
-              .append("  →  NV").append(String.format("%03d", foundNV.getMaNV())).append("\n");
+              .append("  ->  NV").append(String.format("%03d", foundNV.getMaNV())).append("\n");
         if (ngayChanged)
             sb.append("• Ngày lập   : ")
               .append(hd.getNgayLap() != null ? hd.getNgayLap().toLocalDate().format(FMT) : "—")
-              .append("  →  ").append(newNgayLap.format(FMT)).append("\n");
+              .append("  ->  ").append(newNgayLap.format(FMT)).append("\n");
         if (spChanged) {
             if (!removedItems.isEmpty())
-                sb.append("• Xóa SP     : ").append(removedItems.size()).append(" sản phẩm\n");
+                sb.append("Xóa SP     : ").append(removedItems.size()).append(" sản phẩm\n");
             if (!addedItems.isEmpty())
-                sb.append("• Thêm SP    : ").append(addedItems.size()).append(" sản phẩm\n");
-            sb.append(String.format("• Tổng tiền  : %,.0f đ  →  %,.0f đ%n", tongCu, tongMoi));
+                sb.append("Thêm SP    : ").append(addedItems.size()).append(" sản phẩm\n");
+            sb.append(String.format("Tổng tiền  : %,.0f đ  →  %,.0f đ%n", tongCu, tongMoi));
         }
 
         int yn = JOptionPane.showConfirmDialog(this, sb.toString(),
@@ -797,11 +797,11 @@ public class InvoiceEditDialog extends JDialog {
 
         if (result.success) {
             JOptionPane.showMessageDialog(this,
-                "✅ " + result.message, "Thành công", JOptionPane.INFORMATION_MESSAGE);
+                "" + result.message, "Thành công", JOptionPane.INFORMATION_MESSAGE);
             dispose();
         } else {
             JOptionPane.showMessageDialog(this,
-                "❌ " + result.message, "Lỗi", JOptionPane.ERROR_MESSAGE);
+                "" + result.message, "Lỗi", JOptionPane.ERROR_MESSAGE);
         }
     }
 

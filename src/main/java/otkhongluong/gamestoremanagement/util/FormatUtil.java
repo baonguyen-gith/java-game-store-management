@@ -59,6 +59,6 @@ public class FormatUtil {
     // ── Điểm ──────────────────────────────────────────
     /** "cong" → "➕ Cộng", "tru" → "➖ Trừ" */
     public static String formatLoaiDiem(String loai) {
-        return "cong".equalsIgnoreCase(loai) ? "➕ Cộng" : "➖ Trừ";
+        return "cong".equalsIgnoreCase(loai) ? "Cộng" : "Trừ";
     }
 }

@@ -114,8 +114,7 @@
             btnReturn.setPreferredSize(new Dimension(118, 38));
             btnReturn.addActionListener(e -> {
                 int row = table.getSelectedRow();
-                if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn phiếu thuê để trả CD!"); return; }
-                int id = parseMa(tableModel.getValueAt(row, 0).toString());
+                int id = row >= 0 ? parseMa(tableModel.getValueAt(row, 0).toString()) : 0;
                 Frame frame = (Frame) SwingUtilities.getWindowAncestor(this);
                 new RentReturnDialog(frame, id).setVisible(true);
                 loadData();
@@ -125,8 +124,7 @@
             btnExtend.setPreferredSize(new Dimension(118, 38));
             btnExtend.addActionListener(e -> {
                 int row = table.getSelectedRow();
-                if (row < 0) { JOptionPane.showMessageDialog(this, "Chọn phiếu thuê để gia hạn!"); return; }
-                int id = parseMa(tableModel.getValueAt(row, 0).toString());
+                int id = row >= 0 ? parseMa(tableModel.getValueAt(row, 0).toString()) : 0;
                 Frame frame = (Frame) SwingUtilities.getWindowAncestor(this);
                 new RentExtendDialog(frame, id).setVisible(true);
                 loadData();

@@ -23,7 +23,7 @@ import java.util.List;
  * không import RentalService, DAO, DBConnection, hay stream filter trực tiếp.
  *
  * Logic tiền khi gia hạn:
- *   phatTre   = số ngày trễ × 10.000 đ  (0 nếu chưa trễ)
+ *   phatTre   = số ngày trễ × giaThueNgay × 1.5  (0 nếu chưa trễ)
  *   phiGiaHan = tổng GiaThueNgay × số ngày gia hạn thêm
  *   tongThuKhach = phatTre + phiGiaHan
  */
@@ -114,16 +114,10 @@ public class RentExtendDialog extends JDialog {
     /** MVC: dùng ctrl.getById() thay vì service.getById() trực tiếp */
     private void tienDienMaPT(int maPT) {
         RentalOrder pt = ctrl.getById(maPT);
-        if (pt == null || pt.getSoDienThoai() == null) return;
-        txtSDT.setText(pt.getSoDienThoai());
-        thucHienTimKiem();
-        if (searchResults == null) return;
-        for (int i = 0; i < searchResults.size(); i++) {
-            if (searchResults.get(i).getMaPT() == maPT) {
-                tblPhieu.setRowSelectionInterval(i, i);
-                break;
-            }
-        }
+        if (pt == null) return;
+        selectedPhieu = pt;
+        nnapDuLieuBuoc2();
+        hienThiBuoc(2);
     }
 
     /* ══════════════════ HEADER ══════════════════ */
@@ -132,7 +126,7 @@ public class RentExtendDialog extends JDialog {
         p.setBackground(BG_MAIN);
         p.setBorder(new EmptyBorder(16, 22, 12, 22));
 
-        JLabel title = new JLabel("⏰  Gia Hạn Thuê CD / Game");
+        JLabel title = new JLabel("Gia Hạn Thuê CD / Game");
         title.setFont(F_TITLE);
         title.setForeground(TEXT_PRIMARY);
 
@@ -203,7 +197,7 @@ public class RentExtendDialog extends JDialog {
             }
         });
 
-        RoundBtn btnSearch = new RoundBtn("🔍  Tìm", ACCENT, TEXT_PRIMARY);
+        RoundBtn btnSearch = new RoundBtn("Tìm", ACCENT, TEXT_PRIMARY);
         btnSearch.setPreferredSize(new Dimension(110, 38));
         btnSearch.addActionListener(e -> thucHienTimKiem());
 
@@ -289,7 +283,7 @@ public class RentExtendDialog extends JDialog {
         centerBlock.setBackground(BG_MAIN);
 
         pnlCanhBaoTre = taoCanhBaoBox(
-            "⚠  Phiếu đang quá hạn!",
+            "!Phiếu đang quá hạn!",
             "Phí phạt trễ sẽ được tính và thu ngay khi gia hạn.",
             new Color(69, 26, 3), WARNING, new Color(253, 230, 138)
         );
@@ -398,7 +392,11 @@ public class RentExtendDialog extends JDialog {
         if (selectedPhieu == null || selectedPhieu.getNgayTraDuKien() == null) return;
         int soNgay = (int) spinnerSoNgay.getValue();
 
-        LocalDateTime ngayMoi = selectedPhieu.getNgayTraDuKien().plusDays(soNgay);
+        LocalDateTime ngayGoc = selectedPhieu.getNgayTraDuKien();
+        LocalDateTime homNay  = LocalDate.now().atStartOfDay();
+
+        // Nếu đã quá hạn thì tính từ hôm nay, không phải từ ngày dự kiến cũ
+        LocalDateTime ngayMoi = (homNay.isAfter(ngayGoc) ? homNay : ngayGoc).plusDays(soNgay);
         lblNgayTraMoi.setText(ngayMoi.format(FMT_DATE));
 
         double phatTre   = tinhPhatTreHienTai(selectedPhieu);
@@ -406,10 +404,10 @@ public class RentExtendDialog extends JDialog {
         double tongThu   = phatTre + phiGiaHan;
 
         if (phatTre > 0) {
-            lblPhatTre.setText(String.format("%,.0f VNĐ  ⚠", phatTre));
+            lblPhatTre.setText(String.format("%,.0f VNĐ  !", phatTre));
             lblPhatTre.setForeground(DANGER);
         } else {
-            lblPhatTre.setText("Không có  ✓");
+            lblPhatTre.setText("Không có!");
             lblPhatTre.setForeground(SUCCESS);
         }
         lblPhiGiaHan.setText(String.format("%,.0f VNĐ", phiGiaHan));
@@ -433,7 +431,10 @@ public class RentExtendDialog extends JDialog {
         if (!now.isAfter(pt.getNgayTraDuKien())) return 0;
         long days = java.time.temporal.ChronoUnit.DAYS.between(
             pt.getNgayTraDuKien().toLocalDate(), now.toLocalDate());
-        return Math.max(days, 1) * 10_000;
+        double giaThueNgay = pt.getDanhSachChiTiet() != null
+            ? pt.getDanhSachChiTiet().stream().mapToDouble(CTPhieuThue::getGiaThueNgay).sum()
+            : 0;
+        return Math.max(days, 1) * giaThueNgay * 1.5;
     }
 
     /** MVC: dùng ctrl.getById() thay vì service.getById() trực tiếp */
@@ -551,7 +552,9 @@ public class RentExtendDialog extends JDialog {
         double tongThu   = phatTre + phiGiaHan;
         double tienCoc   = selectedPhieu.getTienCoc();
 
-        LocalDateTime ngayMoi = selectedPhieu.getNgayTraDuKien().plusDays(soNgay);
+        LocalDateTime ngayGoc = selectedPhieu.getNgayTraDuKien();
+        LocalDateTime homNay  = LocalDate.now().atStartOfDay();
+        LocalDateTime ngayMoi = (homNay.isAfter(ngayGoc) ? homNay : ngayGoc).plusDays(soNgay);
 
         lblSum_PT.setText("PT" + selectedPhieu.getMaPT()
             + " — " + nvl(selectedPhieu.getTenKhachHang(), ""));
@@ -561,10 +564,10 @@ public class RentExtendDialog extends JDialog {
         lblSum_NgayMoi.setForeground(SUCCESS);
 
         if (phatTre > 0) {
-            lblSum_PhatTre.setText(String.format("%,.0f VNĐ  ⚠", phatTre));
+            lblSum_PhatTre.setText(String.format("%,.0f VNĐ  !", phatTre));
             lblSum_PhatTre.setForeground(DANGER);
         } else {
-            lblSum_PhatTre.setText("Không có  ✓");
+            lblSum_PhatTre.setText("Không có!");
             lblSum_PhatTre.setForeground(SUCCESS);
         }
 
@@ -591,24 +594,24 @@ public class RentExtendDialog extends JDialog {
         JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
         btnRow.setBackground(BG_MAIN);
 
-        btnBack = new RoundBtn("← Quay lại", new Color(71, 85, 105), TEXT_PRIMARY);
+        btnBack = new RoundBtn("<- Quay lại", new Color(71, 85, 105), TEXT_PRIMARY);
         btnBack.setPreferredSize(new Dimension(120, 38));
         btnBack.setVisible(false);
         btnBack.addActionListener(e -> { if (currentStep > 1) hienThiBuoc(currentStep - 1); });
 
-        btnNext = new RoundBtn("Tiếp theo →", ACCENT, TEXT_PRIMARY);
+        btnNext = new RoundBtn("Tiếp theo ->", ACCENT, TEXT_PRIMARY);
         btnNext.setPreferredSize(new Dimension(130, 38));
         btnNext.addActionListener(e -> {
             if (currentStep == 1) sangBuoc2();
             else if (currentStep == 2) sangBuoc3();
         });
 
-        btnConfirm = new RoundBtn("✔  Xác nhận gia hạn", SUCCESS, TEXT_DARK);
+        btnConfirm = new RoundBtn("Xác nhận gia hạn", SUCCESS, TEXT_DARK);
         btnConfirm.setPreferredSize(new Dimension(175, 38));
         btnConfirm.setVisible(false);
         btnConfirm.addActionListener(e -> xacNhanGiaHan());
 
-        RoundBtn btnCancel = new RoundBtn("✕  Hủy", DANGER, TEXT_PRIMARY);
+        RoundBtn btnCancel = new RoundBtn("Hủy!", DANGER, TEXT_PRIMARY);
         btnCancel.setPreferredSize(new Dimension(90, 38));
         btnCancel.addActionListener(e -> dispose());
 
@@ -657,7 +660,9 @@ public class RentExtendDialog extends JDialog {
         double phatTre   = tinhPhatTreHienTai(selectedPhieu);
         double phiGiaHan = tinhPhiGiaHan(selectedPhieu, soNgay);
         double tongThu   = phatTre + phiGiaHan;
-        LocalDateTime ngayMoi = selectedPhieu.getNgayTraDuKien().plusDays(soNgay);
+        LocalDateTime ngayGoc = selectedPhieu.getNgayTraDuKien();
+        LocalDateTime homNay  = LocalDate.now().atStartOfDay();
+        LocalDateTime ngayMoi = (homNay.isAfter(ngayGoc) ? homNay : ngayGoc).plusDays(soNgay);
 
         String msg = String.format(
             "Xác nhận gia hạn phiếu PT%d?\n\n"
@@ -679,7 +684,7 @@ public class RentExtendDialog extends JDialog {
         if (xacNhan != JOptionPane.YES_OPTION) return;
 
         // MVC: 1 lời gọi controller — không có DAO/SQL trong dialog
-        ActionResult ar = ctrl.extendRental(selectedPhieu.getMaPT(), soNgay, phatTre, phiGiaHan);
+        ActionResult ar = ctrl.extendRental(selectedPhieu.getMaPT(), ngayMoi, phatTre, phiGiaHan);
 
         if (ar.success) {
             JOptionPane.showMessageDialog(this,
@@ -710,7 +715,7 @@ public class RentExtendDialog extends JDialog {
             new LineBorder(mauTieuDe, 1, true),
             new EmptyBorder(8, 12, 8, 12)
         ));
-        JLabel icon = new JLabel("⚠");
+        JLabel icon = new JLabel("!");
         icon.setFont(new Font("Segoe UI", Font.BOLD, 18));
         icon.setForeground(mauTieuDe);
 

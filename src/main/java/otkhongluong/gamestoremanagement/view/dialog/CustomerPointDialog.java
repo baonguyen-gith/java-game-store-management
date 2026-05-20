@@ -134,8 +134,10 @@ public class CustomerPointDialog extends JDialog {
         table = new JTable(tableModel) {
             @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
-                if (c instanceof JLabel)
+                if (c instanceof JLabel) {
                     ((JLabel) c).setHorizontalAlignment(col == 4 ? SwingConstants.LEFT : SwingConstants.CENTER);
+                    ((JLabel) c).setIcon(null);
+                }
                 if (isRowSelected(row)) {
                     c.setBackground(ACCENT); c.setForeground(Color.WHITE);
                 } else {
@@ -203,10 +205,10 @@ public class CustomerPointDialog extends JDialog {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 14));
         p.setBackground(BG_DARK);
 
-        RoundBtn btnCong  = new RoundBtn("➕  Cộng điểm",  BTN_GREEN,  Color.WHITE);
-        RoundBtn btnTru   = new RoundBtn("➖  Trừ điểm",   BTN_RED,    Color.WHITE);
-        RoundBtn btnSua   = new RoundBtn("✏  Sửa điểm",   BTN_BLUE,   Color.WHITE);
-        RoundBtn btnXoa   = new RoundBtn("🗑  Xóa lịch sử", BTN_ORANGE, Color.WHITE);
+        RoundBtn btnCong  = new RoundBtn("Cộng điểm",  BTN_GREEN,  Color.WHITE);
+        RoundBtn btnTru   = new RoundBtn("Trừ điểm",   BTN_RED,    Color.WHITE);
+        RoundBtn btnSua   = new RoundBtn("Sửa điểm",   BTN_BLUE,   Color.WHITE);
+        RoundBtn btnXoa   = new RoundBtn("Xóa lịch sử", BTN_ORANGE, Color.WHITE);
         RoundBtn btnDong  = new RoundBtn("Đóng",            new Color(100, 100, 120), Color.WHITE);
 
         Dimension btnSize = new Dimension(150, 40);
@@ -300,7 +302,7 @@ public class CustomerPointDialog extends JDialog {
 
         int confirm = JOptionPane.showConfirmDialog(this,
             "Xóa bản ghi " + loai + " " + diem + " điểm?\n"
-            + "⚠ Hệ thống sẽ tự động hoàn tác số điểm tương ứng!",
+            + "!Hệ thống sẽ tự động hoàn tác số điểm tương ứng!",
             "Xác nhận xóa", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
         if (confirm != JOptionPane.YES_OPTION) return;
 

@@ -219,7 +219,7 @@ public class RentDetailDialog extends JDialog {
         JLabel lblDTTitle = new JLabel("TỔNG DOANH THU ƯỚC TÍNH");
         lblDTTitle.setFont(FONT_SMALL);
         lblDTTitle.setForeground(COLOR_REVENUE);
-        JLabel lblDTNote = new JLabel("= Tiền thuê sau giảm điểm + Tiền phát sinh (gia hạn + phạt trễ đã đóng)");
+        JLabel lblDTNote = new JLabel("= Tiền thuê sau giảm điểm + Tiền phát sinh (gia hạn + phạt trễ đã đóng + phạt trễ tạm tính nếu đang thuê)");
         lblDTNote.setFont(FONT_MICRO);
         lblDTNote.setForeground(TEXT_MUTED);
         doanhThuTop.add(lblDTTitle, BorderLayout.WEST);
@@ -269,6 +269,7 @@ public class RentDetailDialog extends JDialog {
         JLabel noteStatic = new JLabel(
             "* Phạt trễ tạm tính: ước tính chưa chốt — chỉ chốt khi trả CD.  "
           + "| Giảm điểm: từ DIEM_LICHSU (Loai='TRU', MaPT).  "
+          + "| Phạt trễ = số ngày trễ × giá thuê/ngày × 1.5  "
           + "| 1 điểm = " + String.format("%,d", DIEM_TO_VND) + " VNĐ.");
         noteStatic.setFont(FONT_MICRO);
         noteStatic.setForeground(TEXT_MUTED);
@@ -391,7 +392,9 @@ public class RentDetailDialog extends JDialog {
         }
 
         // ── Doanh thu ──
-        double doanhThu = data.tienThueNetDiem + data.tienPhatDB;
+        double doanhThu = data.daTra
+            ? data.tienThueNetDiem + data.tienPhatDB
+            : data.tienThueNetDiem + data.tienPhatDB + data.phatTreTamTinh;
         lblDoanhThu.setText(String.format("%,.0f VNĐ", doanhThu));
         lblDoanhThu.setForeground(COLOR_REVENUE);
 

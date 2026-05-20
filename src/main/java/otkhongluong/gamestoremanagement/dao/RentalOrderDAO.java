@@ -388,16 +388,16 @@ public class RentalOrderDAO {
     
     /* ================= EXTEND RENTAL ================= */
 
-    public boolean extendRental(int maPT, int soNgay, double phatTre, double phiGiaHan) {
+    public boolean extendRental(int maPT, LocalDateTime ngayTraMoi, double phatTre, double phiGiaHan) {
         String sql =
             "UPDATE PHIEUTHUE " +
-            "SET NgayTraDuKien = DATEADD(DAY, ?, NgayTraDuKien), " +
+            "SET NgayTraDuKien = ?, " +
             "    TienPhat      = ISNULL(TienPhat, 0) + ? " +
             "WHERE MaPT = ? AND TrangThai = N'DangThue'";
 
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, soNgay);
+            ps.setTimestamp(1, Timestamp.valueOf(ngayTraMoi));
             ps.setDouble(2, phatTre + phiGiaHan);
             ps.setInt(3, maPT);
             return ps.executeUpdate() > 0;

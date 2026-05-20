@@ -161,15 +161,18 @@ public class GameManagePanel extends JPanel {
 
     private void styleTextField(JTextField tf) {
         tf.setBackground(INPUT_BG);
-        tf.setForeground(new Color(40,40,40));
-        tf.setCaretColor(ACCENT);
+        tf.setForeground(TEXT_MUTED);
+        tf.setCaretColor(TEXT_WHITE);
         tf.setFont(FONT_CELL);
-        tf.setBorder(new EmptyBorder(6, 32, 6, 10));
+        tf.setBorder(new CompoundBorder(
+            new LineBorder(ACCENT, 1, true),
+            new EmptyBorder(6, 10, 6, 32)
+        ));
         tf.setOpaque(false);
+        tf.setPreferredSize(new Dimension(0, 40));
     }
 
     private JScrollPane buildTable() {
-        // --- ĐÃ THÊM CỘT HÌNH ẢNH Ở ĐÂY ---
         String[] cols = {"Mã Game", "Tên Game", "Thể Loại", "Nền Tảng", "Ghi Chú", "Hình Ảnh"};
         tableModel = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
@@ -178,10 +181,13 @@ public class GameManagePanel extends JPanel {
         table = new JTable(tableModel) {
             @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
-                if (c instanceof JLabel) ((JLabel) c).setHorizontalAlignment(SwingConstants.LEFT);
-                ((JLabel) c).setBorder(new EmptyBorder(0, 12, 0, 12));
+                if (c instanceof JLabel) {
+                    ((JLabel) c).setHorizontalAlignment(SwingConstants.LEFT);
+                    ((JLabel) c).setBorder(new EmptyBorder(0, 12, 0, 12));
+                }
                 if (isRowSelected(row)) {
-                    c.setBackground(ACCENT); c.setForeground(Color.WHITE);
+                    c.setBackground(ACCENT);
+                    c.setForeground(Color.WHITE);
                 } else {
                     c.setBackground(row % 2 == 0 ? PURPLE_ROW : PURPLE_ALT);
                     c.setForeground(new Color(40, 40, 40));
@@ -190,12 +196,39 @@ public class GameManagePanel extends JPanel {
             }
         };
 
+        table.setFont(FONT_CELL);
+        table.setRowHeight(38);
+        table.setShowGrid(false);
+        table.setIntercellSpacing(new Dimension(0, 0));
+        table.setSelectionBackground(ACCENT);
+        table.setSelectionForeground(Color.WHITE);
+        table.setBackground(PURPLE_ALT);
+        table.setForeground(TEXT_WHITE);
+
+        JTableHeader header = table.getTableHeader();
+        header.setDefaultRenderer(new DefaultTableCellRenderer() {
+            @Override public Component getTableCellRendererComponent(
+                    JTable t, Object v, boolean sel, boolean foc, int r, int c) {
+                JLabel lbl = new JLabel(v == null ? "" : v.toString());
+                lbl.setFont(FONT_HEADER);
+                lbl.setForeground(Color.WHITE);
+                lbl.setBackground(PURPLE_HEADER);
+                lbl.setHorizontalAlignment(SwingConstants.LEFT);
+                lbl.setOpaque(true);
+                lbl.setBorder(new EmptyBorder(10, 12, 10, 12));
+                return lbl;
+            }
+        });
+        header.setBackground(PURPLE_HEADER);
+        header.setPreferredSize(new Dimension(0, 42));
+        header.setBorder(BorderFactory.createEmptyBorder());
+
+        int[] widths = {80, 200, 110, 110, 150, 150};
+        for (int i = 0; i < widths.length; i++)
+            table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
+
         rowSorter = new TableRowSorter<>(tableModel);
         table.setRowSorter(rowSorter);
-
-        JScrollPane sp = new JScrollPane(table); 
-        sp.getViewport().setBackground(Color.WHITE);
-        sp.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 245)));
 
         table.getTableHeader().addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
@@ -205,27 +238,17 @@ public class GameManagePanel extends JPanel {
                 int modelCol = table.convertColumnIndexToModel(viewCol);
                 String colName = table.getColumnName(viewCol);
                 String filter = JOptionPane.showInputDialog(null, "Lọc cột [" + colName + "]:");
-                if (filter != null) rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + filter.trim(), modelCol));
+                if (filter != null && !filter.trim().isEmpty())
+                    rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + filter.trim(), modelCol));
+                else if (filter != null)
+                    rowSorter.setRowFilter(null);
             }
         });
 
-        table.setFont(FONT_CELL); table.setRowHeight(38); table.setShowGrid(false);
-        JTableHeader header = table.getTableHeader();
-        header.setDefaultRenderer(new DefaultTableCellRenderer() {
-            @Override public Component getTableCellRendererComponent(JTable t, Object v, boolean s, boolean f, int r, int c) {
-                JLabel lbl = new JLabel(v == null ? "" : v.toString());
-                lbl.setFont(FONT_HEADER); lbl.setForeground(Color.WHITE);
-                lbl.setBackground(PURPLE_HEADER); lbl.setHorizontalAlignment(SwingConstants.LEFT);
-                lbl.setOpaque(true); lbl.setBorder(new EmptyBorder(10, 12, 10, 12));
-                return lbl;
-            }
-        });
-        header.setPreferredSize(new Dimension(0, 42));
-
-        // Tăng độ rộng để chứa thêm cột Hình ảnh
-        int[] widths = {80, 200, 110, 110, 150, 150}; 
-        for (int i = 0; i < widths.length; i++) table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
-
+        JScrollPane sp = new JScrollPane(table);
+        sp.setBorder(new LineBorder(PURPLE_HEADER, 1, true));
+        sp.setBackground(Color.WHITE);
+        sp.getViewport().setBackground(PURPLE_ALT);
         return sp;
     }
 
@@ -236,7 +259,7 @@ public class GameManagePanel extends JPanel {
 
         paginationPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         paginationPanel.setBackground(BG_DARK);
-        rebuildPagination(paginationPanel);
+        rebuildPagination(1);
         bar.add(paginationPanel, BorderLayout.WEST);
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
@@ -345,21 +368,33 @@ public class GameManagePanel extends JPanel {
         }
     }
 
-    private void rebuildPagination(JPanel panel) {
-        panel.removeAll();
-        String kw = txtSearch == null ? "" : txtSearch.getText().trim();
-        PageResult<Game> result = controller.getPage(kw, currentPage, PAGE_SIZE);
-        int total = result.totalPages;
-        RoundButton prev = new RoundButton("<", INPUT_BG, BG_DARK);
-        prev.setEnabled(currentPage > 1);
-        prev.addActionListener(e -> { if (currentPage > 1) { currentPage--; renderPage(); } });
-        JLabel lbl = new JLabel("Trang " + currentPage + " / " + total);
-        lbl.setForeground(TEXT_WHITE); lbl.setBorder(new EmptyBorder(0, 10, 0, 10));
-        RoundButton next = new RoundButton(">", INPUT_BG, BG_DARK);
-        next.setEnabled(currentPage < total);
-        next.addActionListener(e -> { if (currentPage < total) { currentPage++; renderPage(); } });
-        panel.add(prev); panel.add(lbl); panel.add(next);
-        panel.revalidate(); panel.repaint();
+    private void rebuildPagination(int totalPages) {
+        paginationPanel.removeAll();
+
+        RoundButton btnPrev = new RoundButton("<", INPUT_BG, BG_DARK);
+        btnPrev.setPreferredSize(new Dimension(40, 36));
+        btnPrev.setEnabled(currentPage > 1);
+        btnPrev.addActionListener(e -> {
+            if (currentPage > 1) { currentPage--; renderPage(); }
+        });
+
+        JLabel lblPageInfo = new JLabel("Trang " + currentPage + " / " + totalPages);
+        lblPageInfo.setForeground(TEXT_WHITE);
+        lblPageInfo.setFont(FONT_LABEL);
+        lblPageInfo.setBorder(new EmptyBorder(0, 10, 0, 10));
+
+        RoundButton btnNext = new RoundButton(">", INPUT_BG, BG_DARK);
+        btnNext.setPreferredSize(new Dimension(40, 36));
+        btnNext.setEnabled(currentPage < totalPages);
+        btnNext.addActionListener(e -> {
+            if (currentPage < totalPages) { currentPage++; renderPage(); }
+        });
+
+        paginationPanel.add(btnPrev);
+        paginationPanel.add(lblPageInfo);
+        paginationPanel.add(btnNext);
+        paginationPanel.revalidate();
+        paginationPanel.repaint();
     }
 
     private void loadData() { allData = controller.loadAllGames(); renderPage(); }
@@ -391,7 +426,7 @@ public class GameManagePanel extends JPanel {
             });
         }
 
-        rebuildPagination(paginationPanel);
+        rebuildPagination(result.totalPages);
     }
 
     private void toggleFilterMode(RoundButton btn) {

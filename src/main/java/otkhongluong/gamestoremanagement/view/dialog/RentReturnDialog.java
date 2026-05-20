@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
  * RentReturnDialog — Wizard 3 bước trả CD/Game
  *
  * LOGIC ĐIỂM: 1 điểm = 5.000 VNĐ
- * LOGIC TÍNH PHẠT TRỄ HẠN: soNgayTre x 10.000 VNĐ/ngày
+ * LOGIC TÍNH PHẠT TRỄ HẠN: soNgayTre x giaThueNgay x 1.5
  * LOGIC THANH TOÁN:
  *   TongPhaiTra = (TienThueGoc - GiamDiem) + PhatTre + ChiPhiHuHong
  *   KetQua      = TongPhaiTra - TienCoc
@@ -134,18 +134,11 @@ public class RentReturnDialog extends JDialog {
 
     private void prefillFromMaPT(int id) {
         RentalOrder pt = ctrl.getById(id);
-        if (pt != null && pt.getSoDienThoai() != null) {
-            txtSDT.setText(pt.getSoDienThoai());
-            doSearch();
-            if (searchResults != null) {
-                for (int i = 0; i < searchResults.size(); i++) {
-                    if (searchResults.get(i).getMaPT() == id) {
-                        tblPhieu.setRowSelectionInterval(i, i);
-                        break;
-                    }
-                }
-            }
-        }
+        if (pt == null) return;
+
+        selectedPhieu = pt;
+        loadStep2Data();
+        showStep(2);
     }
 
     // =========================================================
@@ -461,7 +454,10 @@ public class RentReturnDialog extends JDialog {
         long days = java.time.temporal.ChronoUnit.DAYS.between(
             ngayDK.toLocalDate(), ngayTra.toLocalDate());
         if (days <= 0) days = 1;
-        return days * 10_000;
+        double giaThueNgay = pt.getDanhSachChiTiet() != null
+            ? pt.getDanhSachChiTiet().stream().mapToDouble(CTPhieuThue::getGiaThueNgay).sum()
+            : 0;
+        return days * giaThueNgay * 1.5;
     }
 
     // =========================================================

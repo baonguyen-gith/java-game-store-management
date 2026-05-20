@@ -295,7 +295,7 @@ public class RentalService {
                             long ngayTre = ChronoUnit.DAYS.between(
                                 ngayDK.toLocalDate(), homNay.toLocalDate());
                             if (ngayTre <= 0) ngayTre = 1;
-                            data.phatTreTamTinh = ngayTre * 10_000;
+                            data.phatTreTamTinh = ngayTre * data.giaThueNgayHT * 1.5;
                         }
                     }
                 }
@@ -335,8 +335,8 @@ public class RentalService {
 
     /* ================= EXTEND ================= */
 
-    public boolean extendRental(int maPT, int soNgay, double phatTre, double phiGiaHan) {
-        return phieuThueDAO.extendRental(maPT, soNgay, phatTre, phiGiaHan);
+    public boolean extendRental(int maPT, LocalDateTime ngayTraMoi, double phatTre, double phiGiaHan) {
+        return phieuThueDAO.extendRental(maPT, ngayTraMoi, phatTre, phiGiaHan);
     }
 
     /* ================= PENALTY ================= */
@@ -350,7 +350,10 @@ public class RentalService {
         if (ngayTra.isAfter(ngayDK)) {
             long days = ChronoUnit.DAYS.between(ngayDK.toLocalDate(), ngayTra.toLocalDate());
             if (days <= 0) days = 1;
-            phat += days * 10_000;
+            double giaThueNgay = cds != null
+                ? cds.stream().mapToDouble(ct -> ct != null ? ct.getGiaThueNgay() : 0).sum()
+                : 0;
+            phat += days * giaThueNgay * 1.5;
         }
         if (cds != null)
             for (CTPhieuThue ct : cds)
@@ -382,7 +385,10 @@ public class RentalService {
         if (!ngayTra.isAfter(ngayDK)) return 0;
         long days = ChronoUnit.DAYS.between(ngayDK.toLocalDate(), ngayTra.toLocalDate());
         if (days <= 0) days = 1;
-        return days * 10_000;
+        double giaThueNgay = pt.getDanhSachChiTiet() != null
+            ? pt.getDanhSachChiTiet().stream().mapToDouble(CTPhieuThue::getGiaThueNgay).sum()
+            : 0;
+        return days * giaThueNgay * 1.5;
     }
 
     private String nvl(String s)              { return s == null ? "" : s; }
