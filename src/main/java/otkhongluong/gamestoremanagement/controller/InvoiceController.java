@@ -9,6 +9,8 @@ import otkhongluong.gamestoremanagement.model.CartItem;
 import otkhongluong.gamestoremanagement.model.SpRow;
 import otkhongluong.gamestoremanagement.model.RentDetailData;
 import otkhongluong.gamestoremanagement.service.InvoiceService;
+import otkhongluong.gamestoremanagement.util.ExportUtil;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -329,6 +331,23 @@ public class InvoiceController {
             case 5: return Comparator.comparingDouble(Invoice::getTongTien);
             default: return Comparator.comparingInt(Invoice::getMaHD);
         }
+    }
+    
+    public void exportInvoicePDF(int maHD, String filePath) throws IOException {
+        Object[] data    = service.getInvoiceExportData(maHD);
+        Invoice invoice  = (Invoice) data[0];
+        List<String[]> items = (List<String[]>) data[1];
+
+        ExportUtil.exportInvoicePDF(
+            filePath,
+            invoice.getMaHD(),
+            invoice.getTenKhachHang(),
+            invoice.getSoDienThoai(),
+            invoice.getNgayLap(),
+            invoice.getTrangThai(),
+            items,
+            invoice.getTongTien()
+        );
     }
 
     private String nvl(String s) { return s == null ? "" : s; }

@@ -10,7 +10,8 @@ import otkhongluong.gamestoremanagement.model.CartItem;
 import otkhongluong.gamestoremanagement.model.RentDetailData;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 import otkhongluong.gamestoremanagement.util.Session;
-
+import otkhongluong.gamestoremanagement.util.FormatUtil;
+import java.util.ArrayList;
 import java.sql.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -498,6 +499,28 @@ public class InvoiceService {
         } catch (Exception ex) { ex.printStackTrace(); return null; }
 
         return data;
+    }
+    
+    // Chuẩn bị data từ Invoice + List<ChiTietHoaDon> thực tế
+    public Object[] getInvoiceExportData(int maHD) {
+        // getHoaDonById đã load cả danhSachChiTiet bên trong
+        Invoice invoice = dao.getHoaDonById(maHD);
+        if (invoice == null) throw new RuntimeException("Không tìm thấy hóa đơn #" + maHD);
+
+        List<String[]> items = new ArrayList<>();
+        for (ChiTietHoaDon ct : invoice.getDanhSachChiTiet()) {
+            double thanhTien = ct.getSoLuong() * ct.getDonGia();
+            items.add(new String[]{
+                ct.getTenGame(),
+                ct.getLoaiSanPham(),
+                String.valueOf(ct.getSoLuong()),
+                FormatUtil.formatTien(ct.getDonGia()),
+                FormatUtil.formatTien(thanhTien)
+            });
+        }
+
+        // Trả Object[] để tránh tạo thêm class mới
+        return new Object[]{invoice, items};
     }
 
     // ================================================================

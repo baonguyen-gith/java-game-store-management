@@ -278,7 +278,34 @@ public class ReportPanel extends JPanel {
         filterBar.add(makeFilterLabel("Tháng:")); filterBar.add(cboMonth);
         filterBar.add(Box.createHorizontalStrut(8));
         filterBar.add(makeFilterLabel("Năm:"));   filterBar.add(cboYear);
+        filterBar.add(Box.createHorizontalStrut(16)); // ← thêm khoảng cách
 
+        // ── THÊM NÚT XUẤT EXCEL ──────────────────────────────────────
+        JButton btnExport = makeExportButton("Xuất Excel");
+        btnExport.addActionListener(e -> {
+            int m = (Integer) cboMonth.getSelectedItem();
+            int y = cboYear.getSelectedItem() != null
+                ? (Integer) cboYear.getSelectedItem()
+                : LocalDate.now().getYear();
+
+            String path = otkhongluong.gamestoremanagement.util.ExportUtil
+                .chooseFilePath(this, "xlsx", "Excel Files");
+            if (path == null) return;
+
+            try {
+                ctrl.exportMonthlyExcel(m, y, path);
+                JOptionPane.showMessageDialog(this,
+                    "Xuất Excel thành công!\n" + path,
+                    "OK", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this,
+                    "Lỗi: " + ex.getMessage(),
+                    "Lỗi", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+        filterBar.add(btnExport);
+        
         JLabel chartTitle = new JLabel();
         chartTitle.setFont(new Font("Segoe UI", Font.BOLD, 14));
         chartTitle.setForeground(TEXT_WHITE);
@@ -354,14 +381,39 @@ public class ReportPanel extends JPanel {
         JLabel lblBan  = makeSummaryBadge("Tổng bán: —",  COLOR_REVENUE);
         JLabel lblThue = makeSummaryBadge("Tổng thuê: —", COLOR_RENT);
         JLabel lblAll  = makeSummaryBadge("Tổng cộng: —", ACCENT_LIGHT);
-
+        
         filterBar.add(makeFilterLabel("Năm:"));
         filterBar.add(cboYear);
         filterBar.add(Box.createHorizontalStrut(16));
         filterBar.add(lblBan);
         filterBar.add(lblThue);
         filterBar.add(lblAll);
+        filterBar.add(Box.createHorizontalStrut(16)); // ← thêm khoảng cách
 
+        // ── THÊM NÚT XUẤT EXCEL ──────────────────────────────────────
+        JButton btnExport = makeExportButton("Xuất Excel");
+        btnExport.addActionListener(e -> {
+            int y = cboYear.getSelectedItem() != null
+                ? (Integer) cboYear.getSelectedItem()
+                : LocalDate.now().getYear();
+
+            String path = otkhongluong.gamestoremanagement.util.ExportUtil
+                .chooseFilePath(this, "xlsx", "Excel Files");
+            if (path == null) return;
+
+            try {
+                ctrl.exportYearlyExcel(y, path);
+                JOptionPane.showMessageDialog(this,
+                    "Xuất Excel thành công!\n" + path,
+                    "OK", JOptionPane.INFORMATION_MESSAGE);
+            } catch (java.io.IOException ex) {
+                JOptionPane.showMessageDialog(this,
+                    "Lỗi: " + ex.getMessage(),
+                    "Lỗi", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+        filterBar.add(btnExport);
+        
         YearlyBarChart chartPanel = new YearlyBarChart(
             years.isEmpty() ? LocalDate.now().getYear() : years.get(0));
         chartPanel.setPreferredSize(new Dimension(0, 260));
@@ -1026,5 +1078,30 @@ public class ReportPanel extends JPanel {
         lbl.setBorder(new EmptyBorder(5, 10, 5, 10));
         lbl.setOpaque(false);
         return lbl;
+    }
+    
+    // Đặt cùng chỗ với makeFilterLabel(), makeCombo()...
+    private JButton makeExportButton(String label) {
+        JButton btn = new JButton(label) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                    RenderingHints.VALUE_ANTIALIAS_ON);
+                boolean hov = getModel().isRollover();
+                g2.setColor(hov ? new Color(52, 160, 80) : new Color(34, 130, 60));
+                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
+                g2.dispose();
+                setForeground(Color.WHITE);
+                super.paintComponent(g);
+            }
+        };
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setContentAreaFilled(false);
+        btn.setOpaque(false);
+        btn.setBorder(new EmptyBorder(7, 16, 7, 16));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        return btn;
     }
 }

@@ -120,6 +120,29 @@ public class ReportService {
                                     (String)r[3], (String)r[4], (int)r[5], (double)r[6]));
         return rows;
     }
+    
+    // Dùng thẳng ReportDAO.getMonthlyRows() và getYearlyRows() đã có
+    public Object[] getMonthlyExportData(int month, int year) {
+        List<Object[]> rows = dao.getMonthlyRows(month, year);
+
+        double totalBan  = 0, totalThue = 0;
+        for (Object[] row : rows) {
+            totalBan  += ((Number) row[2]).doubleValue();
+            totalThue += ((Number) row[3]).doubleValue();
+        }
+        return new Object[]{rows, totalBan, totalThue};
+    }
+
+    public Object[] getYearlyExportData(int year) {
+        List<Object[]> rows = dao.getYearlyRows(year);
+
+        double totalBan  = 0, totalThue = 0;
+        for (Object[] row : rows) {
+            totalBan  += ((Number) row[2]).doubleValue();
+            totalThue += ((Number) row[4]).doubleValue();
+        }
+        return new Object[]{rows, totalBan, totalThue};
+    }
 
     // ── Tab 7 ────────────────────────────────────────────────
 
@@ -129,7 +152,7 @@ public class ReportService {
         for (Object[] r : dao.getVIPCustomers()) {
             String medal = rank == 1 ? "🥇" : rank == 2 ? "🥈" : rank == 3 ? "🥉" : String.valueOf(rank);
             rows.add(new VIPRow(medal, (String)r[0], (String)r[1], (String)r[2],
-                                (int)r[3], (double)r[4], (double)r[5]));
+                    (int)r[3], (double)r[4], (double)r[5]));
             rank++;
         }
         return rows;

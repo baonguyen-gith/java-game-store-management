@@ -1,6 +1,8 @@
 package otkhongluong.gamestoremanagement.controller;
 
 import otkhongluong.gamestoremanagement.service.ReportService;
+import otkhongluong.gamestoremanagement.util.ExportUtil;
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -111,5 +113,23 @@ public class ReportController {
             medal=m; hoTen=n; sdt=s; email=e; diemTichLuy=d; tongMua=mu; tongThue=th;
         }
         public double tongCong() { return tongMua + tongThue; }
+    }
+    
+    public void exportMonthlyExcel(int month, int year, String filePath) throws IOException {
+        Object[] data        = reportService.getMonthlyExportData(month, year);
+        List<Object[]> rows  = (List<Object[]>) data[0];
+        double totalBan      = (double) data[1];
+        double totalThue     = (double) data[2];
+
+        ExportUtil.exportMonthlyExcel(filePath, month, year, rows, totalBan, totalThue);
+    }
+
+    public void exportYearlyExcel(int year, String filePath) throws IOException {
+        Object[] data        = reportService.getYearlyExportData(year);
+        List<Object[]> rows  = (List<Object[]>) data[0];
+        double totalBan      = (double) data[1];
+        double totalThue     = (double) data[2];
+
+        ExportUtil.exportYearlyExcel(filePath, year, rows, totalBan, totalThue);
     }
 }

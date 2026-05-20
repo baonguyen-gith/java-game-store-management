@@ -11,7 +11,8 @@ import otkhongluong.gamestoremanagement.model.RentalOrder;
 import otkhongluong.gamestoremanagement.model.CTPhieuThue;
 import otkhongluong.gamestoremanagement.model.RentDetailData;
 import otkhongluong.gamestoremanagement.util.DBConnection;
-
+import otkhongluong.gamestoremanagement.util.FormatUtil;
+import java.util.ArrayList;
 import java.sql.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -389,6 +390,28 @@ public class RentalService {
             ? pt.getDanhSachChiTiet().stream().mapToDouble(CTPhieuThue::getGiaThueNgay).sum()
             : 0;
         return days * giaThueNgay * 1.5;
+    }
+    
+    // Chuẩn bị data từ RentalOrder + List<CTPhieuThue> thực tế
+    public Object[] getRentalExportData(int maPT) {
+        // findById đã load cả danhSachChiTiet
+        RentalOrder rental = phieuThueDAO.findById(maPT);
+        if (rental == null) throw new RuntimeException("Không tìm thấy phiếu thuê #" + maPT);
+
+        List<String[]> items = new ArrayList<>();
+        for (CTPhieuThue ct : rental.getDanhSachChiTiet()) {
+            items.add(new String[]{
+                "CD" + String.format("%04d", ct.getMaCD()),
+                ct.getTenGame(),
+                ct.getTrangThai(),
+                FormatUtil.formatTien(ct.getDonGiaThue())
+            });
+        }
+
+        double tongTienThue = rental.getDanhSachChiTiet().stream()
+            .mapToDouble(CTPhieuThue::getDonGiaThue).sum();
+
+        return new Object[]{rental, items, tongTienThue};
     }
 
     private String nvl(String s)              { return s == null ? "" : s; }

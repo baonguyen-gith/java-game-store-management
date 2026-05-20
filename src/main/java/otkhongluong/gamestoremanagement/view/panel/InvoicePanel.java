@@ -7,6 +7,8 @@ import otkhongluong.gamestoremanagement.view.dialog.InvoiceAddDialog;
 import otkhongluong.gamestoremanagement.view.dialog.InvoiceEditDialog;
 import otkhongluong.gamestoremanagement.util.RoundButton;
 import otkhongluong.gamestoremanagement.util.FormatUtil;
+import otkhongluong.gamestoremanagement.util.ExportUtil;
+import java.io.IOException;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -342,6 +344,33 @@ import java.util.List;
             // RIGHT: Sửa + Xóa
             JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
             btnPanel.setBackground(BG_DARK);
+            
+            RoundButton btnExportPDF = new RoundButton("Xuất PDF", new Color(234, 88, 12), Color.WHITE);
+            btnExportPDF.setPreferredSize(new Dimension(105, 38));
+            btnExportPDF.addActionListener(e -> {
+                int row = table.getSelectedRow();
+                if (row == -1) {
+                    JOptionPane.showMessageDialog(this, "Vui lòng chọn hóa đơn!");
+                    return;
+                }
+                // Cột 0 là MaHD — kiểm tra lại index theo JTable của bạn
+                int maHD = Integer.parseInt(table.getValueAt(row, 0).toString()
+                    .replace("HD", "").trim());
+
+                String path = ExportUtil.chooseFilePath(this, "pdf", "PDF Files");
+                if (path == null) return;
+
+                try {
+                    controller.exportInvoicePDF(maHD, path);
+                    JOptionPane.showMessageDialog(this,
+                        "Xuất PDF thành công!\n" + path, "OK",
+                        JOptionPane.INFORMATION_MESSAGE);
+                } catch (IOException ex) {
+                    JOptionPane.showMessageDialog(this,
+                        "Lỗi: " + ex.getMessage(), "Lỗi",
+                        JOptionPane.ERROR_MESSAGE);
+                }
+            });
 
             RoundButton btnEdit = new RoundButton("Sửa", BTN_EDIT, Color.WHITE);
             btnEdit.setPreferredSize(new Dimension(105, 38));
@@ -396,7 +425,8 @@ import java.util.List;
                         "Lỗi", JOptionPane.ERROR_MESSAGE);
                 }
             });
-
+            
+            btnPanel.add(btnExportPDF);
             btnPanel.add(btnEdit);
             btnPanel.add(btnDelete);
             bar.add(btnPanel, BorderLayout.EAST);

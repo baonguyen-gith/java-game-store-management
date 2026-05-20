@@ -9,7 +9,8 @@ import otkhongluong.gamestoremanagement.model.Customer;
 import otkhongluong.gamestoremanagement.model.Employee;
 import otkhongluong.gamestoremanagement.model.RentalOrder;
 import otkhongluong.gamestoremanagement.service.RentalService;
-
+import otkhongluong.gamestoremanagement.util.ExportUtil;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -410,6 +411,29 @@ public class RentController {
             case 6: return Comparator.comparing(pt -> nvl(pt.getTrangThai()));
             default: return Comparator.comparingInt(RentalOrder::getMaPT);
         }
+    }
+    
+    public void exportRentalPDF(int maPT, String filePath) throws IOException {
+        Object[] data       = service.getRentalExportData(maPT);
+        RentalOrder rental  = (RentalOrder) data[0];
+        List<String[]> items = (List<String[]>) data[1];
+        double tongTienThue = (double) data[2];
+
+        ExportUtil.exportRentalPDF(
+            filePath,
+            rental.getMaPT(),
+            rental.getTenKhachHang(),
+            rental.getSoDienThoai(),
+            rental.getTenNhanVien(),
+            rental.getNgayThue(),
+            rental.getNgayTraDuKien(),
+            rental.getNgayTraThucTe(),
+            rental.getTienCoc(),
+            rental.getTienPhat(),
+            rental.getTrangThai(),
+            items,
+            tongTienThue
+        );
     }
 
     private String nvl(String s) { return s == null ? "" : s; }
