@@ -617,19 +617,38 @@ public class ProductPanel extends JPanel {
                 JOptionPane.showMessageDialog(dialog, "Vui lòng chọn đĩa cần sửa!");
                 return;
             }
-            // Lấy MaCD từ bảng (bỏ prefix "CD0xx")
             String maCDStr = discModel.getValueAt(viewRow, 0).toString().replaceAll("[^\\d]", "");
             int maCD = Integer.parseInt(maCDStr);
-
             String tinhTrangCu = discModel.getValueAt(viewRow, 1).toString();
-            String tinhTrangMoi = JOptionPane.showInputDialog(dialog,
-                    "Tình trạng mới:", tinhTrangCu);
-            if (tinhTrangMoi != null) {
+
+            // >>> BẮT ĐẦU ĐOẠN MỚI >>>
+            String[] options = {"Mới", "Tốt", "Cũ", "Hỏng"};
+            JComboBox<String> comboTinhTrang = new JComboBox<>(options);
+            comboTinhTrang.setSelectedItem(tinhTrangCu);
+
+            JPanel inputPanel = new JPanel(new BorderLayout(8, 8));
+            inputPanel.add(new JLabel("Chọn tình trạng mới:"), BorderLayout.NORTH);
+            inputPanel.add(comboTinhTrang, BorderLayout.CENTER);
+
+            UIManager.put("OptionPane.okButtonText", "Xác nhận");
+            UIManager.put("OptionPane.cancelButtonText", "Hủy");
+
+            int choice = JOptionPane.showConfirmDialog(
+                    dialog, inputPanel,
+                    "Sửa tình trạng – CD" + String.format("%03d", maCD),
+                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+            UIManager.put("OptionPane.okButtonText", "OK");
+            UIManager.put("OptionPane.cancelButtonText", "Cancel");
+
+            if (choice == JOptionPane.OK_OPTION) {
+                String tinhTrangMoi = (String) comboTinhTrang.getSelectedItem();
                 ProductController.ActionResult result =
                         discController.handleCapNhatTinhTrang(maCD, tinhTrangMoi);
                 showResult(result);
                 if (result.success) refreshDiscTable.run();
             }
+            // <<< KẾT THÚC ĐOẠN MỚI <
         });
 
         // Nút Xóa đĩa
