@@ -2,71 +2,87 @@ package otkhongluong.gamestoremanagement.service;
 
 import otkhongluong.gamestoremanagement.dao.UserDAO;
 import otkhongluong.gamestoremanagement.model.User;
-
 import java.util.List;
 
 public class UserService {
 
-    private final UserDAO userDAO;
+    private final UserDAO userDAO = new UserDAO();
 
-    public UserService() {
-        this.userDAO = new UserDAO();
-    }
-
-    /** Lấy toàn bộ danh sách user. */
     public List<User> getAllUsers() {
         return userDAO.findAll();
     }
 
-    /**
-     * [MỚI] Lấy danh sách user kèm thông tin nhân viên (JOIN NHANVIEN).
-     * Uỷ quyền thẳng xuống DAO vì đây là truy vấn đọc thuần tuý, không có nghiệp vụ.
-     */
     public List<Object[]> getAllUsersWithEmployee() {
         return userDAO.findAllWithEmployee();
     }
 
-    /** Thêm user mới. @throws IllegalArgumentException nếu dữ liệu không hợp lệ */
-    public void addUser(String username, String password, String roleStr) {
+    /** Delegate xuống DAO — nghiệp vụ lọc nằm ở DAO vì cần JOIN. */
+    public List<Object[]> getNhanVienDropdown(int maNVEditDang) {
+        return userDAO.findNhanVienDropdown(maNVEditDang);
+    }
+
+    // ── Thêm ──────────────────────────────────────────────────────────────────
+
+    public void addUser(String username, String password, String roleStr, int maNV) {
         ValidationService.validateNotEmpty(username, "Username");
         ValidationService.validateNotEmpty(password, "Password");
         int role = parseRole(roleStr);
+
         if (userDAO.findByUsername(username.trim()) != null)
             throw new IllegalArgumentException("Username đã tồn tại!");
-        User user = new User(0, username.trim(), password.trim(), role);
+
+        User user = new User(0, username.trim(), password.trim(), role, maNV);
         if (!userDAO.insert(user))
             throw new RuntimeException("Thêm thất bại! Lỗi database.");
     }
 
-    /** Sửa thông tin user. @throws IllegalArgumentException nếu dữ liệu không hợp lệ */
-    public void updateUser(int maUser, String username, String password, String roleStr) {
+    // ── Sửa ──────────────────────────────────────────────────────────────────
+
+    /**
+     * @param password Rỗng = giữ nguyên password cũ trong DB.
+     */
+    public void updateUser(int maUser, String username,
+                           String password, String roleStr, int maNV) {
         ValidationService.validateNotEmpty(username, "Username");
-        ValidationService.validateNotEmpty(password, "Password");
+        // Không validate password rỗng — rỗng nghĩa là giữ nguyên
         int role = parseRole(roleStr);
+
         User existing = userDAO.findByUsername(username.trim());
         if (existing != null && existing.getMaUser() != maUser)
             throw new IllegalArgumentException("Username đã tồn tại!");
-        User user = new User(maUser, username.trim(), password.trim(), role);
+
+        // Nếu password rỗng thì lấy password cũ từ DB
+        String finalPassword = password.isEmpty()
+            ? userDAO.findById(maUser).getPassword()
+            : password.trim();
+
+        User user = new User(maUser, username.trim(), finalPassword, role, maNV);
         if (!userDAO.update(user))
             throw new RuntimeException("Sửa thất bại! Lỗi database.");
     }
 
-    /** Xóa user theo ID. @throws RuntimeException nếu xóa thất bại */
+    // ── Xóa ──────────────────────────────────────────────────────────────────
+
     public void deleteUser(int maUser) {
         if (!userDAO.delete(maUser))
             throw new RuntimeException("Xóa thất bại! Lỗi database.");
     }
 
-    // ─── Private helpers ───────────────────────────────────────────────────────
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
     private int parseRole(String roleStr) {
         ValidationService.validateNotEmpty(roleStr, "Role");
         try {
             int role = Integer.parseInt(roleStr.trim());
-            if (role != 1 && role != 2)
-                throw new IllegalArgumentException("Role phải là 1 (Admin) hoặc 2 (Staff)!");
+            if (role < 1 || role > 3)
+                throw new IllegalArgumentException("Role phải là 1, 2 hoặc 3!");
             return role;
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Role không hợp lệ! Phải là số nguyên.");
+            throw new IllegalArgumentException("Role không hợp lệ!");
         }
+    }
+    
+    public User getUserById(int maUser) {
+        return userDAO.findById(maUser);
     }
 }

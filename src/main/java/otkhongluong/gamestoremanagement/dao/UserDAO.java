@@ -134,4 +134,33 @@ public class UserDAO {
             rs.getInt("MaNV")
         );
     }
+    
+    public List<Object[]> findNhanVienDropdown(int maNVEditDang) {
+        List<Object[]> list = new ArrayList<>();
+        String sql =
+            "SELECT nv.MaNV, nv.HoTen, " +
+            "       CASE WHEN u.MaNV IS NOT NULL THEN 1 ELSE 0 END AS DaCoTK " +
+            "FROM NHANVIEN nv " +
+            "LEFT JOIN USERS u ON nv.MaNV = u.MaNV " +
+            "WHERE u.MaNV IS NULL OR nv.MaNV = ? " +
+            "ORDER BY nv.MaNV";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, maNVEditDang < 0 ? -1 : maNVEditDang);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int maNV = rs.getInt("MaNV");
+                    list.add(new Object[]{
+                        maNV,
+                        FormatUtil.formatMaNV(maNV),
+                        rs.getString("HoTen"),
+                        rs.getInt("DaCoTK") == 1
+                    });
+                }
+            }
+        } catch (SQLException e) {
+            throw new DatabaseException("Lỗi khi lấy dropdown nhân viên: " + e.getMessage(), e);
+        }
+        return list;
+    }
 }

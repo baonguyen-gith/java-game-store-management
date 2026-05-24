@@ -2,6 +2,7 @@ package otkhongluong.gamestoremanagement.view.panel;
 
 import otkhongluong.gamestoremanagement.controller.UserController;
 import otkhongluong.gamestoremanagement.model.User;
+import otkhongluong.gamestoremanagement.view.dialog.UserDialog;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -10,7 +11,7 @@ import java.util.List;
 
 public class UserPanel extends JPanel {
 
-    // ===== UI COMPONENTS =====
+    // ===== UI =====
     private JTable table;
     private DefaultTableModel tableModel;
     private JButton btnAdd;
@@ -21,7 +22,6 @@ public class UserPanel extends JPanel {
     private final UserController controller = new UserController();
     private final User currentUser;
 
-    // ===========================
     public UserPanel(User currentUser) {
         this.currentUser = currentUser;
         initUI();
@@ -30,7 +30,7 @@ public class UserPanel extends JPanel {
         initEvents();
     }
 
-    // ===== KHỞI TẠO GIAO DIỆN =====
+    // ===== GIAO DIỆN =====
     private void initUI() {
         setLayout(new BorderLayout());
         setBackground(new Color(20, 20, 50));
@@ -40,23 +40,18 @@ public class UserPanel extends JPanel {
         title.setForeground(Color.WHITE);
         title.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
 
-        // ✅ Thêm 2 cột: Mã NV và Tên NV
         String[] cols = {"ID", "Username", "Role", "Mã NV", "Tên Nhân Viên"};
         tableModel = new DefaultTableModel(cols, 0) {
-            @Override
-            public boolean isCellEditable(int row, int col) { return false; }
+            @Override public boolean isCellEditable(int r, int c) { return false; }
         };
+
         table = new JTable(tableModel);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-
-        // Căn chỉnh độ rộng cột
-        table.getColumnModel().getColumn(0).setPreferredWidth(50);   // ID
-        table.getColumnModel().getColumn(1).setPreferredWidth(130);  // Username
-        table.getColumnModel().getColumn(2).setPreferredWidth(70);   // Role
-        table.getColumnModel().getColumn(3).setPreferredWidth(80);   // Mã NV
-        table.getColumnModel().getColumn(4).setPreferredWidth(180);  // Tên NV
-
-        JScrollPane scroll = new JScrollPane(table);
+        table.getColumnModel().getColumn(0).setPreferredWidth(50);
+        table.getColumnModel().getColumn(1).setPreferredWidth(130);
+        table.getColumnModel().getColumn(2).setPreferredWidth(70);
+        table.getColumnModel().getColumn(3).setPreferredWidth(80);
+        table.getColumnModel().getColumn(4).setPreferredWidth(180);
 
         btnAdd    = new JButton("➕ Thêm");
         btnEdit   = new JButton("✏️ Sửa");
@@ -68,9 +63,9 @@ public class UserPanel extends JPanel {
         actions.add(btnEdit);
         actions.add(btnDelete);
 
-        add(title,   BorderLayout.NORTH);
-        add(scroll,  BorderLayout.CENTER);
-        add(actions, BorderLayout.SOUTH);
+        add(title,                  BorderLayout.NORTH);
+        add(new JScrollPane(table), BorderLayout.CENTER);
+        add(actions,                BorderLayout.SOUTH);
     }
 
     // ===== PHÂN QUYỀN =====
@@ -86,29 +81,26 @@ public class UserPanel extends JPanel {
         btnAdd.addActionListener(e -> handleAdd());
         btnEdit.addActionListener(e -> handleEdit());
         btnDelete.addActionListener(e -> handleDelete());
+        // Double-click mở dialog sửa
+        table.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent e) {
+                if (e.getClickCount() == 2) handleEdit();
+            }
+        });
     }
 
-    // ===== XỬ LÝ THÊM =====
+    // ===== THÊM =====
     private void handleAdd() {
-        String username = JOptionPane.showInputDialog(this, "Nhập username:");
-        if (username == null) return;
-
-        String password = JOptionPane.showInputDialog(this, "Nhập password:");
-        if (password == null) return;
-
-        String roleStr = JOptionPane.showInputDialog(this, "Role (1=Admin, 2=Staff):");
-        if (roleStr == null) return;
-
-        String error = controller.addUser(username, password, roleStr);
-        if (error != null) {
-            JOptionPane.showMessageDialog(this, error, "Lỗi", JOptionPane.ERROR_MESSAGE);
-        } else {
-            JOptionPane.showMessageDialog(this, "Thêm thành công!");
-            loadData();
-        }
+        Window ancestor = SwingUtilities.getWindowAncestor(this);
+        Frame frame = (ancestor instanceof Frame) ? (Frame) ancestor : null;
+        UserDialog dialog = new UserDialog(frame, null, controller, this::loadData);
+        dialog.setAlwaysOnTop(true);
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
     }
 
-    // ===== XỬ LÝ SỬA =====
+
+    // ===== SỬA =====
     private void handleEdit() {
         int row = table.getSelectedRow();
         if (row == -1) {
@@ -116,32 +108,34 @@ public class UserPanel extends JPanel {
             return;
         }
 
-        // Cột 0 vẫn là MaUser (int)
-        int id = (int) tableModel.getValueAt(row, 0);
-
-        String username = JOptionPane.showInputDialog(this, "Username mới:");
-        if (username == null) return;
-
-        String password = JOptionPane.showInputDialog(this, "Password mới:");
-        if (password == null) return;
-
-        String roleStr = JOptionPane.showInputDialog(this, "Role (1=Admin, 2=Staff):");
-        if (roleStr == null) return;
-
-        String error = controller.updateUser(id, username, password, roleStr);
-        if (error != null) {
-            JOptionPane.showMessageDialog(this, error, "Lỗi", JOptionPane.ERROR_MESSAGE);
-        } else {
-            JOptionPane.showMessageDialog(this, "Sửa thành công!");
-            loadData();
+        int maUser = (int) tableModel.getValueAt(row, 0);
+        User editUser = controller.getUserById(maUser);
+        if (editUser == null) {
+            JOptionPane.showMessageDialog(this, "Không tìm thấy user!", "Lỗi", JOptionPane.ERROR_MESSAGE);
+            return;
         }
+
+        Window ancestor = SwingUtilities.getWindowAncestor(this);
+        Frame frame = (ancestor instanceof Frame) ? (Frame) ancestor : null;
+        UserDialog dialog = new UserDialog(frame, editUser, controller, this::loadData);
+        dialog.setAlwaysOnTop(true);
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
     }
 
-    // ===== XỬ LÝ XÓA =====
+    // ===== XÓA =====
     private void handleDelete() {
         int row = table.getSelectedRow();
         if (row == -1) {
             JOptionPane.showMessageDialog(this, "Vui lòng chọn 1 dòng!");
+            return;
+        }
+
+        // Ngăn admin tự xóa chính mình
+        int maUser = (int) tableModel.getValueAt(row, 0);
+        if (maUser == currentUser.getMaUser()) {
+            JOptionPane.showMessageDialog(this,
+                "Không thể xóa tài khoản đang đăng nhập!", "Lỗi", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
@@ -150,9 +144,7 @@ public class UserPanel extends JPanel {
         );
         if (confirm != JOptionPane.YES_OPTION) return;
 
-        int id = (int) tableModel.getValueAt(row, 0);
-
-        String error = controller.deleteUser(id);
+        String error = controller.deleteUser(maUser);
         if (error != null) {
             JOptionPane.showMessageDialog(this, error, "Lỗi", JOptionPane.ERROR_MESSAGE);
         } else {
@@ -161,15 +153,10 @@ public class UserPanel extends JPanel {
         }
     }
 
-    // ===== NẠP DỮ LIỆU VÀO BẢNG =====
+    // ===== LOAD DATA =====
     private void loadData() {
         tableModel.setRowCount(0);
-        // ✅ Dùng getAllUsersWithEmployee() thay vì getAllUsers()
-        //    để lấy thêm Mã NV (formatted "NV1") và Tên NV từ JOIN NHANVIEN
         List<Object[]> list = controller.getAllUsersWithEmployee();
-        for (Object[] row : list) {
-            // row = [MaUser(int), Username, Role(String), MaNVFormatted(String), HoTen(String)]
-            tableModel.addRow(row);
-        }
+        for (Object[] row : list) tableModel.addRow(row);
     }
 }
