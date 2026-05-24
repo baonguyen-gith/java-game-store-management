@@ -473,12 +473,10 @@ public class GameManagePanel extends JPanel {
         addDetailRow(grid, "Ghi Chú:", nvl(g.getGhiChu()));
         addDetailRow(grid, "Link Hình Ảnh:", nvl(g.getHinhAnh()));
 
-        // Dòng kẻ phân cách ảo
         JLabel lblSep = new JLabel("<html><b style='color:#825AE6'>--- THÔNG TIN MỞ RỘNG ---</b></html>");
         grid.add(lblSep);
         grid.add(new JLabel(""));
 
-        // --- Nhóm 2: Thông tin mở rộng (Bảng GAME_CHITIET) ---
         addDetailRow(grid, "Rating:", nvl(g.getRating()));
         addDetailRow(grid, "Genre:", nvl(g.getGenre()));
         addDetailRow(grid, "Phương thức:", nvl(g.getDeliveryMethod()));
@@ -488,7 +486,6 @@ public class GameManagePanel extends JPanel {
         addDetailRow(grid, "Ngôn ngữ:", nvl(g.getLanguage()));
         addDetailRow(grid, "Tiền tệ:", nvl(g.getCurrency()));
 
-        // --- Phần mô tả dài (Dùng JTextArea) ---
         JPanel descPanel = new JPanel(new BorderLayout(5, 5));
         descPanel.setBackground(Color.WHITE);
         descPanel.setBorder(new TitledBorder(new LineBorder(new Color(230,230,230)), "Mô tả chi tiết"));

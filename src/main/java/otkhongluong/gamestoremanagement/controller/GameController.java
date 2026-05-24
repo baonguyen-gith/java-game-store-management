@@ -8,16 +8,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * GameController — lớp trung gian giữa View và Service (MVC).
- * ✅ FIX: xóa duplicate import java.util.List (xuất hiện 2 lần → compile error).
- * View chỉ được phép gọi GameController, KHÔNG gọi GameService trực tiếp.
- */
 public class GameController {
 
     private final GameService gameService;
 
-    // Cache danh sách đầy đủ để filter/sort không cần query lại DB
     private List<Game> cachedGames;
 
     public GameController() {
