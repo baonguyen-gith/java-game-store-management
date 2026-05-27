@@ -46,11 +46,11 @@ Di chuyển terminal vào thư mục gốc của dự án (`java-game-store-mana
    ```
 2. Chạy ứng dụng:
    ```bash
-   mvn exec:java -Dexec.mainClass="otkhongluong.gamestoremanagement.App"
+   mvn exec:java -Dexec.mainClass="otkhongluong.gamestoremanagement.Main"
    ```
 
 ### Chạy trực tiếp trên IDE
-* **VS Code / IntelliJ**: Tìm đến lớp `App.java` (đường dẫn: [src/main/java/otkhongluong/gamestoremanagement/App.java]), click chuột phải chọn **Run** hoặc bấm biểu tượng **Run** (mũi tên xanh).
+* **VS Code / IntelliJ**: Tìm đến lớp `App.java` (đường dẫn: [src/main/java/otkhongluong/gamestoremanagement/Main.java]), click chuột phải chọn **Run** hoặc bấm biểu tượng **Run** (mũi tên xanh).
 
 ---
 
