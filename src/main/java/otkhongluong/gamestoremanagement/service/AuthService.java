@@ -68,13 +68,13 @@ public class AuthService {
         return user != null && user.getMaRole() == 1;
     }
 
-    /** @return true nếu user là Staff (MaRole == 2) */
+    /** @return true nếu user là Staff (MaRole == 3 hoặc 4) */
     public boolean isStaff(User user) {
-        return user != null && user.getMaRole() == 2;
+        return user != null && (user.getMaRole() == 3 || user.getMaRole() == 4);
     }
-    /** @return true nếu user là Manager (MaRole == 3) */
+    /** @return true nếu user là Manager (MaRole == 2) */
     public boolean isManager(User user) {
-        return user != null && user.getMaRole() == 3;
+        return user != null && user.getMaRole() == 2;
     }
 
     // ── Private helpers ───────────────────────────────────────

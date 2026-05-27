@@ -344,7 +344,11 @@ public class GameManagePanel extends JPanel {
         mainPanel.add(new JLabel("Mô tả:")); mainPanel.add(new JScrollPane(txtMoTa));
         mainPanel.add(new JLabel("Link Ảnh:")); mainPanel.add(imgRow);
 
-        int res = JOptionPane.showConfirmDialog(this, new JScrollPane(mainPanel), isEdit ? "Sửa Game" : "Thêm Game", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        JScrollPane scrollPane = new JScrollPane(mainPanel);
+        scrollPane.setPreferredSize(new Dimension(550, 480));
+        scrollPane.setBorder(null);
+
+        int res = JOptionPane.showConfirmDialog(this, scrollPane, isEdit ? "Sửa Game" : "Thêm Game", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (res == JOptionPane.OK_OPTION) {
             Map<String, String> form = new HashMap<>();
                 form.put("tenGame", txtTen.getText());
@@ -502,7 +506,10 @@ public class GameManagePanel extends JPanel {
         mainPanel.add(descPanel, BorderLayout.CENTER);
 
         // Hiển thị Dialog
-        JOptionPane.showMessageDialog(this, new JScrollPane(mainPanel), 
+        JScrollPane scrollPane = new JScrollPane(mainPanel);
+        scrollPane.setPreferredSize(new Dimension(600, 480));
+        scrollPane.setBorder(null);
+        JOptionPane.showMessageDialog(this, scrollPane, 
             "Thông tin chi tiết: " + g.getTenGame(), JOptionPane.PLAIN_MESSAGE);
     }
 

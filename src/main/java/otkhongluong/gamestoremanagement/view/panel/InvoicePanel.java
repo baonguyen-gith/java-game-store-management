@@ -521,7 +521,6 @@ import java.util.List;
         private void openDetail(int id) {
             Window parent = SwingUtilities.getWindowAncestor(table);
             InvoiceDetailDialog d = new InvoiceDetailDialog((Frame) parent, id);
-            d.pack();
             d.setLocationRelativeTo(parent);
             d.setVisible(true);
         }
@@ -558,7 +557,6 @@ import java.util.List;
                     int id = Integer.parseInt(maHD.replaceAll("\\D", ""));
                     Window parent = SwingUtilities.getWindowAncestor(table);
                     InvoiceDetailDialog d = new InvoiceDetailDialog((Frame) parent, id);
-                    d.pack();
                     d.setLocationRelativeTo(parent);
                     d.setVisible(true);
                 });

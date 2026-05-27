@@ -34,7 +34,7 @@ public class ManagerView extends JFrame {
         this.currentUser = user;
         this.navigator   = navigator;
 
-        if (user.getMaRole() != 3) {
+        if (user.getMaRole() != 2) {
             JOptionPane.showMessageDialog(this, "Không có quyền!");
             dispose();
             return;

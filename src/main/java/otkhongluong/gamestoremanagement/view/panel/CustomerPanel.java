@@ -270,11 +270,12 @@ public class CustomerPanel extends JPanel {
         btnDiem.setPreferredSize(new Dimension(130, 40));
         btnDiem.setToolTipText("Quản lý điểm tích lũy");
         btnDiem.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row < 0) {
+            int viewRow = table.getSelectedRow();
+            if (viewRow < 0) {
                 JOptionPane.showMessageDialog(this, "Vui lòng chọn khách hàng để quản lý điểm!");
                 return;
             }
+            int row = table.convertRowIndexToModel(viewRow);
             Customer kh = currentPageData.get(row);
             new CustomerPointDialog(
                 (Frame) SwingUtilities.getWindowAncestor(this),
@@ -287,11 +288,12 @@ public class CustomerPanel extends JPanel {
         btnEdit.setIcon(IconUtils.getEditIcon(16, BG_DARK));
         btnEdit.setPreferredSize(new Dimension(110, 40));
         btnEdit.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row < 0) {
+            int viewRow = table.getSelectedRow();
+            if (viewRow < 0) {
                 JOptionPane.showMessageDialog(this, "Vui lòng chọn khách hàng cần sửa!");
                 return;
             }
+            int row = table.convertRowIndexToModel(viewRow);
             showEditCustomerDialog(currentPageData.get(row));
         });
 
@@ -299,11 +301,12 @@ public class CustomerPanel extends JPanel {
         btnDelete.setIcon(IconUtils.getDeleteIcon(16, BG_DARK));
         btnDelete.setPreferredSize(new Dimension(110, 40));
         btnDelete.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row < 0) {
+            int viewRow = table.getSelectedRow();
+            if (viewRow < 0) {
                 JOptionPane.showMessageDialog(this, "Vui lòng chọn khách hàng để xóa!");
                 return;
             }
+            int row = table.convertRowIndexToModel(viewRow);
             Customer kh = currentPageData.get(row);
 
             // ✅ View tự hỏi confirm, rồi mới gọi controller

@@ -32,8 +32,8 @@ public class Session {
     /** @return true nếu user hiện tại là Admin (MaRole == 1) */
     public static boolean isAdmin() { return maRole == 1; }
 
-    /** @return true nếu user hiện tại là Staff (MaRole == 2) */
-    public static boolean isStaff() { return maRole == 2; }
+    /** @return true nếu user hiện tại là Staff (MaRole == 3 hoặc 4) */
+    public static boolean isStaff() { return maRole == 3 || maRole == 4; }
 
     // ── Compat: giữ setMaNV để không break caller cũ ──
     /** @deprecated dùng {@link #login(int, int, String)} thay thế */

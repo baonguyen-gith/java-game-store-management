@@ -274,11 +274,12 @@
             btnEdit.setIcon(IconUtils.getEditIcon(16, BG_DARK));
             btnEdit.setPreferredSize(new Dimension(110, 40));
             btnEdit.addActionListener(e -> {
-                int row = table.getSelectedRow();
-                if (row < 0) {
+                int viewRow = table.getSelectedRow();
+                if (viewRow < 0) {
                     JOptionPane.showMessageDialog(this, "Chọn nhân viên để sửa!");
                     return;
                 }
+                int row = table.convertRowIndexToModel(viewRow);
                 Employee nv = currentPageData.get(row);
                 new EmployeeDialog(
                     (Frame) SwingUtilities.getWindowAncestor(this),
@@ -292,11 +293,12 @@
             btnDelete.setIcon(IconUtils.getDeleteIcon(16, BG_DARK));
             btnDelete.setPreferredSize(new Dimension(110, 40));
             btnDelete.addActionListener(e -> {
-                int row = table.getSelectedRow();
-                if (row < 0) {
+                int viewRow = table.getSelectedRow();
+                if (viewRow < 0) {
                     JOptionPane.showMessageDialog(this, "Chọn nhân viên để xóa!");
                     return;
                 }
+                int row = table.convertRowIndexToModel(viewRow);
                 Employee nv = currentPageData.get(row);
 
                 // ✅ View tự hỏi confirm, rồi mới gọi controller.handleDelete()

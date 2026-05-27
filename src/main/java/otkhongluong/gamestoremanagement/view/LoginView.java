@@ -43,6 +43,7 @@ public class LoginView extends JFrame {
     private JTextField     txtUsername;
     private JPasswordField txtPassword;
     private JButton        btnLogin, btnToggle;
+    private JCheckBox      chkRemember;
     private boolean        pwVisible = false;
     private LoginController controller;
 
@@ -73,6 +74,7 @@ public class LoginView extends JFrame {
         layered.add(formWrapper, JLayeredPane.PALETTE_LAYER);
 
         pack();
+        loadRememberedCredentials();
     }
 
     // ══════════════════════════════════════════════════════
@@ -123,8 +125,8 @@ public class LoginView extends JFrame {
         options.setOpaque(false);
         options.setMaximumSize(new Dimension(9999, 30));
 
-        // Checkbox "Remember me"
-        JCheckBox chkRemember = new JCheckBox("Remember me");
+        // Checkbox "Ghi nhớ đăng nhập"
+        chkRemember = new JCheckBox("Ghi nhớ đăng nhập");
         chkRemember.setOpaque(false);
         chkRemember.setForeground(TEXT_OPT);
         chkRemember.setFont(new Font("Segoe UI", Font.PLAIN, 13));
@@ -274,7 +276,29 @@ public class LoginView extends JFrame {
         String u = txtUsername.getText().equals("Username") ? "" : txtUsername.getText();
         String p = String.valueOf(txtPassword.getPassword()).equals("Password")
                 ? "" : new String(txtPassword.getPassword());
-        controller.handleLogin(u, p);
+        boolean remember = chkRemember.isSelected();
+        controller.handleLogin(u, p, remember);
+    }
+
+    private void loadRememberedCredentials() {
+        try {
+            java.util.prefs.Preferences prefs = java.util.prefs.Preferences.userRoot().node("gamestoremanagement_login");
+            boolean remember = prefs.getBoolean("remember", false);
+            chkRemember.setSelected(remember);
+            if (remember) {
+                String u = prefs.get("username", "");
+                String p = prefs.get("password", "");
+                if (!u.isEmpty()) {
+                    txtUsername.setText(u);
+                    txtUsername.setForeground(INPUT_FG);
+                }
+                if (!p.isEmpty()) {
+                    txtPassword.setText(p);
+                    txtPassword.setForeground(INPUT_FG);
+                    txtPassword.setEchoChar(pwVisible ? (char) 0 : '•');
+                }
+            }
+        } catch (Exception ignored) {}
     }
 
     public void showError(String msg)   { JOptionPane.showMessageDialog(this, msg, "Lỗi", JOptionPane.ERROR_MESSAGE); }
