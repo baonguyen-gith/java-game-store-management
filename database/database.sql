@@ -1,10 +1,6 @@
-/* =====================================
-    DATABASE: QLGAME (SQL SERVER)
-    Đã bỏ SEQUENCE (dùng IDENTITY thay thế)
-    Đã đồng bộ với code Java
-===================================== */
- 
 USE master;
+GO
+ALTER DATABASE qlgamee SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
 GO
 IF EXISTS (SELECT name FROM sys.databases WHERE name = N'qlgamee')
     DROP DATABASE qlgamee;
@@ -13,18 +9,16 @@ CREATE DATABASE qlgamee;
 GO
 USE qlgamee;
 GO
- 
--- ========================
--- 1. ROLE
--- ========================
+
+-- ============================================================
+-- TAO BANG
+-- ============================================================
+
 CREATE TABLE ROLE (
-    MaRole INT IDENTITY(1,1) PRIMARY KEY,
+    MaRole  INT IDENTITY(1,1) PRIMARY KEY,
     TenRole NVARCHAR(50) NOT NULL
 );
- 
--- ========================
--- 2. NHANVIEN
--- ========================
+
 CREATE TABLE NHANVIEN (
     MaNV       INT IDENTITY(1,1) PRIMARY KEY,
     HoTen      NVARCHAR(100) NOT NULL,
@@ -33,10 +27,7 @@ CREATE TABLE NHANVIEN (
     CCCD       VARCHAR(20) UNIQUE,
     NgayVaoLam DATE DEFAULT GETDATE()
 );
- 
--- ========================
--- 3. USERS
--- ========================
+
 CREATE TABLE USERS (
     MaUser   INT IDENTITY(1,1) PRIMARY KEY,
     Username VARCHAR(50)  UNIQUE NOT NULL,
@@ -44,10 +35,7 @@ CREATE TABLE USERS (
     MaRole   INT,
     MaNV     INT
 );
- 
--- ========================
--- 4. KHACHHANG
--- ========================
+
 CREATE TABLE KHACHHANG (
     MaKH        INT IDENTITY(1,1) PRIMARY KEY,
     HoTen       NVARCHAR(100),
@@ -57,14 +45,10 @@ CREATE TABLE KHACHHANG (
     DiaChi      NVARCHAR(200),
     DiemTichLuy INT DEFAULT 0
 );
--- Filtered unique index cho SDT (NULL không bị unique constraint)
 CREATE UNIQUE INDEX UQ_KHACHHANG_SDT
 ON KHACHHANG (SDT)
 WHERE SDT IS NOT NULL;
- 
--- ========================
--- 5. GAME
--- ========================
+
 CREATE TABLE GAME (
     MaGame  INT IDENTITY(1,1) PRIMARY KEY,
     TenGame NVARCHAR(200) NOT NULL,
@@ -73,10 +57,7 @@ CREATE TABLE GAME (
     GhiChu  NVARCHAR(500),
     HinhAnh VARCHAR(255)
 );
- 
--- ========================
--- 5.1 GAME_CHITIET
--- ========================
+
 CREATE TABLE GAME_CHITIET (
     MaGame         INT PRIMARY KEY,
     MoTa           NVARCHAR(MAX),
@@ -89,56 +70,41 @@ CREATE TABLE GAME_CHITIET (
     Language       NVARCHAR(200),
     Currency       NVARCHAR(10)
 );
- 
--- ========================
--- 6. SANPHAM
--- ========================
+
 CREATE TABLE SANPHAM (
     MaSP        INT IDENTITY(1,1) PRIMARY KEY,
     MaGame      INT,
     GiaBan      DECIMAL(15,2),
     GiaThueNgay DECIMAL(15,2)
 );
- 
--- ========================
--- 7. CD
--- ========================
+
+-- TrangThai: SanSang | DangThue | DaBan | Hong
 CREATE TABLE CD (
     MaCD      INT IDENTITY(1,1) PRIMARY KEY,
     MaSP      INT,
     TinhTrang NVARCHAR(50),
     TrangThai NVARCHAR(20) DEFAULT N'SanSang'
-    -- TrangThai: SanSang | DangThue | DaBan | Hong
 );
- 
--- ========================
--- 8. ROM
--- ========================
+
 CREATE TABLE ROM (
     MaSP       INT PRIMARY KEY,
     DungLuong  NVARCHAR(20),
     LinkLuuTru VARCHAR(500),
     SoLuotBan  INT DEFAULT 0
 );
- 
--- ========================
--- 9. HOADON
--- ========================
+
+-- TrangThai: ChuaThanhToan | DaThanhToan
 CREATE TABLE HOADON (
     MaHD       INT IDENTITY(1,1) PRIMARY KEY,
-    MaKH       INT,               -- NULL = khách vãng lai
+    MaKH       INT,
     MaNV       INT,
     NgayLap    DATETIME DEFAULT GETDATE(),
     TongTien   DECIMAL(15,2) DEFAULT 0,
     DiemSuDung INT DEFAULT 0,
     TienGiam   DECIMAL(15,2) DEFAULT 0,
     TrangThai  NVARCHAR(20) DEFAULT N'ChuaThanhToan'
-    -- TrangThai: ChuaThanhToan | DaThanhToan
 );
- 
--- ========================
--- 10. CTHOADON
--- ========================
+
 CREATE TABLE CTHOADON (
     MaHD    INT,
     MaSP    INT,
@@ -146,10 +112,8 @@ CREATE TABLE CTHOADON (
     DonGia  DECIMAL(15,2),
     PRIMARY KEY (MaHD, MaSP)
 );
- 
--- ========================
--- 11. PHIEUTHUE
--- ========================
+
+-- TrangThai: DangThue | DaTra
 CREATE TABLE PHIEUTHUE (
     MaPT          INT IDENTITY(1,1) PRIMARY KEY,
     MaKH          INT,
@@ -159,29 +123,24 @@ CREATE TABLE PHIEUTHUE (
     TienCoc       DECIMAL(15,2),
     TienPhat      DECIMAL(15,2) DEFAULT 0,
     TrangThai     NVARCHAR(20) DEFAULT N'DangThue'
-    -- TrangThai: DangThue | DaTra
 );
- 
--- ========================
--- 12. CTPHIEUTHUE
--- ========================
+
 CREATE TABLE CTPHIEUTHUE (
-    MaPT      INT,
-    MaCD      INT,
-    MaNV      INT,
+    MaPT       INT,
+    MaCD       INT,
+    MaNV       INT,
     DonGiaThue DECIMAL(15,2),
     PRIMARY KEY (MaPT, MaCD)
 );
- 
--- ========================
--- 13. DIEM_LICHSU
--- ========================
+
+-- Loai: 'CONG' hoac 'TRU'
 CREATE TABLE DIEM_LICHSU (
     MaLS   INT IDENTITY(1,1) PRIMARY KEY,
     MaKH   INT,
-    MaPT   INT,            -- NULL nếu từ hóa đơn
-    Loai   NVARCHAR(10),   -- 'CONG' hoặc 'TRU'
+    MaPT   INT,
+    Loai   NVARCHAR(10),
     SoDiem INT,
     Ngay   DATETIME DEFAULT GETDATE(),
     GhiChu NVARCHAR(200)
 );
+GO
