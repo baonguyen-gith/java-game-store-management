@@ -87,7 +87,8 @@ public class RentDetailDialog extends JDialog {
         super(parent, "Chi tiết phiếu thuê", true);
         this.maPT = maPT;
 
-        setMinimumSize(new Dimension(900, 620));
+        setSize(new Dimension(900, 560));
+        setMinimumSize(new Dimension(900, 560));
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout());
         setBackground(BG_DARK);

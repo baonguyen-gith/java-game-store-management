@@ -114,7 +114,7 @@ public class UserDAO {
                 list.add(new Object[]{
                     rs.getInt("MaUser"),
                     rs.getString("Username"),
-                    rs.getInt("MaRole") == 1 ? "Admin" : "Staff",
+                    rs.getInt("MaRole") == 1 ? "Admin" : (rs.getInt("MaRole") == 2 ? "Quản lý" : "Nhân viên"),
                     FormatUtil.formatMaNV(maNV),    // FIX: dùng FormatUtil
                     hoTen
                 });

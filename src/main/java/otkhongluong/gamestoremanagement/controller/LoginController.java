@@ -28,13 +28,27 @@ public class LoginController {
         this.view = view;
     }
 
-    public void handleLogin(String username, String password) {
+    public void handleLogin(String username, String password, boolean remember) {
         try {
             User user = authService.login(username, password);
             if (user == null) {
                 view.showError("Sai tài khoản hoặc mật khẩu!");
                 return;
             }
+
+            // Ghi nhớ đăng nhập nếu thành công
+            try {
+                java.util.prefs.Preferences prefs = java.util.prefs.Preferences.userRoot().node("gamestoremanagement_login");
+                if (remember) {
+                    prefs.put("username", username);
+                    prefs.put("password", password);
+                    prefs.putBoolean("remember", true);
+                } else {
+                    prefs.remove("username");
+                    prefs.remove("password");
+                    prefs.putBoolean("remember", false);
+                }
+            } catch (Exception ignored) {}
 
             Session.login(user.getMaNV(), user.getMaRole(), user.getUsername());
             view.dispose();
