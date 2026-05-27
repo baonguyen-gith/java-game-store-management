@@ -60,11 +60,11 @@ Dưới đây là danh sách các tài khoản mẫu đã được cấu hình s
 
 | STT | Tài Khoản (Username) | Mật Khẩu (Password) | Vai Trò (Role) | Chức năng chính được phép |
 | :---: | :--- | :--- | :--- | :--- |
-| **1** | `admin` | `12345678` | **Admin** | Toàn quyền kiểm soát hệ thống, quản lý tài khoản, nhân viên, cấu hình game, hóa đơn, và báo cáo doanh thu. |
-| **2** | `manager` | `12345678` | **Quản lý** | Quản lý kho game, khách hàng, sản phẩm (CD/ROM), xem thống kê doanh thu hệ thống. Không có quyền quản lý nhân viên và tài khoản. |
-| **3** | `nv_banhang` | `12345678` | **Nhân viên bán hàng** | Giao diện thu ngân: Tạo hóa đơn mua game, thuê đĩa game, trả đĩa game, quản lý tích điểm và thông tin khách hàng. |
-| **4** | `nv_banhang2` | `12345678` | **Nhân viên bán hàng** | Tương tự nhân viên bán hàng 1. |
-| **5** | `nv_kythuat` | `12345678` | **Nhân viên kỹ thuật** | Tương tự nhân viên bán hàng (truy cập các tác vụ kỹ thuật đĩa game). |
+| **1** | `admin` | `Password@123` | **Admin** | Toàn quyền kiểm soát hệ thống, quản lý tài khoản, nhân viên, cấu hình game, hóa đơn, và báo cáo doanh thu. |
+| **2** | `quanly` | `Password@123` | **Quản lý** | Quản lý kho game, khách hàng, sản phẩm (CD/ROM), xem thống kê doanh thu hệ thống. Không có quyền quản lý nhân viên và tài khoản. |
+| **3** | `nhanvien1` | `Password@123` | **Nhân viên bán hàng** | Giao diện thu ngân: Tạo hóa đơn mua game, thuê đĩa game, trả đĩa game, quản lý tích điểm và thông tin khách hàng. |
+| **4** | `nhanvien2` | `Password@123` | **Nhân viên bán hàng** | Tương tự nhân viên bán hàng 1. |
+| **5** | `nhanvien3` | `Password@123` | **Nhân viên bán hàng** | Tương tự nhân viên bán hàng 1. |
 
 > [!NOTE]  
 > Các mật khẩu mẫu trên được lưu dưới dạng plaintext để dễ dàng phát triển. Khi đăng nhập lần đầu tiên thành công, hệ thống sẽ **tự động hash mật khẩu** bằng thuật toán mã hóa **BCrypt** theo chuẩn bảo mật production và lưu đè lên mật khẩu cũ trong database để đảm bảo an toàn tuyệt đối.
