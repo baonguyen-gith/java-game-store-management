@@ -404,12 +404,10 @@ public class TransactionPanel extends JPanel {
 
         if (loai != null && loai.contains("Hóa")) {
             InvoiceDetailDialog d = new InvoiceDetailDialog((Frame) parent, numId);
-            d.pack();
             d.setLocationRelativeTo(parent);
             d.setVisible(true);
         } else {
             RentDetailDialog d = new RentDetailDialog((Frame) parent, numId);
-            d.pack();
             d.setLocationRelativeTo(parent);
             d.setVisible(true);
         }

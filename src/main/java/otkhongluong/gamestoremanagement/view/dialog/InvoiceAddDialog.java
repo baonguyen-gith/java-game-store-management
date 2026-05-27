@@ -109,7 +109,7 @@ public class InvoiceAddDialog extends JDialog {
     // =========================================================
     public InvoiceAddDialog(Frame parent) {
         super(parent, "Tạo hóa đơn mua game", true);
-        setSize(900, 620);
+        setSize(900, 670);
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout());
         setBackground(BG);
@@ -520,14 +520,17 @@ public class InvoiceAddDialog extends JDialog {
 
         int row = 0;
 
-        // SĐT + Tìm + Tạo + Bỏ qua
+        // SĐT + Tìm + Tạo + Bỏ qua (Được gộp vào một Panel phụ để tránh bị GridBagLayout kéo dãn nút)
         txtSDT = makeInput();
+        txtSDT.setPreferredSize(new Dimension(220, 40));
+        txtSDT.setFont(new Font("Segoe UI", Font.BOLD, 15));
+
         PillButton btnTim  = new PillButton("Tìm",    ACCENT,                    WHITE);
         PillButton btnTao  = new PillButton("Tạo mới", SUCCESS,                  TEXT_DARK);
         PillButton btnSkip = new PillButton("Bỏ qua",  new Color(90, 70, 140),   WHITE);
-        btnTim.setPreferredSize(new Dimension(80, 34));
-        btnTao.setPreferredSize(new Dimension(100, 34));
-        btnSkip.setPreferredSize(new Dimension(90, 34));
+        btnTim.setPreferredSize(new Dimension(80, 40));
+        btnTao.setPreferredSize(new Dimension(100, 40));
+        btnSkip.setPreferredSize(new Dimension(90, 40));
         btnSkip.setToolTipText("Khách không cung cấp SĐT — bỏ qua tích điểm");
         btnTim.addActionListener(e  -> doFindKH());
         btnTao.addActionListener(e  -> doCreateKH());
@@ -537,12 +540,33 @@ public class InvoiceAddDialog extends JDialog {
             public void keyPressed(KeyEvent e)  { if (e.getKeyCode() == KeyEvent.VK_ENTER) doFindKH(); }
         });
 
+        JPanel sdtPanel = new JPanel(new GridBagLayout());
+        sdtPanel.setOpaque(false);
+        GridBagConstraints sdtGc = new GridBagConstraints();
+        sdtGc.insets = new Insets(0, 0, 0, 8);
+        sdtGc.fill = GridBagConstraints.HORIZONTAL;
+        sdtGc.gridy = 0;
+
+        sdtGc.gridx = 0; sdtGc.weightx = 1.0;
+        sdtPanel.add(txtSDT, sdtGc);
+
+        sdtGc.fill = GridBagConstraints.NONE;
+        sdtGc.weightx = 0.0;
+
+        sdtGc.gridx = 1;
+        sdtPanel.add(btnTim, sdtGc);
+
+        sdtGc.gridx = 2;
+        sdtPanel.add(btnTao, sdtGc);
+
+        sdtGc.gridx = 3;
+        sdtGc.insets = new Insets(0, 0, 0, 0);
+        sdtPanel.add(btnSkip, sdtGc);
+
         addFormLabel(form, gc, "Số điện thoại KH:", row, 0, 140);
-        gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; form.add(txtSDT, gc);
-        gc.gridx = 2; gc.weightx = 0; form.add(btnTim,  gc);
-        gc.gridx = 3;                 form.add(btnTao,  gc);
-        gc.gridx = 4;                 form.add(btnSkip, gc);
-        gc.gridwidth = 1;
+        gc.gridx = 1; gc.gridy = row; gc.weightx = 1.0; gc.gridwidth = 4;
+        form.add(sdtPanel, gc);
+        gc.gridwidth = 1; gc.weightx = 0;
 
         // Tên KH
         row++;
@@ -954,6 +978,7 @@ public class InvoiceAddDialog extends JDialog {
 
     private JTextField makeInput() {
         JTextField tf = new JTextField();
+        tf.setPreferredSize(new Dimension(180, 34));
         tf.setBackground(INPUT_BG); tf.setForeground(TEXT_DARK);
         tf.setCaretColor(ACCENT); tf.setFont(F_CELL);
         tf.setBorder(new CompoundBorder(

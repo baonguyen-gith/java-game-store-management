@@ -60,7 +60,8 @@ public class InvoiceDetailDialog extends JDialog {
         this.maHD       = maHD;
         this.controller = controller;
 
-        setMinimumSize(new Dimension(860, 580));
+        setSize(new Dimension(860, 560));
+        setMinimumSize(new Dimension(860, 560));
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout());
         setBackground(BG_DARK);

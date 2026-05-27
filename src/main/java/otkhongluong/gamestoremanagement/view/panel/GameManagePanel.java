@@ -344,7 +344,11 @@ public class GameManagePanel extends JPanel {
         mainPanel.add(new JLabel("Mô tả:")); mainPanel.add(new JScrollPane(txtMoTa));
         mainPanel.add(new JLabel("Link Ảnh:")); mainPanel.add(imgRow);
 
-        int res = JOptionPane.showConfirmDialog(this, new JScrollPane(mainPanel), isEdit ? "Sửa Game" : "Thêm Game", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        JScrollPane scrollPane = new JScrollPane(mainPanel);
+        scrollPane.setPreferredSize(new Dimension(550, 480));
+        scrollPane.setBorder(null);
+
+        int res = JOptionPane.showConfirmDialog(this, scrollPane, isEdit ? "Sửa Game" : "Thêm Game", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (res == JOptionPane.OK_OPTION) {
             Map<String, String> form = new HashMap<>();
                 form.put("tenGame", txtTen.getText());
@@ -473,12 +477,10 @@ public class GameManagePanel extends JPanel {
         addDetailRow(grid, "Ghi Chú:", nvl(g.getGhiChu()));
         addDetailRow(grid, "Link Hình Ảnh:", nvl(g.getHinhAnh()));
 
-        // Dòng kẻ phân cách ảo
         JLabel lblSep = new JLabel("<html><b style='color:#825AE6'>--- THÔNG TIN MỞ RỘNG ---</b></html>");
         grid.add(lblSep);
         grid.add(new JLabel(""));
 
-        // --- Nhóm 2: Thông tin mở rộng (Bảng GAME_CHITIET) ---
         addDetailRow(grid, "Rating:", nvl(g.getRating()));
         addDetailRow(grid, "Genre:", nvl(g.getGenre()));
         addDetailRow(grid, "Phương thức:", nvl(g.getDeliveryMethod()));
@@ -488,7 +490,6 @@ public class GameManagePanel extends JPanel {
         addDetailRow(grid, "Ngôn ngữ:", nvl(g.getLanguage()));
         addDetailRow(grid, "Tiền tệ:", nvl(g.getCurrency()));
 
-        // --- Phần mô tả dài (Dùng JTextArea) ---
         JPanel descPanel = new JPanel(new BorderLayout(5, 5));
         descPanel.setBackground(Color.WHITE);
         descPanel.setBorder(new TitledBorder(new LineBorder(new Color(230,230,230)), "Mô tả chi tiết"));
@@ -505,7 +506,10 @@ public class GameManagePanel extends JPanel {
         mainPanel.add(descPanel, BorderLayout.CENTER);
 
         // Hiển thị Dialog
-        JOptionPane.showMessageDialog(this, new JScrollPane(mainPanel), 
+        JScrollPane scrollPane = new JScrollPane(mainPanel);
+        scrollPane.setPreferredSize(new Dimension(600, 480));
+        scrollPane.setBorder(null);
+        JOptionPane.showMessageDialog(this, scrollPane, 
             "Thông tin chi tiết: " + g.getTenGame(), JOptionPane.PLAIN_MESSAGE);
     }
 

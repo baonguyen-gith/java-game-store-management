@@ -166,3 +166,4 @@ public class ProductController {
         public static ActionResult fail(String msg) { return new ActionResult(false, msg); }
     }
 }
+

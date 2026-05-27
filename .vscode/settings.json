@@ -1,4 +1,6 @@
 {
-    "java.configuration.updateBuildConfiguration": "interactive",
-    "java.debug.settings.onBuildFailureProceed": true
+  "java.configuration.updateBuildConfiguration": "interactive",
+  "java.debug.settings.onBuildFailureProceed": true,
+  "snyk.advanced.organization": "92e2461f-1d2b-429c-8200-a9810e0686c2",
+  "snyk.advanced.autoSelectOrganization": true
 }

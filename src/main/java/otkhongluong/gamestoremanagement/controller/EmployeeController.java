@@ -118,6 +118,10 @@ public class EmployeeController {
             return SaveResult.fail("Sai định dạng ngày (dd/MM/yyyy)!");
         }
 
+        if (ngaySinh != null && ngayVaoLam != null && ngaySinh.isAfter(ngayVaoLam)) {
+            return SaveResult.fail("Ngày sinh không được lớn hơn ngày vào làm!");
+        }
+
         if (currentNhanVien == null) {
             Employee nv = new Employee(0, hoTen.trim(), sdt.trim(), ngaySinh, cccd.trim(), ngayVaoLam);
             boolean ok = service.addNhanVien(nv);
