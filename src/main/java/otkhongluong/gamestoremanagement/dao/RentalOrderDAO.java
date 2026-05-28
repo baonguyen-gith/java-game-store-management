@@ -10,20 +10,11 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * FIX: xóa insert() cũ (thiếu cột MaNV, schema không khớp insertWithConnection).
- * Thay bằng insert() mới bọc insertWithConnection() trong transaction — 1 entry point duy nhất.
- * RentalService.createPhieuThue() vẫn dùng insertWithConnection() trực tiếp (không đổi).
- */
 public class RentalOrderDAO {
     private static final int VND_PER_DIEM = 100_000;
-    /* ================= INSERT (entry point chuẩn cho caller đơn giản) ================= */
 
-    /**
-     * Insert phiếu thuê + chi tiết trong 1 transaction.
-     * Dùng khi caller không cần quản lý connection bên ngoài.
-     * RentalService.createPhieuThue() vẫn dùng insertWithConnection() trực tiếp — không đổi.
-     */
+    /* ================= INSERT ================= */
+
     public boolean insert(RentalOrder pt) {
         try (Connection con = DBConnection.getConnection()) {
             con.setAutoCommit(false);
@@ -43,7 +34,7 @@ public class RentalOrderDAO {
         }
     }
 
-    /* ================= INSERT WITH CONNECTION (dùng trong Service transaction) ================= */
+    /* ================= INSERT WITH CONNECTION ================= */
 
     public boolean insertWithConnection(RentalOrder pt, Connection con) throws SQLException {
         String sql =
@@ -192,21 +183,9 @@ public class RentalOrderDAO {
         return false;
     }
 
-    /* ================= UPDATE CD STATUS AFTER RETURN ================= */
-
-    public boolean updateCDStatusAfterReturn(int maPT) {
-        String sql =
-            "UPDATE CD SET TrangThai = N'SanSang' " +
-            "WHERE MaCD IN (SELECT MaCD FROM CTPHIEUTHUE WHERE MaPT = ?)";
-        try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, maPT);
-            return ps.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
+    // FIX BUG 4: Đã XÓA method updateCDStatusAfterReturn() vì là dead code.
+    // returnCDFull() trong RentalService không gọi method này.
+    // Việc cập nhật CD.TrangThai được xử lý bởi Trigger TRG_CAP_NHAT_TRANGTHAI_CD_KHI_TRA.
 
     /* ================= UPDATE ================= */
 
@@ -284,9 +263,22 @@ public class RentalOrderDAO {
 
     /* ================= UPDATE NGAY TRA + DON GIA ================= */
 
+    /**
+     * FIX BUG 5: Đơn giản hóa công thức tính DonGiaFinal.
+     *
+     * Công thức cũ:
+     *   tienGiaHan = max(0, soNgayCu * giaThueNgay - donGiaCu)
+     *   donGiaFinal = soNgayMoi * giaThueNgay - tienGiaHan
+     * → Sai khi DonGiaThue ban đầu đã bị giảm do điểm tích lũy
+     *   (tienGiaHan > 0 làm donGiaFinal bị khấu trừ oan)
+     *
+     * Công thức mới: donGiaFinal = soNgayMoi * giaThueNgay
+     * DonGiaThue trong CTPHIEUTHUE luôn phản ánh tổng tiền thuê theo số ngày,
+     * không lưu discount điểm (discount điểm chỉ ghi vào DIEM_LICHSU).
+     */
     public boolean updateNgayTraVaDonGia(int maPT, LocalDateTime ngayTraMoi) {
         final String SQL_SELECT_CTPT =
-            "SELECT ct.MaCD, ct.DonGiaThue, sp.GiaThueNgay, pt.NgayThue, pt.NgayTraDuKien " +
+            "SELECT ct.MaCD, sp.GiaThueNgay, pt.NgayThue " +
             "FROM   CTPHIEUTHUE ct " +
             "JOIN   PHIEUTHUE   pt ON pt.MaPT = ct.MaPT " +
             "JOIN   CD          cd ON cd.MaCD = ct.MaCD " +
@@ -310,22 +302,16 @@ public class RentalOrderDAO {
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         int    maCD        = rs.getInt("MaCD");
-                        double donGiaCu    = rs.getDouble("DonGiaThue");
                         double giaThueNgay = rs.getDouble("GiaThueNgay");
-                        LocalDateTime ngayThue  = rs.getTimestamp("NgayThue") != null
+                        LocalDateTime ngayThue = rs.getTimestamp("NgayThue") != null
                             ? rs.getTimestamp("NgayThue").toLocalDateTime() : LocalDateTime.now();
-                        LocalDateTime ngayTraCu = rs.getTimestamp("NgayTraDuKien") != null
-                            ? rs.getTimestamp("NgayTraDuKien").toLocalDateTime() : LocalDateTime.now();
 
-                        long soNgayCu  = ChronoUnit.DAYS.between(
-                            ngayThue.toLocalDate().atStartOfDay(),
-                            ngayTraCu.toLocalDate().atStartOfDay());
-                        double tienGiaHan = Math.max(0, soNgayCu * giaThueNgay - donGiaCu);
-
+                        // FIX BUG 5: Tính lại hoàn toàn từ GiaThueNgay * số ngày mới.
+                        // Không trừ "tienGiaHan" nữa vì discount điểm không nằm trong DonGiaThue.
                         long soNgayMoi = ChronoUnit.DAYS.between(
                             ngayThue.toLocalDate().atStartOfDay(),
                             ngayTraMoi.toLocalDate().atStartOfDay());
-                        double donGiaFinal = soNgayMoi * giaThueNgay - tienGiaHan;
+                        double donGiaFinal = Math.max(0, soNgayMoi) * giaThueNgay;
 
                         maCDList.add(new int[]{maCD});
                         donGiaFinalList.add(new double[]{donGiaFinal});
@@ -374,21 +360,20 @@ public class RentalOrderDAO {
         } catch (Exception e) { e.printStackTrace(); }
         return 0;
     }
-            
+
     /* ================= TINH DIEM PHIEU ================= */
-    /**
-     * Tính số điểm tích lũy tương ứng với phiếu thuê.
-     * 100.000 VNĐ tiền thuê gốc = 1 điểm.
-     * Dùng trong saveEditRental() khi cần chuyển điểm giữa 2 khách hàng.
-     */
+
     public int tinhDiemPhieu(int maPT) {
         double tongTien = getTongTienByMaPT(maPT);
         return (int) (tongTien / VND_PER_DIEM);
     }
-    
+
     /* ================= EXTEND RENTAL ================= */
 
     public boolean extendRental(int maPT, LocalDateTime ngayTraMoi, double phatTre, double phiGiaHan) {
+        // FIX: Lưu tổng (phatTre + phiGiaHan) vào TienPhat thay vì chỉ phatTre.
+        // Lý do: returnCDFull() cộng pt.getTienPhat() vào tienPhatChot khi trả CD.
+        // Nếu chỉ lưu phatTre, toàn bộ phiGiaHan đã thu tại quầy bị mất khỏi quyết toán.
         String sql =
             "UPDATE PHIEUTHUE " +
             "SET NgayTraDuKien = ?, " +
@@ -398,7 +383,7 @@ public class RentalOrderDAO {
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setTimestamp(1, Timestamp.valueOf(ngayTraMoi));
-            ps.setDouble(2, phatTre + phiGiaHan);
+            ps.setDouble(2, phatTre + phiGiaHan);   // ← đây là dòng duy nhất thay đổi
             ps.setInt(3, maPT);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {

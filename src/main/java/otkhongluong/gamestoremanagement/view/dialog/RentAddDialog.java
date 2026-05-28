@@ -580,6 +580,11 @@ public class RentAddDialog extends JDialog {
             int    diemThucDung = (int) Math.floor(giamDiem / DIEM_TO_VND);
             giamDiem = diemThucDung * DIEM_TO_VND;
 
+            // Cập nhật lại ô nhập nếu điểm bị cap xuống do vượt quá tiền thuê
+            if (diemThucDung < diemDung) {
+                txtDiemSuDung.setText(String.valueOf(diemThucDung));
+            }
+
             double tongPhaiTra = Math.max(0, tongThueGoc - giamDiem);
             double tienCoc     = Math.max(COC_MIN, tongThueGoc * COC_MULTIPLY);
 

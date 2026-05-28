@@ -357,7 +357,7 @@ public class RentReturnDialog extends JDialog {
 
         JPanel trePanel = new JPanel(new BorderLayout(0, 6));
         trePanel.setBackground(BG);
-        JLabel lblTreLbl = new JLabel("Tiền phạt trễ hạn (tự tính):");
+        JLabel lblTreLbl = new JLabel("Nợ gia hạn + phạt trễ mới (nếu có):");
         lblTreLbl.setFont(F_LABEL);
         lblTreLbl.setForeground(TEXT_MUTED);
         lblPhatTre = new JLabel("0 VNĐ");
@@ -439,10 +439,23 @@ public class RentReturnDialog extends JDialog {
         }
 
         double phatTre = tinhPhatTreHan(selectedPhieu, ngayTraThucTe);
-        lblPhatTre.setForeground(phatTre > 0 ? DANGER : SUCCESS);
-        lblPhatTre.setText(phatTre > 0
-            ? String.format("%,.0f VNĐ", phatTre)
-            : "Đúng hạn");
+        double noGiaHan = selectedPhieu.getTienPhat();           // nợ từ các lần gia hạn
+        double phatMoi  = Math.max(0, phatTre - noGiaHan);       // phạt trễ phát sinh mới
+
+        if (noGiaHan > 0 && phatMoi > 0) {
+            lblPhatTre.setText(String.format("%,.0f VNĐ  (nợ GH: %,.0f  +  trễ mới: %,.0f)",
+                phatTre, noGiaHan, phatMoi));
+            lblPhatTre.setForeground(DANGER);
+        } else if (noGiaHan > 0) {
+            lblPhatTre.setText(String.format("%,.0f VNĐ  (nợ từ gia hạn)", noGiaHan));
+            lblPhatTre.setForeground(GOLD);
+        } else if (phatMoi > 0) {
+            lblPhatTre.setText(String.format("%,.0f VNĐ  (phạt trễ)", phatMoi));
+            lblPhatTre.setForeground(DANGER);
+        } else {
+            lblPhatTre.setText("Không có");
+            lblPhatTre.setForeground(SUCCESS);
+        }
 
         txtChiPhiHuHong.setText("0");
     }
@@ -450,14 +463,27 @@ public class RentReturnDialog extends JDialog {
     private double tinhPhatTreHan(RentalOrder pt, LocalDateTime ngayTra) {
         if (pt == null || ngayTra == null || pt.getNgayTraDuKien() == null) return 0;
         LocalDateTime ngayDK = pt.getNgayTraDuKien();
-        if (!ngayTra.isAfter(ngayDK)) return 0;
-        long days = java.time.temporal.ChronoUnit.DAYS.between(
-            ngayDK.toLocalDate(), ngayTra.toLocalDate());
-        if (days <= 0) days = 1;
-        double giaThueNgay = pt.getDanhSachChiTiet() != null
-            ? pt.getDanhSachChiTiet().stream().mapToDouble(CTPhieuThue::getGiaThueNgay).sum()
-            : 0;
-        return days * giaThueNgay * 1.5;
+
+        // Phạt trễ mới: tính từ NgayTraDuKien hiện tại (đã cộng ngày gia hạn nếu có)
+        double phatMoi = 0;
+        if (ngayTra.isAfter(ngayDK)) {
+            long days = java.time.temporal.ChronoUnit.DAYS.between(
+                ngayDK.toLocalDate(), ngayTra.toLocalDate());
+            if (days <= 0) days = 1;
+            double giaThueNgay = pt.getDanhSachChiTiet() != null
+                ? pt.getDanhSachChiTiet().stream().mapToDouble(CTPhieuThue::getGiaThueNgay).sum()
+                : 0;
+            phatMoi = days * giaThueNgay * 1.5;
+        }
+
+        // FIX: cộng thêm TienPhat đang có trong DB.
+        // Sau khi gia hạn, DAO lưu phatTre (lúc gia hạn) vào TienPhat.
+        // NgayTraDuKien đã được đẩy ra sau → phatMoi tính từ ngày mới = 0 nếu trả đúng hạn.
+        // Nếu không cộng pt.getTienPhat(), khoản phạt đã thu lúc gia hạn bị mất
+        // khỏi màn hình quyết toán — returnCDFull() vẫn ghi đúng vào DB nhưng
+        // delta (thu thêm / hoàn lại) hiển thị sai cho nhân viên.
+        double phatCuDaLuu = pt.getTienPhat(); // 0 nếu chưa từng gia hạn với phạt
+        return phatMoi + phatCuDaLuu;
     }
 
     // =========================================================
@@ -496,7 +522,7 @@ public class RentReturnDialog extends JDialog {
         card.add(sumKey("Tiền thuê gốc:"));          card.add(lblS3TienThue);
         card.add(sumKey("Giảm từ điểm:"));           card.add(lblS3DiemTru);
         card.add(sumKey("Tiền thuê sau giảm:"));     card.add(lblS3TienThueNet);
-        card.add(sumKey("Phạt trễ hạn:"));           card.add(lblS3PhatTre);
+        card.add(sumKey("Nợ gia hạn + phạt trễ:"));  card.add(lblS3PhatTre);
         card.add(sumKey("Chi phí hư hỏng:"));        card.add(lblS3HuHong);
         card.add(sumKey("Tiền cọc đã đặt:"));        card.add(lblS3TienCoc);
         card.add(sumKey("Kết quả thanh toán:"));     card.add(lblS3KetQua);
@@ -580,11 +606,20 @@ public class RentReturnDialog extends JDialog {
             lblS3TienThueNet.setText(String.format("%,.0f VNĐ", tienThueNet));
             lblS3TienThueNet.setForeground(ACCENT_LIGHT);
 
-            if (phatTre > 0) {
-                lblS3PhatTre.setText(String.format("%,.0f VNĐ", phatTre));
+            double noGiaHan = selectedPhieu.getTienPhat();
+            double phatMoi  = Math.max(0, phatTre - noGiaHan);
+            if (noGiaHan > 0 && phatMoi > 0) {
+                lblS3PhatTre.setText(String.format("%,.0f VNĐ  (nợ GH: %,.0f  +  trễ mới: %,.0f)",
+                    phatTre, noGiaHan, phatMoi));
+                lblS3PhatTre.setForeground(DANGER);
+            } else if (noGiaHan > 0) {
+                lblS3PhatTre.setText(String.format("%,.0f VNĐ  (nợ từ gia hạn)", noGiaHan));
+                lblS3PhatTre.setForeground(GOLD);
+            } else if (phatMoi > 0) {
+                lblS3PhatTre.setText(String.format("%,.0f VNĐ  (phạt trễ)", phatMoi));
                 lblS3PhatTre.setForeground(DANGER);
             } else {
-                lblS3PhatTre.setText("Không có  (đúng hạn)");
+                lblS3PhatTre.setText("Không có");
                 lblS3PhatTre.setForeground(SUCCESS);
             }
 
@@ -733,7 +768,7 @@ public class RentReturnDialog extends JDialog {
               + "  Tiền thuê gốc      : %,.0f VNĐ\n"
               + "  Giảm từ điểm       : -%,.0f VNĐ  (%d điểm x %,d VNĐ)\n"
               + "  Tiền thuê sau giảm : %,.0f VNĐ\n"
-              + "  Phạt trễ hạn       : %,.0f VNĐ\n"
+              + "  Nợ GH + phạt trễ   : %,.0f VNĐ\n"
               + "  Chi phí hư hỏng    : %,.0f VNĐ\n"
               + "  Tổng phải trả      : %,.0f VNĐ\n"
               + "  Tiền cọc           : %,.0f VNĐ\n"

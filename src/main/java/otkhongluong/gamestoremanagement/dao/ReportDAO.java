@@ -88,7 +88,12 @@ public class ReportDAO {
     // ══════════════════════════════════════════════════════════════════
 
     public List<Integer> getAvailableMonthYears() {
-        return getDistinctYears(ReportTable.HOADON);
+        List<Integer> years = getDistinctYears(ReportTable.HOADON);
+        for (int y : getDistinctYears(ReportTable.PHIEUTHUE_DATRA)) {
+            if (!years.contains(y)) years.add(y);
+        }
+        years.sort(Comparator.reverseOrder());
+        return years;
     }
 
     public List<Object[]> getMonthlyRows(int month, int year) {

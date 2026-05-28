@@ -27,8 +27,8 @@ public class RentalService {
     private final CustomerDAO    khachHangDAO = new CustomerDAO();
     private final EmployeeDAO    nhanVienDAO  = new EmployeeDAO();
 
-    private static final int DIEM_TO_VND  = 5_000;   // 1 điểm = 5.000 VNĐ
-    private static final int VND_PER_DIEM = 100_000;  // 100.000 VNĐ thuê = 1 điểm cộng
+    private static final int DIEM_TO_VND  = 5_000;
+    private static final int VND_PER_DIEM = 100_000;
 
     public RentalService() {
         phieuThueDAO = new RentalOrderDAO();
@@ -58,7 +58,7 @@ public class RentalService {
                         System.out.println("[DEBUG] MaCD=" + ct.getMaCD() + " → TrangThai='" + trangThai + "'");
                         if (!"SanSang".equals(trangThai)) {
                             con.rollback();
-                            // xử lý lyDo...
+                            return false;
                         }
                     }
                 }
@@ -90,38 +90,26 @@ public class RentalService {
 
     /* ================= DEDUCT POINTS (RentAddDialog) ================= */
 
-    /**
-     * Trừ điểm khi tạo phiếu thuê + ghi DIEM_LICHSU.
-     * Delegate hoàn toàn xuống PointDAO — không còn SQL trực tiếp.
-     *
-     * @return null nếu thành công, message lỗi nếu thất bại
-     */
     public String deductPointForRental(int maKH, int diemThucDung, int maPT) {
-        return pointDAO.truDiem(maKH, diemThucDung, "Thuê CD - PT" + maPT);
+        return pointDAO.truDiemVoiMaPT(maKH, diemThucDung, maPT, "Thuê CD - PT" + maPT);
     }
 
     /* ================= RETURN CD (full — RentReturnDialog) ================= */
 
-    /**
-     * Trả CD đầy đủ: cập nhật phiếu thuê + đặt CD = SanSang trong 1 transaction,
-     * sau đó cộng điểm tích lũy qua PointDAO (connection riêng biệt — eventual consistency).
-     *
-     * @return "OK:..." nếu thành công, "ERR:..." nếu lỗi
-     */
     public String returnCDFull(int maPT, LocalDateTime ngayTraThucTe,
                                 double chiPhiHuHong, int maKH, int diemTichLuy) {
         RentalOrder pt = phieuThueDAO.findById(maPT);
         if (pt == null) return "ERR:Không tìm thấy phiếu thuê PT" + maPT;
 
-        double phatTreHan   = tinhPhatTreHanOnly(pt, ngayTraThucTe);
-        double tienPhatChot = pt.getTienPhat() + phatTreHan + chiPhiHuHong;
+        // Trigger tự cộng phạt trễ mới vào TienPhat hiện tại.
+        // Java chỉ cần cộng huHong — không cộng phatTreHan nữa để tránh tính 2 lần.
+        double tienPhatChot = pt.getTienPhat() + chiPhiHuHong;
 
-        // Bước 1 — cập nhật phiếu thuê + CD trong 1 transaction
         try (Connection con = DBConnection.getConnection()) {
             con.setAutoCommit(false);
             try {
                 try (PreparedStatement ps = con.prepareStatement(
-                        "UPDATE PHIEUTHUE SET NgayTraThucTe=?, TienPhat=?, TrangThai=N'DaTra' WHERE MaPT=?")) {
+                        "UPDATE PHIEUTHUE SET NgayTraThucTe=?, TienPhat=? WHERE MaPT=?")) {
                     ps.setTimestamp(1, Timestamp.valueOf(ngayTraThucTe));
                     ps.setDouble(2, tienPhatChot);
                     ps.setInt(3, maPT);
@@ -130,17 +118,7 @@ public class RentalService {
                         return "ERR:Cập nhật phiếu thuê thất bại!";
                     }
                 }
-
-                for (CTPhieuThue ct : pt.getDanhSachChiTiet()) {
-                    try (PreparedStatement ps = con.prepareStatement(
-                            "UPDATE CD SET TrangThai = N'SanSang' WHERE MaCD = ?")) {
-                        ps.setInt(1, ct.getMaCD());
-                        ps.executeUpdate();
-                    }
-                }
-
                 con.commit();
-
             } catch (Exception ex) {
                 con.rollback();
                 ex.printStackTrace();
@@ -151,11 +129,9 @@ public class RentalService {
             return "ERR:Lỗi kết nối: " + ex.getMessage();
         }
 
-        // Bước 2 — cộng điểm qua PointDAO (eventual consistency)
         if (maKH > 0 && diemTichLuy > 0) {
             boolean diemOk = pointDAO.congDiem(maKH, diemTichLuy, "Trả CD - PT" + maPT);
             if (!diemOk) {
-                // Phiếu thuê đã trả thành công; log lỗi điểm để xử lý thủ công nếu cần
                 System.err.println("[RentalService] Cảnh báo: trả CD PT" + maPT
                         + " thành công nhưng cộng điểm cho KH" + maKH + " thất bại.");
             }
@@ -176,21 +152,12 @@ public class RentalService {
 
     /* ================= LOAD DIEM DA TRU (RentReturnDialog) ================= */
 
-    /**
-     * Tổng điểm đã trừ khi lập phiếu thuê, lấy từ DIEM_LICHSU qua PointDAO.
-     */
     public int loadDiemDaTru(int maPT) {
         return pointDAO.sumDiemTruByMaPT(maPT);
     }
 
     /* ================= SAVE EDIT RENTAL (RentEditDialog) ================= */
 
-    /**
-     * Lưu thay đổi sửa phiếu thuê trong 1 transaction (KH/NV + ngày trả).
-     * Điều chỉnh điểm khi đổi KH được thực hiện qua PointDAO sau transaction chính.
-     *
-     * @return "OK:..." nếu thành công, "ERR:..." nếu lỗi
-     */
     public String saveEditRental(int maPT,
                                  Customer newKH,
                                  Employee newNV,
@@ -206,7 +173,6 @@ public class RentalService {
         int maKHMoi = khChanged ? newKH.getMaKH() : maKHCu;
         int maNVMoi = nvChanged ? newNV.getMaNV() : maNVCu;
 
-        // Bước 1 — cập nhật DB trong transaction
         try (Connection con = DBConnection.getConnection()) {
             con.setAutoCommit(false);
             try {
@@ -227,7 +193,6 @@ public class RentalService {
             return "ERR:Lỗi kết nối: " + ex.getMessage();
         }
 
-        // Bước 2 — chuyển điểm từ KH cũ sang KH mới qua PointDAO (eventual consistency)
         if (khChanged) {
             int diem = phieuThueDAO.tinhDiemPhieu(maPT);
             if (diem > 0) {
@@ -244,23 +209,24 @@ public class RentalService {
         return "OK:Cập nhật phiếu PT" + String.format("%04d", maPT) + " thành công!";
     }
 
-    
+    /* ================= LOAD RENT DETAIL ================= */
+
+    /**
+     * Tải toàn bộ dữ liệu chi tiết phiếu thuê để hiển thị trong RentDetailDialog.
+     *
+     * FIX BUG 1: Thêm nhánh xử lý trường hợp đang thuê, chưa quá hạn mới,
+     * nhưng tienPhatDB > 0 (phạt cũ đã thu khi gia hạn).
+     * Trước đây nhánh này bị bỏ qua hoàn toàn làm mất tiền phạt khỏi màn hình.
+     *
+     * Ba trạng thái sau gia hạn:
+     *   [A] Đang thuê, còn hạn, chưa từng quá hạn  -> phatTreTamTinh = 0
+     *   [B] Đang thuê, còn hạn, có phạt cũ từ gia hạn -> phatTreTamTinh = tienPhatDB  ← FIX
+     *   [C] Đang thuê, đang quá hạn mới             -> phatTreTamTinh = ngayTre * giá * 1.5 + tienPhatDB
+     */
     public RentDetailData loadRentDetail(int maPT) {
         RentDetailData data = new RentDetailData();
 
-        String sqlHeader =
-            "SELECT pt.NgayThue, pt.NgayTraDuKien, pt.NgayTraThucTe, " +
-            "       pt.TienCoc, pt.TienPhat, pt.TrangThai, " +
-            "       kh.HoTen, kh.SDT, " +
-            "       SUM(ct.DonGiaThue) AS TongDonGiaThue " +
-            "FROM PHIEUTHUE pt " +
-            "LEFT JOIN KHACHHANG kh ON pt.MaKH = kh.MaKH " +
-            "LEFT JOIN CTPHIEUTHUE ct ON pt.MaPT = ct.MaPT " +
-            "WHERE pt.MaPT = ? " +
-            "GROUP BY pt.MaPT, pt.NgayThue, pt.NgayTraDuKien, pt.NgayTraThucTe, " +
-            "         pt.TienCoc, pt.TienPhat, pt.TrangThai, kh.HoTen, kh.SDT";
-
-        String sqlDetail =
+        final String SQL_DETAIL =
             "SELECT TOP 1 cd.MaCD, g.MaGame, g.TenGame, sp.GiaThueNgay " +
             "FROM CTPHIEUTHUE ct " +
             "JOIN CD      cd ON ct.MaCD   = cd.MaCD " +
@@ -268,41 +234,24 @@ public class RentalService {
             "JOIN GAME    g  ON sp.MaGame = g.MaGame " +
             "WHERE ct.MaPT = ?";
 
-        // Điểm đã trừ — qua PointDAO
+        final String SQL_HEADER =
+            "SELECT pt.NgayThue, pt.NgayTraDuKien, pt.NgayTraThucTe, " +
+            "       pt.TienCoc, pt.TienPhat, pt.TrangThai, " +
+            "       kh.HoTen, kh.SDT, " +
+            "       SUM(ct.DonGiaThue) AS TongDonGiaThue " +
+            "FROM PHIEUTHUE pt " +
+            "LEFT JOIN KHACHHANG    kh ON pt.MaKH = kh.MaKH " +
+            "LEFT JOIN CTPHIEUTHUE  ct ON pt.MaPT = ct.MaPT " +
+            "WHERE pt.MaPT = ? " +
+            "GROUP BY pt.MaPT, pt.NgayThue, pt.NgayTraDuKien, pt.NgayTraThucTe, " +
+            "         pt.TienCoc, pt.TienPhat, pt.TrangThai, kh.HoTen, kh.SDT";
+
         data.giamDiem = loadDiemDaTru(maPT) * (double) DIEM_TO_VND;
 
         try (Connection con = DBConnection.getConnection()) {
-            try (PreparedStatement ps = con.prepareStatement(sqlHeader)) {
-                ps.setInt(1, maPT);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (!rs.next()) return null;
 
-                    data.daTra           = "DaTra".equalsIgnoreCase(rs.getString("TrangThai"));
-                    data.trangThai       = data.daTra ? "Đã trả" : "Đang thuê";
-                    data.tenKH           = nvl2(rs.getString("HoTen"), "—");
-                    data.sdt             = nvl2(rs.getString("SDT"),   "—");
-                    data.ngayThue        = rs.getTimestamp("NgayThue");
-                    data.ngayTraDK       = rs.getTimestamp("NgayTraDuKien");
-                    data.ngayTraTT       = rs.getTimestamp("NgayTraThucTe");
-                    data.tienCoc         = rs.getDouble("TienCoc");
-                    data.tienPhatDB      = rs.getDouble("TienPhat");
-                    data.tienThueBanDau  = rs.getDouble("TongDonGiaThue");
-                    data.tienThueNetDiem = Math.max(0, data.tienThueBanDau - data.giamDiem);
-
-                    if (!data.daTra && data.ngayTraDK != null) {
-                        LocalDateTime ngayDK = data.ngayTraDK.toLocalDateTime();
-                        LocalDateTime homNay = LocalDate.now().atStartOfDay();
-                        if (homNay.isAfter(ngayDK)) {
-                            long ngayTre = ChronoUnit.DAYS.between(
-                                ngayDK.toLocalDate(), homNay.toLocalDate());
-                            if (ngayTre <= 0) ngayTre = 1;
-                            data.phatTreTamTinh = ngayTre * data.giaThueNgayHT * 1.5;
-                        }
-                    }
-                }
-            }
-
-            try (PreparedStatement ps = con.prepareStatement(sqlDetail)) {
+            // BƯỚC 1: Tải CD detail TRƯỚC để có giaThueNgayHT
+            try (PreparedStatement ps = con.prepareStatement(SQL_DETAIL)) {
                 ps.setInt(1, maPT);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
@@ -310,22 +259,75 @@ public class RentalService {
                         data.maGame        = rs.getInt("MaGame");
                         data.tenGame       = nvl(rs.getString("TenGame"));
                         data.giaThueNgayHT = rs.getDouble("GiaThueNgay");
-
-                        data.soNgayGoc = data.giaThueNgayHT > 0
-                            ? Math.max(1, Math.round(data.tienThueBanDau / data.giaThueNgayHT))
-                            : 1;
-
-                        if (data.tienPhatDB > 0 && data.ngayThue != null && data.ngayTraDK != null) {
-                            long soNgayTong = ChronoUnit.DAYS.between(
-                                data.ngayThue.toLocalDateTime().toLocalDate(),
-                                data.ngayTraDK.toLocalDateTime().toLocalDate());
-                            long soNgayGiaHan   = Math.max(0, soNgayTong - data.soNgayGoc);
-                            data.tienGiaHan     = soNgayGiaHan * data.giaThueNgayHT;
-                            data.treHanDaDong   = Math.max(0, data.tienPhatDB - data.tienGiaHan);
-                        }
                     }
                 }
             }
+
+            // BƯỚC 2: Tải header phiếu thuê
+            try (PreparedStatement ps = con.prepareStatement(SQL_HEADER)) {
+                ps.setInt(1, maPT);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) return null;
+
+                    data.daTra          = "DaTra".equalsIgnoreCase(rs.getString("TrangThai"));
+                    data.trangThai      = data.daTra ? "Đã trả" : "Đang thuê";
+                    data.tenKH          = nvl2(rs.getString("HoTen"), "—");
+                    data.sdt            = nvl2(rs.getString("SDT"),   "—");
+                    data.ngayThue       = rs.getTimestamp("NgayThue");
+                    data.ngayTraDK      = rs.getTimestamp("NgayTraDuKien");
+                    data.ngayTraTT      = rs.getTimestamp("NgayTraThucTe");
+                    data.tienCoc        = rs.getDouble("TienCoc");
+                    data.tienPhatDB     = rs.getDouble("TienPhat");
+                    data.tienThueBanDau = rs.getDouble("TongDonGiaThue");
+                    data.tienThueNetDiem = Math.max(0, data.tienThueBanDau - data.giamDiem);
+
+                    // Tính soNgayGoc
+                    if (data.ngayThue != null && data.ngayTraDK != null) {
+                        long soNgayTongDK = ChronoUnit.DAYS.between(
+                            data.ngayThue.toLocalDateTime().toLocalDate(),
+                            data.ngayTraDK.toLocalDateTime().toLocalDate());
+                        if (data.giaThueNgayHT > 0) {
+                            data.soNgayGoc = Math.max(1,
+                                (long) Math.round(data.tienThueBanDau / data.giaThueNgayHT));
+                            data.soNgayGoc = Math.min(data.soNgayGoc, Math.max(1, soNgayTongDK));
+                        } else {
+                            data.soNgayGoc = Math.max(1, soNgayTongDK);
+                        }
+                    }
+
+                    // Tính tiền gia hạn & phạt đã đóng (chỉ khi đã trả)
+                    if (data.daTra && data.tienPhatDB > 0
+                            && data.ngayThue != null && data.ngayTraDK != null) {
+                        long soNgayTong = ChronoUnit.DAYS.between(
+                            data.ngayThue.toLocalDateTime().toLocalDate(),
+                            data.ngayTraDK.toLocalDateTime().toLocalDate());
+                        long soNgayGiaHan = Math.max(0, soNgayTong - data.soNgayGoc);
+                        data.tienGiaHan   = soNgayGiaHan * data.giaThueNgayHT;
+                        data.treHanDaDong = Math.max(0, data.tienPhatDB - data.tienGiaHan);
+                    }
+
+                    // ── FIX BUG 1: Tính phạt trễ tạm tính (đang thuê) ──────────────
+                    if (!data.daTra && data.ngayTraDK != null && data.giaThueNgayHT > 0) {
+                        LocalDateTime ngayDK = data.ngayTraDK.toLocalDateTime();
+                        LocalDateTime homNay = LocalDate.now().atStartOfDay();
+
+                        if (homNay.isAfter(ngayDK)) {
+                            // [C] Đang quá hạn mới: phạt mới + cộng phạt cũ từ DB
+                            long ngayTre = ChronoUnit.DAYS.between(
+                                ngayDK.toLocalDate(), homNay.toLocalDate());
+                            if (ngayTre <= 0) ngayTre = 1;
+                            data.phatTreTamTinh = ngayTre * data.giaThueNgayHT * 1.5
+                                                  + data.tienPhatDB;
+                        } else if (data.tienPhatDB > 0) {
+                            // [B] Còn hạn nhưng đã có phạt cũ từ lần gia hạn trước
+                            // Hiển thị lại tienPhatDB để không bị "mất" khỏi màn hình
+                            data.phatTreTamTinh = data.tienPhatDB;
+                        }
+                        // [A] Còn hạn, chưa từng quá hạn: phatTreTamTinh = 0 (mặc định)
+                    }
+                }
+            }
+
         } catch (Exception ex) {
             ex.printStackTrace();
             return null;
@@ -391,10 +393,8 @@ public class RentalService {
             : 0;
         return days * giaThueNgay * 1.5;
     }
-    
-    // Chuẩn bị data từ RentalOrder + List<CTPhieuThue> thực tế
+
     public Object[] getRentalExportData(int maPT) {
-        // findById đã load cả danhSachChiTiet
         RentalOrder rental = phieuThueDAO.findById(maPT);
         if (rental == null) throw new RuntimeException("Không tìm thấy phiếu thuê #" + maPT);
 

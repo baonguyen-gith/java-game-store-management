@@ -185,6 +185,16 @@ public class CustomerDAO {
             e.printStackTrace();
         }
     }
+    
+    // Overload dùng trong transaction — nhận Connection từ bên ngoài
+    public void updatePoint(Connection conn, int maKH, int delta) throws SQLException {
+        String sql = "UPDATE KHACHHANG SET DiemTichLuy = DiemTichLuy + ? WHERE MaKH = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, delta);
+            ps.setInt(2, maKH);
+            ps.executeUpdate();
+        }
+    }
 
     // ================= SEARCH =================
     public List<Customer> search(String keyword) {

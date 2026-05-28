@@ -36,7 +36,7 @@ public class StaffView extends JFrame {
         this.currentUser = user;
         this.navigator   = navigator;
 
-        if (user.getMaRole() != 3 && user.getMaRole() != 4) {
+        if (user.getMaRole() != 3) {
             JOptionPane.showMessageDialog(this, "Không có quyền truy cập!");
             dispose();
             return;

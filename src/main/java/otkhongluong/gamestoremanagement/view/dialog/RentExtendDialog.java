@@ -284,7 +284,7 @@ public class RentExtendDialog extends JDialog {
 
         pnlCanhBaoTre = taoCanhBaoBox(
             "!Phiếu đang quá hạn!",
-            "Phí phạt trễ sẽ được tính và thu ngay khi gia hạn.",
+            "Phí phạt trễ sẽ được ghi nợ và thu khi khách trả CD.",
             new Color(69, 26, 3), WARNING, new Color(253, 230, 138)
         );
         pnlCanhBaoTre.setVisible(false);
@@ -340,19 +340,19 @@ public class RentExtendDialog extends JDialog {
         lblPhiGiaHan = new JLabel("0 VNĐ");
         lblTongThu   = new JLabel("0 VNĐ");
 
-        pnlPhi.add(taoPhiRow("Phạt trễ (nếu có):",    false));
-        pnlPhi.add(taoPhiValue(lblPhatTre,  false));
-        pnlPhi.add(taoPhiRow("Phí gia hạn thêm:",      false));
+        pnlPhi.add(taoPhiRow("Phạt trễ hiện tại:",            false));
+        pnlPhi.add(taoPhiValue(lblPhatTre,   false));
+        pnlPhi.add(taoPhiRow("Phí gia hạn thêm:",             false));
         pnlPhi.add(taoPhiValue(lblPhiGiaHan, false));
-        pnlPhi.add(taoPhiRow("TỔNG THU TỪ KHÁCH:",     true));
-        pnlPhi.add(taoPhiValue(lblTongThu,  true));
+        pnlPhi.add(taoPhiRow("TỔNG GHI NỢ (thu khi trả CD):", true));
+        pnlPhi.add(taoPhiValue(lblTongThu,   true));
 
         lblPhatTre.setFont(F_HEADER);   lblPhatTre.setForeground(TEXT_PRIMARY);
         lblPhiGiaHan.setFont(F_HEADER); lblPhiGiaHan.setForeground(TEXT_PRIMARY);
         lblTongThu.setFont(new Font("Segoe UI", Font.BOLD, 16));
         lblTongThu.setForeground(SUCCESS);
 
-        JLabel noteCoc = new JLabel("* Tiền cọc KHÔNG thay đổi — chỉ quyết toán khi khách trả CD");
+        JLabel noteCoc = new JLabel("* Không thu tiền ngay — toàn bộ sẽ thu một lần khi khách trả CD");
         noteCoc.setFont(F_CAPTION);
         noteCoc.setForeground(TEXT_MUTED);
         noteCoc.setBorder(new EmptyBorder(5, 0, 0, 0));
@@ -485,9 +485,9 @@ public class RentExtendDialog extends JDialog {
         card.add(Box.createVerticalStrut(12));
         card.add(taoDuongKe());
         card.add(Box.createVerticalStrut(12));
-        card.add(taoSummaryRow("Phạt trễ (thu ngay):",    lblSum_PhatTre,   false));
+        card.add(taoSummaryRow("Phạt trễ:",     lblSum_PhatTre,   false));
         card.add(Box.createVerticalStrut(4));
-        card.add(taoSummaryRow("Phí gia hạn (thu ngay):", lblSum_PhiGiaHan, false));
+        card.add(taoSummaryRow("Phí gia hạn:", lblSum_PhiGiaHan, false));
         card.add(Box.createVerticalStrut(12));
         card.add(taoDuongKe());
         card.add(Box.createVerticalStrut(12));
@@ -495,12 +495,13 @@ public class RentExtendDialog extends JDialog {
         card.add(Box.createVerticalStrut(12));
         card.add(taoDuongKe());
         card.add(Box.createVerticalStrut(12));
-        card.add(taoSummaryRow("Tiền cọc (giữ nguyên):", lblSum_TienCoc, false));
+        card.add(taoSummaryRow("Tổng ghi nợ (thu khi trả CD):", lblSum_TienCoc, false));
 
         JLabel note = new JLabel(
             "<html><center>"
-          + "DB sẽ cập nhật: <b>NgayTraDuKien += số ngày</b>"
-          + "&nbsp; | &nbsp;<b>TienPhat, TienCoc: KHÔNG đổi</b>"
+          + "DB cập nhật: <b>NgayTraDuKien += số ngày</b>"
+          + " &nbsp;|&nbsp; <b>TienPhat += phạt trễ + phí gia hạn</b>"
+          + " — thu khi trả CD"
           + "</center></html>"
         );
         note.setFont(F_SMALL);
@@ -574,9 +575,9 @@ public class RentExtendDialog extends JDialog {
         lblSum_PhiGiaHan.setText(String.format("%,.0f VNĐ", phiGiaHan));
         lblSum_PhiGiaHan.setForeground(TEXT_PRIMARY);
         lblSum_TongThu.setText(String.format("%,.0f VNĐ", tongThu));
-        lblSum_TienCoc.setText(String.format("%,.0f VNĐ  (không thay đổi)", tienCoc));
-        lblSum_TienCoc.setForeground(TEXT_MUTED);
-        lblSum_TienCoc.setFont(F_BODY);
+        lblSum_TienCoc.setText(String.format("%,.0f VNĐ", tongThu));
+        lblSum_TienCoc.setForeground(WARNING);
+        lblSum_TienCoc.setFont(F_HEADER);
 
         if (btnConfirm != null) btnConfirm.setEnabled(true);
     }
@@ -666,17 +667,15 @@ public class RentExtendDialog extends JDialog {
 
         String msg = String.format(
             "Xác nhận gia hạn phiếu PT%d?\n\n"
-          + "  Ngày trả mới           : %s  (+%d ngày)\n"
-          + "  Phạt trễ (thu ngay)    : %,.0f VNĐ\n"
-          + "  Phí gia hạn (thu ngay) : %,.0f VNĐ\n"
-          + "  ──────────────────────────────────\n"
-          + "  TỔNG THU TỪ KHÁCH     : %,.0f VNĐ\n\n"
-          + "  Tiền cọc               : %,.0f VNĐ  [KHÔNG ĐỔI]\n"
-          + "  (Quyết toán cọc khi khách trả CD)",
+          + "  Ngày trả mới   : %s  (+%d ngày)\n"
+          + "  Phạt trễ       : %,.0f VNĐ\n"
+          + "  Phí gia hạn    : %,.0f VNĐ\n"
+          + "  ──────────────────────────────\n"
+          + "  Tổng ghi nợ    : %,.0f VNĐ\n\n"
+          + "  ► Không thu tiền ngay — sẽ thu khi khách trả CD.",
             selectedPhieu.getMaPT(),
             ngayMoi.format(FMT_DATE), soNgay,
-            phatTre, phiGiaHan, tongThu,
-            selectedPhieu.getTienCoc()
+            phatTre, phiGiaHan, tongThu
         );
 
         int xacNhan = JOptionPane.showConfirmDialog(this, msg,
@@ -690,14 +689,13 @@ public class RentExtendDialog extends JDialog {
             JOptionPane.showMessageDialog(this,
                 String.format(
                     "Gia hạn thành công!\n\n"
-                  + "  Ngày trả mới      : %s\n"
-                  + "  Đã thu từ khách   : %,.0f VNĐ\n"
-                  + "    • Phạt trễ      : %,.0f VNĐ\n"
-                  + "    • Phí gia hạn   : %,.0f VNĐ\n\n"
-                  + "  Tiền cọc          : %,.0f VNĐ  (giữ nguyên)",
+                  + "  Ngày trả mới   : %s\n"
+                  + "  Phạt trễ       : %,.0f VNĐ\n"
+                  + "  Phí gia hạn    : %,.0f VNĐ\n"
+                  + "  Tổng ghi nợ    : %,.0f VNĐ\n\n"
+                  + "  ► Sẽ thu khi khách trả CD.",
                     ngayMoi.format(FMT_DATE),
-                    tongThu, phatTre, phiGiaHan,
-                    selectedPhieu.getTienCoc()),
+                    phatTre, phiGiaHan, tongThu),
                 "Hoàn tất", JOptionPane.INFORMATION_MESSAGE);
             dispose();
         } else {

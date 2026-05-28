@@ -11,7 +11,6 @@ import otkhongluong.gamestoremanagement.model.RentDetailData;
 import otkhongluong.gamestoremanagement.util.DBConnection;
 import otkhongluong.gamestoremanagement.util.Session;
 import otkhongluong.gamestoremanagement.util.FormatUtil;
-import java.util.ArrayList;
 import java.sql.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -261,12 +260,12 @@ public class InvoiceService {
                 final int finalDiemCong = diemCong;
                 if (maKH > 0) {
                     if (finalDiemThuc > 0) {
-                        khDAO.updatePoint(maKH, -finalDiemThuc);
+                        khDAO.updatePoint(con, maKH, -finalDiemThuc);  // ← thêm con
                         dao.logDiem(con, maKH, "TRU", finalDiemThuc,
                             "Dùng điểm mua game — HĐ" + maHD);
                     }
                     if (finalDiemCong > 0) {
-                        khDAO.updatePoint(maKH, finalDiemCong);
+                        khDAO.updatePoint(con, maKH, finalDiemCong);   // ← thêm con
                         dao.logDiem(con, maKH, "CONG", finalDiemCong,
                             "Mua game — HĐ" + maHD + String.format(" (tổng %,.0f VNĐ)", tongGoc));
                     }

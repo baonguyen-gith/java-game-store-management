@@ -22,11 +22,8 @@ public class DBConnection {
             // ✅ PHẢI truyền USER + PASSWORD
             conn = DriverManager.getConnection(URL, USER, PASSWORD);
 
-            System.out.println("✅ Connected SQL Server successfully!");
-
         } catch (Exception e) {
-            System.out.println("❌ Database connection failed!");
-            e.printStackTrace();
+        e.printStackTrace();
         }
 
         return conn;

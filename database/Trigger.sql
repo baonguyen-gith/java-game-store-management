@@ -12,25 +12,28 @@ BEGIN
         SET NOCOUNT ON;
 
         UPDATE p
-        SET p.TienPhat = CASE
-            WHEN i.NgayTraThucTe > i.NgayTraDuKien THEN
-                -- Tối thiểu 1 ngày (giống: if (days <= 0) days = 1)
-                CASE
-                    WHEN DATEDIFF(DAY, i.NgayTraDuKien, i.NgayTraThucTe) <= 0 THEN 1
-                    ELSE DATEDIFF(DAY, i.NgayTraDuKien, i.NgayTraThucTe)
-                END
-                *
-                -- SUM(GiaThueNgay) từ SANPHAM, không phải DonGiaThue
-                (
-                    SELECT ISNULL(SUM(sp.GiaThueNgay), 0)
-                    FROM   CTPHIEUTHUE ct
-                    JOIN   CD      cd ON cd.MaCD = ct.MaCD
-                    JOIN   SANPHAM sp ON sp.MaSP = cd.MaSP
-                    WHERE  ct.MaPT = i.MaPT
-                )
-                * 1.5
-            ELSE 0
-        END
+        SET p.TienPhat = 
+            -- Giữ lại TienPhat cũ (phí gia hạn + phạt trễ đã thu khi gia hạn)
+            ISNULL(p.TienPhat, 0)
+            +
+            -- Cộng thêm phạt trễ mới (nếu trả trễ so với NgayTraDuKien hiện tại)
+            CASE
+                WHEN i.NgayTraThucTe > i.NgayTraDuKien THEN
+                    CASE
+                        WHEN DATEDIFF(DAY, i.NgayTraDuKien, i.NgayTraThucTe) <= 0 THEN 1
+                        ELSE DATEDIFF(DAY, i.NgayTraDuKien, i.NgayTraThucTe)
+                    END
+                    *
+                    (
+                        SELECT ISNULL(SUM(sp.GiaThueNgay), 0)
+                        FROM   CTPHIEUTHUE ct
+                        JOIN   CD      cd ON cd.MaCD = ct.MaCD
+                        JOIN   SANPHAM sp ON sp.MaSP = cd.MaSP
+                        WHERE  ct.MaPT = i.MaPT
+                    )
+                    * 1.5
+                ELSE 0
+            END
         FROM PHIEUTHUE p
         INNER JOIN inserted i ON p.MaPT = i.MaPT
         WHERE i.NgayTraThucTe IS NOT NULL;
