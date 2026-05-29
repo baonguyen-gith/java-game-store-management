@@ -15,11 +15,17 @@ public class AuthServiceTest {
         System.out.println("=========================================");
 
         try {
-            String username = "admin";
-            String password = "admin123"; 
+            String username = "an";
+            String password = "123"; 
             User loggedInUser = authService.login(username, password);
 
-            if (loggedInUser != null && "admin".equals(loggedInUser.getUsername())) {
+            if (loggedInUser != null) {
+                System.out.println("[DEBUG] Username thuc te lay tu DB: " + loggedInUser.getUsername());
+            } else {
+                System.out.println("[DEBUG] Ham login dang tra ve NULL (Khong tim thay user hoac sai pass)!");
+            }
+
+            if (loggedInUser != null && "an".equals(loggedInUser.getUsername())) {
                 System.out.println("[ 🟢 PASSED ] Ca 1: Đăng nhập thành công hợp lệ.");
             } else {
                 System.out.println("[ 🔴 FAILED ] Ca 1: Sai thông tin đối chiếu hoặc trả về null.");
@@ -29,7 +35,7 @@ public class AuthServiceTest {
         }
 
         try {
-            String username = "admin";
+            String username = "an";
             String password = "mat_khau_bi_go_sai_123";
             User loggedInUser = authService.login(username, password);
 

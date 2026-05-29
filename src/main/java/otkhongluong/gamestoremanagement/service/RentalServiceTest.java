@@ -31,9 +31,14 @@ public class RentalServiceTest {
 
             List<CTPhieuThue> danhSachChiTiet = new ArrayList<>();
 
-            danhSachChiTiet.add(new CTPhieuThue(5, "League of Legends Offline", 30000.0, "SanSang"));
+            CTPhieuThue ctMau = new CTPhieuThue();
+            ctMau.setMaCD(5);                       
+            ctMau.setTenGame("League of Legends Offline"); 
+            ctMau.setDonGiaThue(30000.0);         
+            ctMau.setTrangThai("SanSang");        
+            
+            danhSachChiTiet.add(ctMau);
             pt.setDanhSachChiTiet(danhSachChiTiet);
-
             boolean isSuccess = rentalService.createPhieuThue(pt);
 
             if (isSuccess) {
