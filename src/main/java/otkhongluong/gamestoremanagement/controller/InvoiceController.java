@@ -28,7 +28,6 @@ import java.util.stream.Collectors;
  *                         confirmPayment, getROMLink
  *   - InvoiceEditDialog → loadWorkingItems, loadSpCatalogForEdit, findKH,
  *                         findNV, saveEditInvoice
- *   - RentDetailDialog  → loadRentDetail
  *   - TransactionDetailDialog → getHoaDonById (đã có)
  */
 public class InvoiceController {
@@ -253,18 +252,6 @@ public class InvoiceController {
             return ActionResult.ok(result.substring(3));
         else
             return ActionResult.fail(result.substring(4));
-    }
-
-    // ================================================================
-    // CHI TIẾT PHIẾU THUÊ — RentDetailDialog
-    // ================================================================
-
-    /**
-     * Load dữ liệu đầy đủ cho RentDetailDialog.
-     * @return RentDetailData hoặc null nếu không tìm thấy
-     */
-    public RentDetailData loadRentDetail(int maPT) {
-        return service.loadRentDetail(maPT);
     }
 
     // ================================================================

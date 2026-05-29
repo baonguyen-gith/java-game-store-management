@@ -18,7 +18,9 @@ public class TestAdmin {
 
         User fake = new User();
         fake.setMaUser(1);
+        fake.setMaNV(1);
         fake.setUsername("admin");
+        fake.setPassword("$2a$10$slYQmyNdgTY18LMoDIs11OHQEBsxGBsS3bT.T5ZZNGPDiPDy6JbTu");
         fake.setMaRole(1);
 
         // ✅ AdminView cần Navigator để xử lý logout

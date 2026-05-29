@@ -35,7 +35,8 @@
 --   KH5 : CONG=5(cu)=5, TRU=0                       ->  5  [dang thue PT2 chua tinh]
 --   KH6 : CONG=12(HD6)+3(PT4)=15, TRU=0                 -> 15
 -- ============================================================
-
+USE qlgamee;
+GO
 -- Tat constraint de insert du lieu mau (tranh loi FK)
 ALTER TABLE USERS         NOCHECK CONSTRAINT ALL;
 ALTER TABLE KHACHHANG     NOCHECK CONSTRAINT ALL;
@@ -105,8 +106,8 @@ SET IDENTITY_INSERT GAME ON;
 INSERT INTO GAME (MaGame, TenGame, TheLoai, NenTang, GhiChu, HinhAnh) VALUES
 (1, N'FIFA 24',          N'The thao',  N'PS5/Xbox', N'Game bong da the thao dinh cao',   '/icons/fifa24.jpg'),
 (2, N'Elden Ring',       N'RPG',       N'PC/PS5',   N'RPG hanh dong the gioi mo rong',   '/icons/eldenring.jpg'),
-(3, N'Call of Duty MW3', N'Ban sung',  N'PC/Xbox',  N'FPS ban sung goc nhin thu nhat',   '/icons/codmw3.jpg'),
-(4, N'The Witcher 3',    N'RPG',       N'PC/PS4',   N'RPG kich ban phong phu sau sac',   '/icons/witcher3.jpg'),
+(3, N'Call of Duty MW3', N'Ban sung',  N'PC/Xbox',  N'FPS ban sung goc nhin thu nhat',   '/icons/callofdutymw3.jpg'),
+(4, N'The Witcher 3',    N'RPG',       N'PC/PS4',   N'RPG kich ban phong phu sau sac',   '/icons/thewitcher3.jpg'),
 (5, N'Minecraft',        N'Sandbox',   N'PC/Xbox',  N'Sandbox xay dung va kham pha',     '/icons/minecraft.jpg'),
 (6, N'GTA V',            N'Hanh dong', N'PC/PS4',   N'The gioi mo hanh dong Rockstar',   '/icons/gtav.png');
 SET IDENTITY_INSERT GAME OFF;

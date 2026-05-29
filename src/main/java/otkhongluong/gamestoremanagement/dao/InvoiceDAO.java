@@ -102,6 +102,18 @@ public class InvoiceDAO {
             }
         }
     }
+    
+    public boolean checkAndLockCD(Connection conn, int maCD) throws SQLException {
+        String sql = "SELECT TrangThai FROM CD WITH (UPDLOCK, ROWLOCK) WHERE MaCD = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, maCD);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return false;
+                return "SanSang".equals(rs.getString("TrangThai"));
+            }
+        }
+    }
+
 
     /* =====================================================
         CẬP NHẬT CD / ROM SAU KHI BÁN
@@ -171,11 +183,13 @@ public class InvoiceDAO {
      ===================================================== */
     public void transferPointLogs(Connection conn, int maHD, int maKHCu, int maKHMoi)
             throws SQLException {
+        String like = "%HĐ" + maHD + "%";
         try (PreparedStatement ps = conn.prepareStatement(
                 "UPDATE DIEM_LICHSU SET MaKH=? " +
-                "WHERE MaKH=? AND MaPT IS NULL AND GhiChu LIKE N'%HĐ" + maHD + "%'")) {
+                "WHERE MaKH=? AND MaPT IS NULL AND GhiChu LIKE N?")) {
             ps.setInt(1, maKHMoi);
             ps.setInt(2, maKHCu);
+            ps.setNString(3, like);
             ps.executeUpdate();
         }
     }
@@ -549,9 +563,10 @@ public class InvoiceDAO {
     private int querySum(Connection con, int maKH, String like, String loai) throws SQLException {
         try (PreparedStatement ps = con.prepareStatement(
                 "SELECT COALESCE(SUM(SoDiem),0) FROM DIEM_LICHSU " +
-                "WHERE MaKH=? AND MaPT IS NULL AND GhiChu LIKE ? AND Loai=N'" + loai + "'")) {
+                "WHERE MaKH=? AND MaPT IS NULL AND GhiChu LIKE ? AND Loai=?")) {
             ps.setInt(1, maKH);
             ps.setString(2, like);
+            ps.setNString(3, loai);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getInt(1) : 0;
             }

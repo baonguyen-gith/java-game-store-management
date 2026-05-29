@@ -123,26 +123,31 @@ public class ReportService {
     
     // Dùng thẳng ReportDAO.getMonthlyRows() và getYearlyRows() đã có
     public Object[] getMonthlyExportData(int month, int year) {
-        List<Object[]> rows = dao.getMonthlyRows(month, year);
-
-        double totalBan  = 0, totalThue = 0;
-        for (Object[] row : rows) {
-            totalBan  += ((Number) row[2]).doubleValue();
-            totalThue += ((Number) row[3]).doubleValue();
-        }
-        return new Object[]{rows, totalBan, totalThue};
+        return dao.runInSerializable(conn -> {
+            // Tất cả query chạy trong cùng 1 SERIALIZABLE transaction
+            List<Object[]> rows = dao.getMonthlyRowsWithConn(conn, month, year);
+            double totalBan  = 0, totalThue = 0;
+            for (Object[] row : rows) {
+                totalBan  += ((Number) row[2]).doubleValue();
+                totalThue += ((Number) row[3]).doubleValue();
+            }
+            return new Object[]{rows, totalBan, totalThue};
+        });
     }
+
 
     public Object[] getYearlyExportData(int year) {
-        List<Object[]> rows = dao.getYearlyRows(year);
-
-        double totalBan  = 0, totalThue = 0;
-        for (Object[] row : rows) {
-            totalBan  += ((Number) row[2]).doubleValue();
-            totalThue += ((Number) row[4]).doubleValue();
-        }
-        return new Object[]{rows, totalBan, totalThue};
+        return dao.runInSerializable(conn -> {
+            List<Object[]> rows = dao.getYearlyRowsWithConn(conn, year);
+            double totalBan  = 0, totalThue = 0;
+            for (Object[] row : rows) {
+                totalBan  += ((Number) row[2]).doubleValue();
+                totalThue += ((Number) row[4]).doubleValue();
+            }
+            return new Object[]{rows, totalBan, totalThue};
+        });
     }
+
 
     // ── Tab 7 ────────────────────────────────────────────────
 

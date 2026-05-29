@@ -45,23 +45,21 @@ public class RentalService {
             con.setAutoCommit(false);
             try {
                 for (CTPhieuThue ct : pt.getDanhSachChiTiet()) {
-                    String chk = "SELECT TrangThai FROM CD WHERE MaCD = ?";
+                    // UPDLOCK: giữ khóa update, ngăn transaction khác cùng đọc-update
+                    // ROWLOCK: chỉ lock dòng này, không lock cả bảng
+                    String chk = "SELECT TrangThai FROM CD WITH (UPDLOCK, ROWLOCK) WHERE MaCD = ?";
                     try (PreparedStatement ps = con.prepareStatement(chk)) {
                         ps.setInt(1, ct.getMaCD());
                         ResultSet rs = ps.executeQuery();
-                        if (!rs.next()) {
-                            System.out.println("[DEBUG] MaCD=" + ct.getMaCD() + " → KHÔNG TÌM THẤY TRONG DB");
-                            con.rollback();
-                            return false;
-                        }
+                        if (!rs.next()) { con.rollback(); return false; }
                         String trangThai = rs.getString("TrangThai");
-                        System.out.println("[DEBUG] MaCD=" + ct.getMaCD() + " → TrangThai='" + trangThai + "'");
                         if (!"SanSang".equals(trangThai)) {
                             con.rollback();
-                            return false;
+                            return false;   // CD đang bận — báo lỗi cho UI
                         }
                     }
                 }
+
 
                 boolean ok = phieuThueDAO.insertWithConnection(pt, con);
                 if (!ok) { con.rollback(); return false; }
@@ -159,55 +157,55 @@ public class RentalService {
     /* ================= SAVE EDIT RENTAL (RentEditDialog) ================= */
 
     public String saveEditRental(int maPT,
-                                 Customer newKH,
-                                 Employee newNV,
-                                 LocalDateTime newNgayTra,
-                                 int maKHCu, int maNVCu) {
-        boolean khChanged   = newKH != null && newKH.getMaKH() != maKHCu;
-        boolean nvChanged   = newNV != null && newNV.getMaNV() != maNVCu;
-        boolean ngayChanged = newNgayTra != null;
+                                Customer newKH,
+                                Employee newNV,
+                                LocalDateTime newNgayTra,
+                                int maKHCu, int maNVCu) {
+       boolean khChanged   = newKH != null && newKH.getMaKH() != maKHCu;
+       boolean nvChanged   = newNV != null && newNV.getMaNV() != maNVCu;
+       boolean ngayChanged = newNgayTra != null;
 
-        if (!khChanged && !nvChanged && !ngayChanged)
-            return "ERR:Không có thay đổi nào để lưu.";
+       if (!khChanged && !nvChanged && !ngayChanged)
+           return "ERR:Không có thay đổi nào để lưu.";
 
-        int maKHMoi = khChanged ? newKH.getMaKH() : maKHCu;
-        int maNVMoi = nvChanged ? newNV.getMaNV() : maNVCu;
+       int maKHMoi = khChanged ? newKH.getMaKH() : maKHCu;
+       int maNVMoi = nvChanged ? newNV.getMaNV() : maNVCu;
 
-        try (Connection con = DBConnection.getConnection()) {
-            con.setAutoCommit(false);
-            try {
-                if (khChanged || nvChanged) {
-                    phieuThueDAO.updateKhachHangVaNhanVien(maPT, maKHMoi, maNVMoi);
-                }
-                if (ngayChanged) {
-                    phieuThueDAO.updateNgayTraVaDonGia(maPT, newNgayTra);
-                }
-                con.commit();
-            } catch (Exception ex) {
-                con.rollback();
-                ex.printStackTrace();
-                return "ERR:" + ex.getMessage();
-            }
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            return "ERR:Lỗi kết nối: " + ex.getMessage();
-        }
+       try (Connection con = DBConnection.getConnection()) {
+           con.setAutoCommit(false);
+           try {
+               if (khChanged || nvChanged) {
+                   phieuThueDAO.updateKhachHangVaNhanVien(con, maPT, maKHMoi, maNVMoi);
+               }
+               if (ngayChanged) {
+                   phieuThueDAO.updateNgayTraVaDonGia(con, maPT, newNgayTra);
+               }
+               if (khChanged) {
+                   int diem = phieuThueDAO.tinhDiemPhieu(maPT);
+                   if (diem > 0) {
+                       String errTru = pointDAO.truDiemInTx(con, maKHCu, diem,
+                           "Chuyển điểm sang KH" + maKHMoi + " - PT" + maPT);
+                       if (errTru != null) {
+                           con.rollback();
+                           return "ERR:Chuyển điểm thất bại: " + errTru;
+                       }
+                       pointDAO.congDiemInTx(con, maKHMoi, diem,
+                           "Nhận điểm từ KH" + maKHCu + " - PT" + maPT);
+                   }
+               }
+               con.commit();
+           } catch (Exception ex) {
+               con.rollback();
+               ex.printStackTrace();
+               return "ERR:" + ex.getMessage();
+           }
+       } catch (SQLException ex) {
+           ex.printStackTrace();
+           return "ERR:Lỗi kết nối: " + ex.getMessage();
+       }
 
-        if (khChanged) {
-            int diem = phieuThueDAO.tinhDiemPhieu(maPT);
-            if (diem > 0) {
-                String errTru  = pointDAO.truDiem(maKHCu,  diem, "Chuyển điểm sang KH" + maKHMoi + " - PT" + maPT);
-                boolean congOk = pointDAO.congDiem(maKHMoi, diem, "Nhận điểm từ KH"    + maKHCu  + " - PT" + maPT);
-                if (errTru != null || !congOk) {
-                    System.err.println("[RentalService] Cảnh báo: cập nhật PT" + maPT
-                            + " thành công nhưng chuyển điểm KH" + maKHCu
-                            + "→KH" + maKHMoi + " có lỗi. Kiểm tra thủ công.");
-                }
-            }
-        }
-
-        return "OK:Cập nhật phiếu PT" + String.format("%04d", maPT) + " thành công!";
-    }
+       return "OK:Cập nhật phiếu PT" + String.format("%04d", maPT) + " thành công!";
+   }
 
     /* ================= LOAD RENT DETAIL ================= */
 

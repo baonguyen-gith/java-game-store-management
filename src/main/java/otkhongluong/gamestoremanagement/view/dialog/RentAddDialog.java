@@ -910,7 +910,26 @@ public class RentAddDialog extends JDialog {
                     "Hoàn tất", JOptionPane.INFORMATION_MESSAGE);
                 dispose();
             } else {
-                showMsg(ar.message);
+                boolean isConflict = ar.message != null && ar.message.contains("không còn sẵn sàng");
+                if (isConflict) {
+                    int choice = JOptionPane.showOptionDialog(
+                        this,
+                        "Xung đột dữ liệu!\n\n" + ar.message,
+                        "CD không còn sẵn sàng",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE,
+                        null,
+                        new String[]{"Làm mới danh sách", "Đóng"},
+                        "Làm mới danh sách"
+                    );
+                    if (choice == JOptionPane.YES_OPTION) {
+                        showStep(1);  // showStep(1) đã gọi loadCDTable() bên trong
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(this,
+                        "Tạo phiếu thuê thất bại!\n\n" + ar.message,
+                        "Lỗi", JOptionPane.ERROR_MESSAGE);
+                }
             }
         } catch (Exception ex) {
             ex.printStackTrace();

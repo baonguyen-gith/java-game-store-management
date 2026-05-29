@@ -201,14 +201,16 @@ public class InvoiceService {
         if (cart == null || cart.isEmpty()) return "ERR:Giỏ hàng trống!";
 
         // ── Tính toán nghiệp vụ (không có SQL) ──────────────────────────
-        double tongGoc     = cart.stream().mapToDouble(i -> i.donGia * i.soLuong).sum();
+        double tongGoc  = cart.stream().mapToDouble(i -> i.donGia * i.soLuong).sum();
+
+        // Reset sớm nếu khách vãng lai — để tongPhaiTra tính đúng
+        if (maKH == -1) { diemThucDung = 0; }
+
         double giamTien    = Math.min((double) diemThucDung * DIEM_TO_VND, tongGoc);
         int    diemThuc    = (int) Math.floor(giamTien / DIEM_TO_VND);
         giamTien           = diemThuc * DIEM_TO_VND;
         double tongPhaiTra = Math.max(0, tongGoc - giamTien);
         int    diemCong    = (int) Math.floor(tongGoc / VND_PER_DIEM);
-
-        if (maKH == -1) { diemThuc = 0; giamTien = 0; }
 
         // Gộp cart theo MaSP
         Map<Integer, double[]> spMap = new LinkedHashMap<>();
@@ -224,12 +226,7 @@ public class InvoiceService {
                 // 1. Kiểm tra race-condition CD
                 for (CartItem item : cart) {
                     if ("CD".equals(item.loaiSP)) {
-                        String tt = dao.getCDTrangThai(con, item.maCD);
-                        if (tt == null) {
-                            con.rollback();
-                            return "ERR:Không tìm thấy CD" + item.maCD + "!";
-                        }
-                        if (!"SanSang".equals(tt)) {
+                        if (!dao.checkAndLockCD(con, item.maCD)) {
                             con.rollback();
                             return "ERR:CD" + item.maCD + " — \"" + item.tenGame +
                                    "\" vừa bị người khác mua!\nVui lòng chọn CD khác hoặc ROM.";
@@ -405,100 +402,6 @@ public class InvoiceService {
         }
     }
 
-    // ================================================================
-    // CHI TIẾT PHIẾU THUÊ
-    // ================================================================
-
-    /** Load dữ liệu đầy đủ cho RentDetailDialog. */
-    public RentDetailData loadRentDetail(int maPT) {
-        RentDetailData data = new RentDetailData();
-
-        String sqlHeader =
-            "SELECT pt.NgayThue, pt.NgayTraDuKien, pt.NgayTraThucTe, " +
-            "       pt.TienCoc, pt.TienPhat, pt.TrangThai, " +
-            "       kh.HoTen, kh.SDT, " +
-            "       SUM(ct.DonGiaThue) AS TongDonGiaThue " +
-            "FROM PHIEUTHUE pt " +
-            "LEFT JOIN KHACHHANG kh ON pt.MaKH=kh.MaKH " +
-            "LEFT JOIN CTPHIEUTHUE ct ON pt.MaPT=ct.MaPT " +
-            "WHERE pt.MaPT=? " +
-            "GROUP BY pt.MaPT, pt.NgayThue, pt.NgayTraDuKien, pt.NgayTraThucTe, " +
-            "         pt.TienCoc, pt.TienPhat, pt.TrangThai, kh.HoTen, kh.SDT";
-
-        String sqlDetail =
-            "SELECT TOP 1 cd.MaCD, g.MaGame, g.TenGame, sp.GiaThueNgay " +
-            "FROM CTPHIEUTHUE ct " +
-            "JOIN CD      cd ON ct.MaCD  =cd.MaCD " +
-            "JOIN SANPHAM sp ON cd.MaSP  =sp.MaSP " +
-            "JOIN GAME    g  ON sp.MaGame=g.MaGame " +
-            "WHERE ct.MaPT=?";
-
-        try (Connection con = DBConnection.getConnection()) {
-
-            // Điểm đã trừ — qua DAO
-            data.giamDiem = dao.getGiamDiemByPT(con, maPT) * DIEM_TO_VND;
-
-            // Header
-            try (PreparedStatement ps = con.prepareStatement(sqlHeader)) {
-                ps.setInt(1, maPT);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (!rs.next()) return null;
-
-                    data.daTra           = "DaTra".equalsIgnoreCase(rs.getString("TrangThai"));
-                    data.trangThai       = data.daTra ? "Đã trả" : "Đang thuê";
-                    data.tenKH           = nvl2(rs.getString("HoTen"), "—");
-                    data.sdt             = nvl2(rs.getString("SDT"),   "—");
-                    data.ngayThue        = rs.getTimestamp("NgayThue");
-                    data.ngayTraDK       = rs.getTimestamp("NgayTraDuKien");
-                    data.ngayTraTT       = rs.getTimestamp("NgayTraThucTe");
-                    data.tienCoc         = rs.getDouble("TienCoc");
-                    data.tienPhatDB      = rs.getDouble("TienPhat");
-                    data.tienThueBanDau  = rs.getDouble("TongDonGiaThue");
-                    data.tienThueNetDiem = Math.max(0, data.tienThueBanDau - data.giamDiem);
-
-                    if (!data.daTra && data.ngayTraDK != null) {
-                        LocalDateTime ngayDK = data.ngayTraDK.toLocalDateTime();
-                        LocalDateTime homNay = LocalDate.now().atStartOfDay();
-                        if (homNay.isAfter(ngayDK)) {
-                            long ngayTre = java.time.temporal.ChronoUnit.DAYS.between(
-                                ngayDK.toLocalDate(), homNay.toLocalDate());
-                            if (ngayTre <= 0) ngayTre = 1;
-                            data.phatTreTamTinh = ngayTre * 10_000;
-                        }
-                    }
-                }
-            }
-
-            // CD detail
-            try (PreparedStatement ps = con.prepareStatement(sqlDetail)) {
-                ps.setInt(1, maPT);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        data.maCD          = rs.getInt("MaCD");
-                        data.maGame        = rs.getInt("MaGame");
-                        data.tenGame       = nvl(rs.getString("TenGame"));
-                        data.giaThueNgayHT = rs.getDouble("GiaThueNgay");
-
-                        data.soNgayGoc = data.giaThueNgayHT > 0
-                            ? Math.max(1, Math.round(data.tienThueBanDau / data.giaThueNgayHT))
-                            : 1;
-
-                        if (data.tienPhatDB > 0 && data.ngayThue != null && data.ngayTraDK != null) {
-                            long soNgayTong = java.time.temporal.ChronoUnit.DAYS.between(
-                                data.ngayThue.toLocalDateTime().toLocalDate(),
-                                data.ngayTraDK.toLocalDateTime().toLocalDate());
-                            long soNgayGiaHan = Math.max(0, soNgayTong - data.soNgayGoc);
-                            data.tienGiaHan   = soNgayGiaHan * data.giaThueNgayHT;
-                            data.treHanDaDong = Math.max(0, data.tienPhatDB - data.tienGiaHan);
-                        }
-                    }
-                }
-            }
-
-        } catch (Exception ex) { ex.printStackTrace(); return null; }
-
-        return data;
-    }
     
     // Chuẩn bị data từ Invoice + List<ChiTietHoaDon> thực tế
     public Object[] getInvoiceExportData(int maHD) {

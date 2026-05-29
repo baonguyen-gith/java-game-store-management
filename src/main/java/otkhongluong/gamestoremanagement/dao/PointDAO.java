@@ -82,25 +82,38 @@ public class PointDAO {
         try (Connection conn = DBConnection.getConnection()) {
             conn.setAutoCommit(false);
             try {
-                int diemHienCo = 0;
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "SELECT DiemTichLuy FROM KHACHHANG WHERE MaKH = ?")) {
-                    ps.setInt(1, maKH);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (!rs.next()) { conn.rollback(); return "Không tìm thấy KH MaKH=" + maKH; }
-                        diemHienCo = rs.getInt("DiemTichLuy");
-                    }
-                }
-                if (diemHienCo < diem) {
-                    conn.rollback();
-                    return "Điểm không đủ! Hiện có: " + diemHienCo + ", cần trừ: " + diem;
-                }
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "UPDATE KHACHHANG SET DiemTichLuy = DiemTichLuy - ? WHERE MaKH = ?")) {
+                // ── BƯỚC 1: UPDATE nguyên tử, chỉ thực hiện khi đủ điểm ──
+                // WHERE DiemTichLuy >= ? đảm bảo không bao giờ xuống âm
+                // Không cần SELECT trước → loại bỏ hoàn toàn non-repeatable read
+                String sqlUpdate =
+                    "UPDATE KHACHHANG " +
+                    "SET DiemTichLuy = DiemTichLuy - ? " +
+                    "WHERE MaKH = ? AND DiemTichLuy >= ?";
+                int rows;
+                try (PreparedStatement ps = conn.prepareStatement(sqlUpdate)) {
                     ps.setInt(1, diem);
                     ps.setInt(2, maKH);
-                    ps.executeUpdate();
+                    ps.setInt(3, diem);   // điều kiện: phải có đủ điểm
+                    rows = ps.executeUpdate();
                 }
+
+                // ── BƯỚC 2: Kiểm tra kết quả ──
+                if (rows == 0) {
+                    // 0 rows = không tìm thấy KH HOẶC không đủ điểm
+                    conn.rollback();
+                    // Phân biệt 2 trường hợp để thông báo rõ hơn
+                    String sqlCheck = "SELECT DiemTichLuy FROM KHACHHANG WHERE MaKH = ?";
+                    try (PreparedStatement ps = conn.prepareStatement(sqlCheck)) {
+                        ps.setInt(1, maKH);
+                        try (ResultSet rs = ps.executeQuery()) {
+                            if (!rs.next()) return "Không tìm thấy KH MaKH=" + maKH;
+                            int diemHienCo = rs.getInt("DiemTichLuy");
+                            return "Điểm không đủ! Hiện có: " + diemHienCo + ", cần trừ: " + diem;
+                        }
+                    }
+                }
+
+                // ── BƯỚC 3: Ghi lịch sử ──
                 try (PreparedStatement ps = conn.prepareStatement(
                         "INSERT INTO DIEM_LICHSU (MaKH, MaPT, Loai, SoDiem, Ngay, GhiChu) " +
                         "VALUES (?, NULL, N'TRU', ?, GETDATE(), ?)")) {
@@ -110,7 +123,8 @@ public class PointDAO {
                     ps.executeUpdate();
                 }
                 conn.commit();
-                return null;
+                return null;   // thành công
+
             } catch (SQLException e) {
                 conn.rollback();
                 System.err.println("truDiem error: " + e.getMessage());
@@ -121,6 +135,7 @@ public class PointDAO {
             return e.getMessage();
         }
     }
+
 
     // ==================== TRỪ ĐIỂM (có MaPT — khi tạo phiếu thuê) ====================
 
@@ -133,25 +148,31 @@ public class PointDAO {
         try (Connection conn = DBConnection.getConnection()) {
             conn.setAutoCommit(false);
             try {
-                int diemHienCo = 0;
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "SELECT DiemTichLuy FROM KHACHHANG WHERE MaKH = ?")) {
-                    ps.setInt(1, maKH);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (!rs.next()) { conn.rollback(); return "Không tìm thấy KH MaKH=" + maKH; }
-                        diemHienCo = rs.getInt("DiemTichLuy");
-                    }
-                }
-                if (diemHienCo < diem) {
-                    conn.rollback();
-                    return "Điểm không đủ! Hiện có: " + diemHienCo + ", cần trừ: " + diem;
-                }
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "UPDATE KHACHHANG SET DiemTichLuy = DiemTichLuy - ? WHERE MaKH = ?")) {
+                // UPDATE nguyên tử — không SELECT trước
+                String sqlUpdate =
+                    "UPDATE KHACHHANG " +
+                    "SET DiemTichLuy = DiemTichLuy - ? " +
+                    "WHERE MaKH = ? AND DiemTichLuy >= ?";
+                int rows;
+                try (PreparedStatement ps = conn.prepareStatement(sqlUpdate)) {
                     ps.setInt(1, diem);
                     ps.setInt(2, maKH);
-                    ps.executeUpdate();
+                    ps.setInt(3, diem);
+                    rows = ps.executeUpdate();
                 }
+                if (rows == 0) {
+                    conn.rollback();
+                    String sqlCheck = "SELECT DiemTichLuy FROM KHACHHANG WHERE MaKH = ?";
+                    try (PreparedStatement ps = conn.prepareStatement(sqlCheck)) {
+                        ps.setInt(1, maKH);
+                        try (ResultSet rs = ps.executeQuery()) {
+                            if (!rs.next()) return "Không tìm thấy KH MaKH=" + maKH;
+                            int diemHienCo = rs.getInt("DiemTichLuy");
+                            return "Điểm không đủ! Hiện có: " + diemHienCo + ", cần trừ: " + diem;
+                        }
+                    }
+                }
+                // Ghi lịch sử với MaPT
                 try (PreparedStatement ps = conn.prepareStatement(
                         "INSERT INTO DIEM_LICHSU (MaKH, MaPT, Loai, SoDiem, Ngay, GhiChu) " +
                         "VALUES (?, ?, N'TRU', ?, GETDATE(), ?)")) {
@@ -165,14 +186,13 @@ public class PointDAO {
                 return null;
             } catch (SQLException e) {
                 conn.rollback();
-                System.err.println("truDiemVoiMaPT error: " + e.getMessage());
                 return e.getMessage();
             }
         } catch (SQLException e) {
-            System.err.println("truDiemVoiMaPT error: " + e.getMessage());
             return e.getMessage();
         }
     }
+
 
     // ==================== SỬA ĐIỂM ====================
 
@@ -305,5 +325,55 @@ public class PointDAO {
             e.printStackTrace();
         }
         return 0;
+    }
+    
+    public String truDiemInTx(Connection con, int maKH, int diem, String ghiChu) 
+            throws SQLException {
+        String note = (ghiChu != null && !ghiChu.isBlank()) ? ghiChu : "Trừ điểm thủ công";
+
+        String sqlUpdate =
+            "UPDATE KHACHHANG " +
+            "SET DiemTichLuy = DiemTichLuy - ? " +
+            "WHERE MaKH = ? AND DiemTichLuy >= ?";
+        int rows;
+        try (PreparedStatement ps = con.prepareStatement(sqlUpdate)) {
+            ps.setInt(1, diem); ps.setInt(2, maKH); ps.setInt(3, diem);
+            rows = ps.executeUpdate();
+        }
+        if (rows == 0) {
+            String sqlCheck = "SELECT DiemTichLuy FROM KHACHHANG WHERE MaKH = ?";
+            try (PreparedStatement ps = con.prepareStatement(sqlCheck)) {
+                ps.setInt(1, maKH);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) return "Không tìm thấy KH MaKH=" + maKH;
+                    return "Điểm không đủ! Hiện có: " + rs.getInt("DiemTichLuy") + ", cần trừ: " + diem;
+                }
+            }
+        }
+        try (PreparedStatement ps = con.prepareStatement(
+                "INSERT INTO DIEM_LICHSU (MaKH, MaPT, Loai, SoDiem, Ngay, GhiChu) " +
+                "VALUES (?, NULL, N'TRU', ?, GETDATE(), ?)")) {
+            ps.setInt(1, maKH); ps.setInt(2, diem); ps.setString(3, note);
+            ps.executeUpdate();
+        }
+        return null; // thành công
+    }
+    
+    public boolean congDiemInTx(Connection con, int maKH, int diem, String ghiChu) 
+            throws SQLException {
+        String note = (ghiChu != null && !ghiChu.isBlank()) ? ghiChu : "Cộng điểm thủ công";
+
+        try (PreparedStatement ps = con.prepareStatement(
+                "UPDATE KHACHHANG SET DiemTichLuy = DiemTichLuy + ? WHERE MaKH = ?")) {
+            ps.setInt(1, diem); ps.setInt(2, maKH);
+            if (ps.executeUpdate() == 0) return false;
+        }
+        try (PreparedStatement ps = con.prepareStatement(
+                "INSERT INTO DIEM_LICHSU (MaKH, MaPT, Loai, SoDiem, Ngay, GhiChu) " +
+                "VALUES (?, NULL, N'CONG', ?, GETDATE(), ?)")) {
+            ps.setInt(1, maKH); ps.setInt(2, diem); ps.setString(3, note);
+            ps.executeUpdate();
+        }
+        return true;
     }
 }

@@ -18,12 +18,13 @@ public class TestStaff {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
 
-            // --- Stub user MaRole = 2 ---
+            // --- Stub user MaRole = 3 ---
             User fakeStaff = new User();
-            fakeStaff.setMaNV(98);
-            fakeStaff.setUsername("test_staff");
-            fakeStaff.setPassword("test");
-            fakeStaff.setMaRole(2);
+            fakeStaff.setMaUser(3);
+            fakeStaff.setMaNV(3);
+            fakeStaff.setUsername("nhanvien1");
+            fakeStaff.setPassword("$2a$10$slYQmyNdgTY18LMoDIs11OHQEBsxGBsS3bT.T5ZZNGPDiPDy6JbTu");
+            fakeStaff.setMaRole(3); 
 
             // --- Stub Navigator: goToLogin() chỉ in log, không mở DB ---
             Navigator stubNavigator = new Navigator() {

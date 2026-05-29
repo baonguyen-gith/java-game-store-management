@@ -12,12 +12,13 @@ public class TestManager {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
 
-            // --- Stub user MaRole = 3 ---
+            // --- Stub user MaRole = 2 ---
             User fakeManager = new User();
-            fakeManager.setMaNV(99);
-            fakeManager.setUsername("test_manager");
-            fakeManager.setPassword("test");
-            fakeManager.setMaRole(3);
+            fakeManager.setMaUser(2);
+            fakeManager.setMaNV(2);
+            fakeManager.setUsername("quanly");
+            fakeManager.setPassword("$2a$10$slYQmyNdgTY18LMoDIs11OHQEBsxGBsS3bT.T5ZZNGPDiPDy6JbTu");
+            fakeManager.setMaRole(2);
 
             // --- Stub Navigator: goToLogin() chỉ in log, không mở DB ---
             Navigator stubNavigator = new Navigator() {

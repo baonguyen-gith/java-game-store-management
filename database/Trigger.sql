@@ -1,7 +1,8 @@
 -- ============================================================
 -- TRIGGER
 -- ============================================================
-
+USE qlgamee;
+GO
 -- TRIGGER 1: Tinh tien phat khi tra CD tre han (10.000/ngay)
 CREATE OR ALTER TRIGGER TRG_TINH_TIEN_PHAT
 ON PHIEUTHUE AFTER UPDATE

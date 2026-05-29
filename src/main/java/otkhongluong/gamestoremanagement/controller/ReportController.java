@@ -107,7 +107,8 @@ public class ReportController {
         public final String medal, hoTen, sdt, email; public final int diemTichLuy;
         public final double tongMua, tongThue;
         public VIPRow(String m, String n, String s, String e, int d, double mu, String th) {
-            medal=m; hoTen=n; sdt=s; email=e; diemTichLuy=d; tongMua=mu; tongThue=Double.parseDouble(th);
+            medal = m; hoTen = n; sdt = s; email = e; diemTichLuy = d; tongMua = mu;
+            tongThue = (th == null || th.isBlank()) ? 0.0 : Double.parseDouble(th);
         }
         public VIPRow(String m, String n, String s, String e, int d, double mu, double th) {
             medal=m; hoTen=n; sdt=s; email=e; diemTichLuy=d; tongMua=mu; tongThue=th;

@@ -932,7 +932,33 @@ public class InvoiceAddDialog extends JDialog {
                 "Thanh toán thành công", JOptionPane.INFORMATION_MESSAGE);
             dispose();
         } else {
-            showMsg("Thanh toán thất bại!\n" + result.message);
+            boolean isConflict = result.message != null && result.message.contains("vừa bị người khác mua");
+            if (isConflict) {
+                // Lỗi xung đột CD — hỏi có muốn quay về bước 1 làm mới không
+                int choice = JOptionPane.showOptionDialog(
+                    this,
+                    "Xung đột dữ liệu!\n\n" + result.message
+                        + "\n\nBạn có muốn quay lại Bước 1 để chọn CD khác không?",
+                    "CD không còn sẵn sàng",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.WARNING_MESSAGE,
+                    null,
+                    new String[]{"Quay lại Bước 1", "Đóng"},
+                    "Quay lại Bước 1"
+                );
+                if (choice == JOptionPane.YES_OPTION) {
+                    // Xóa CD bị conflict khỏi giỏ rồi quay về bước 1
+                    cart.removeIf(item -> "CD".equals(item.loaiSP)
+                        && result.message.contains("CD" + item.maCD));
+                    refreshCartTable();
+                    showStep(1);
+                    loadGameTable();  // làm mới danh sách game + SP
+                }
+            } else {
+                JOptionPane.showMessageDialog(this,
+                    "Thanh toán thất bại!\n\n" + result.message,
+                    "Lỗi", JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
 
