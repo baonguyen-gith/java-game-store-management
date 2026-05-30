@@ -464,10 +464,10 @@ public class ProductPanel extends JPanel {
             JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,
             null, loaiOptions, loaiOptions[0]
         );
-        if (loaiChoice < 0) return; // bấm X
+        if (loaiChoice < 0) return;
         boolean isRom = (loaiChoice == 0);
 
-        // Bước 2: form nhập liệu
+        // Bước 2: form nhập giá
         JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
         JTextField txtMaGame  = new JTextField();
         JTextField txtGiaBan  = new JTextField("0");
@@ -487,17 +487,36 @@ public class ProductPanel extends JPanel {
         }
 
         int result = JOptionPane.showConfirmDialog(this, panel,
-            "Thêm " + (isRom ? "ROM" : "CD"), JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+            "Thêm " + (isRom ? "ROM" : "CD"),
+            JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 
-        if (result == JOptionPane.OK_OPTION) {
-            ProductController.ActionResult actionResult = controller.handleAdd(
-                isRom ? "ROM" : "CD",
-                txtMaGame.getText(),
-                txtGiaBan.getText(),
-                isRom ? "0" : txtGiaThue.getText()
-            );
-            showResult(actionResult);
-            if (actionResult.success) loadData();
+        if (result != JOptionPane.OK_OPTION) return;
+
+        // Bước 3: gọi controller thêm sản phẩm
+        ProductController.ActionResult actionResult = controller.handleAdd(
+            isRom ? "ROM" : "CD",
+            txtMaGame.getText(),
+            txtGiaBan.getText(),
+            isRom ? "0" : txtGiaThue.getText()
+        );
+
+        showResult(actionResult);
+
+        if (!actionResult.success) return;
+
+        // Bước 4: load lại data, lấy sản phẩm vừa tạo (mới nhất = đầu danh sách)
+        loadData();
+
+        // allData đã được loadData() cập nhật, sản phẩm mới nhất ở index 0
+        // (vì findAll() ORDER BY MaSP DESC)
+        if (allData == null || allData.isEmpty()) return;
+        Product newProduct = allData.get(0);
+
+        // Bước 5: tự động mở dialog tương ứng
+        if (isRom) {
+            showRomDialog(newProduct);
+        } else {
+            showDiscDialog(newProduct);
         }
     }
 

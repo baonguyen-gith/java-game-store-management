@@ -354,30 +354,52 @@ public class ReportDAO {
     // ══════════════════════════════════════════════════════════════════
 
     public int[] getOverdueCounts() {
-        int tong    = queryInt(
+        int tong = queryInt(
             "SELECT COUNT(*) FROM PHIEUTHUE " +
             "WHERE TrangThai='DangThue' AND NgayTraDuKien < GETDATE()");
         int maxNgay = queryInt(
-            "SELECT ISNULL(MAX(DATEDIFF(day,NgayTraDuKien,GETDATE())),0) FROM PHIEUTHUE " +
-            "WHERE TrangThai='DangThue' AND NgayTraDuKien < GETDATE()");
+            "SELECT ISNULL(MAX(DATEDIFF(day,NgayTraDuKien,GETDATE())),0) " +
+            "FROM PHIEUTHUE WHERE TrangThai='DangThue' AND NgayTraDuKien < GETDATE()");
         return new int[]{tong, maxNgay};
     }
 
     public double getOverdueTotalFine() {
         return queryDouble(
-            "SELECT ISNULL(SUM(TienPhat),0) FROM PHIEUTHUE " +
-            "WHERE TrangThai='DangThue' AND NgayTraDuKien < GETDATE()");
+            "SELECT ISNULL(SUM( " +
+            "    pt.TienPhat + " +                          // phạt cũ đã lưu (gia hạn trước)
+            "    DATEDIFF(day, pt.NgayTraDuKien, GETDATE()) " +
+            "        * dongia.TongGia * 1.5 " +            // phạt trễ mới tính động
+            "), 0) " +
+            "FROM PHIEUTHUE pt " +
+            "JOIN ( " +
+            "    SELECT ct.MaPT, SUM(sp.GiaThueNgay) AS TongGia " +
+            "    FROM CTPHIEUTHUE ct " +
+            "    JOIN CD      cd ON ct.MaCD   = cd.MaCD " +
+            "    JOIN SANPHAM sp ON cd.MaSP   = sp.MaSP " +
+            "    GROUP BY ct.MaPT " +
+            ") dongia ON dongia.MaPT = pt.MaPT " +
+            "WHERE pt.TrangThai = 'DangThue' " +
+            "  AND pt.NgayTraDuKien < GETDATE()");
     }
 
     public List<Object[]> getOverdueList() {
         List<Object[]> rows = new ArrayList<>();
         String sql =
             "SELECT pt.MaPT, kh.HoTen, kh.SDT, pt.NgayThue, pt.NgayTraDuKien, " +
-            "DATEDIFF(day, pt.NgayTraDuKien, GETDATE()) as SoNgay, " +
-            "ISNULL(pt.TienPhat,0) as Phat " +
+            "DATEDIFF(day, pt.NgayTraDuKien, GETDATE()) AS SoNgay, " +
+            "pt.TienPhat + " +
+            "    DATEDIFF(day, pt.NgayTraDuKien, GETDATE()) * dongia.TongGia * 1.5 AS Phat " +
             "FROM PHIEUTHUE pt " +
             "JOIN KHACHHANG kh ON pt.MaKH = kh.MaKH " +
-            "WHERE pt.TrangThai='DangThue' AND pt.NgayTraDuKien < GETDATE() " +
+            "JOIN ( " +
+            "    SELECT ct.MaPT, SUM(sp.GiaThueNgay) AS TongGia " +
+            "    FROM CTPHIEUTHUE ct " +
+            "    JOIN CD      cd ON ct.MaCD = cd.MaCD " +
+            "    JOIN SANPHAM sp ON cd.MaSP = sp.MaSP " +
+            "    GROUP BY ct.MaPT " +
+            ") dongia ON dongia.MaPT = pt.MaPT " +
+            "WHERE pt.TrangThai = 'DangThue' " +
+            "  AND pt.NgayTraDuKien < GETDATE() " +
             "ORDER BY SoNgay DESC";
 
         try (Connection con = DBConnection.getConnection();
@@ -389,9 +411,41 @@ public class ReportDAO {
                 String ht = rs.getTimestamp("NgayTraDuKien") != null
                     ? rs.getTimestamp("NgayTraDuKien").toLocalDateTime().format(FMT) : "";
                 rows.add(new Object[]{
-                    FormatUtil.formatMaPTPad(rs.getInt("MaPT")),  // FIX: dùng FormatUtil
+                    FormatUtil.formatMaPTPad(rs.getInt("MaPT")),
                     rs.getString("HoTen"), rs.getString("SDT"),
                     nt, ht, rs.getInt("SoNgay"), rs.getDouble("Phat")
+                });
+            }
+        } catch (Exception ex) { ex.printStackTrace(); }
+        return rows;
+    }
+    
+    public List<Object[]> getDueSoonList() {
+        List<Object[]> rows = new ArrayList<>();
+        String sql =
+            "SELECT pt.MaPT, kh.HoTen, kh.SDT, pt.NgayThue, pt.NgayTraDuKien, " +
+            "DATEDIFF(minute, GETDATE(), pt.NgayTraDuKien) AS SoPhut " +
+            "FROM PHIEUTHUE pt JOIN KHACHHANG kh ON pt.MaKH = kh.MaKH " +
+            "WHERE pt.TrangThai='DangThue' " +
+            "  AND pt.NgayTraDuKien >= GETDATE() " +
+            "  AND pt.NgayTraDuKien < DATEADD(day, 1, GETDATE()) " +
+            "ORDER BY pt.NgayTraDuKien ASC";
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String nt = rs.getTimestamp("NgayThue") != null
+                    ? rs.getTimestamp("NgayThue").toLocalDateTime().format(FMT) : "";
+                String ht = rs.getTimestamp("NgayTraDuKien") != null
+                    ? rs.getTimestamp("NgayTraDuKien").toLocalDateTime().format(FMT) : "";
+                int soPhut = rs.getInt("SoPhut");
+                String conLai = soPhut >= 60
+                    ? (soPhut / 60) + " giờ " + (soPhut % 60) + " phút"
+                    : soPhut + " phút";
+                rows.add(new Object[]{
+                    FormatUtil.formatMaPTPad(rs.getInt("MaPT")),
+                    rs.getString("HoTen"), rs.getString("SDT"),
+                    nt, ht, conLai
                 });
             }
         } catch (Exception ex) { ex.printStackTrace(); }

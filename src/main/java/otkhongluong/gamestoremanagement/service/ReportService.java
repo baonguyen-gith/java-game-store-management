@@ -144,6 +144,13 @@ public class ReportService {
         }
         return new Object[]{rows, totalBan, totalThue};
     }
+    public List<DueSoonRow> getDueSoonList() {
+        List<DueSoonRow> rows = new ArrayList<>();
+        for (Object[] r : dao.getDueSoonList())
+            rows.add(new DueSoonRow((String)r[0], (String)r[1], (String)r[2],
+                                    (String)r[3], (String)r[4], (String)r[5]));
+        return rows;
+    }
 
 
     // ── Tab 7 ────────────────────────────────────────────────

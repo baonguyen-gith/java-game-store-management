@@ -105,6 +105,16 @@ public class ReportController {
             maPT=ma; hoTen=ten; sdt=s; ngayThue=nt; hanTra=ht; soNgayQuaHan=ng; tienPhat=p;
         }
     }
+    
+    public static class DueSoonRow {
+        public final String maPT, hoTen, sdt, ngayThue, hanTra, thoiGianConLai;
+        public DueSoonRow(String ma, String ten, String s, String nt, String ht, String cl) {
+            maPT=ma; hoTen=ten; sdt=s; ngayThue=nt; hanTra=ht; thoiGianConLai=cl;
+        }
+    }
+
+    public List<DueSoonRow> getDueSoonList() { return reportService.getDueSoonList(); }
+
     public static class VIPRow {
         public final String medal, hoTen, sdt, email; public final int diemTichLuy;
         public final double tongMua, tongThue;

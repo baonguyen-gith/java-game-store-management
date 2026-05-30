@@ -618,19 +618,65 @@ public class ReportPanel extends JPanel {
     // TAB 6 — QUÁ HẠN
     // ═════════════════════════════════════════════════════════════════════════
     private JPanel buildOverdue() {
-        JPanel root = new JPanel(new BorderLayout(0, 16));
+        JPanel root = new JPanel(new BorderLayout(0, 14));
         root.setBackground(BG_DARK);
 
-        // ── Lấy KPI qua Controller ──
         ReportController.OverdueKPI k = ctrl.getOverdueKPI();
 
+        // KPI row
         JPanel kpiRow = new JPanel(new GridLayout(1, 3, 16, 0));
         kpiRow.setBackground(BG_DARK);
-        kpiRow.add(makeKPICard("Phiếu quá hạn",     String.valueOf(k.tongQuaHan),               "Cần liên hệ khách", COLOR_OVERDUE, "!"));
-        kpiRow.add(makeKPICard("Tiền phạt dự kiến", ReportController.formatMoney(k.tongPhat),   "Chưa thu",          COLOR_ROM,     "$"));
-        kpiRow.add(makeKPICard("Quá hạn lâu nhất",  k.maxNgayQuaHan + " ngày",                 "Phiếu lâu nhất",    COLOR_OVERDUE, "~"));
+        kpiRow.add(makeKPICard("Phiếu quá hạn",     String.valueOf(k.tongQuaHan),             "Cần liên hệ khách", COLOR_OVERDUE, "!"));
+        kpiRow.add(makeKPICard("Tiền phạt dự kiến", ReportController.formatMoney(k.tongPhat), "2.000đ/ngày/đĩa",   COLOR_ROM,     "$"));
+        kpiRow.add(makeKPICard("Quá hạn lâu nhất",  k.maxNgayQuaHan + " ngày",               "Phiếu lâu nhất",    COLOR_OVERDUE, "~"));
 
-        // ── Lấy danh sách qua Controller ──
+        // ── Bảng sắp đến hạn ──────────────────────────────────────────────────
+        List<ReportController.DueSoonRow> dueSoonList = ctrl.getDueSoonList();
+
+        JPanel warnCard = makeCard();
+        warnCard.setLayout(new BorderLayout(0, 8));
+        warnCard.setBorder(new EmptyBorder(12, 16, 12, 16));
+
+        JLabel warnTitle = new JLabel("! Sắp đến hạn trả trong 24 giờ  (" + dueSoonList.size() + " phiếu)");
+        warnTitle.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        warnTitle.setForeground(COLOR_ROM);
+        warnCard.add(warnTitle, BorderLayout.NORTH);
+
+        if (dueSoonList.isEmpty()) {
+            JLabel ok = new JLabel("  Không có phiếu nào sắp đến hạn.");
+            ok.setFont(FONT_BODY);
+            ok.setForeground(COLOR_CUSTOMER);
+            ok.setBorder(new EmptyBorder(6, 0, 6, 0));
+            warnCard.add(ok, BorderLayout.CENTER);
+        } else {
+            String[] warnCols = {"Mã PT", "Khách hàng", "SĐT", "Ngày thuê", "Hạn trả", "Còn lại"};
+            DefaultTableModel warnModel = new DefaultTableModel(warnCols, 0) {
+                public boolean isCellEditable(int r, int c) { return false; }
+            };
+            for (ReportController.DueSoonRow r : dueSoonList) {
+                warnModel.addRow(new Object[]{
+                    r.maPT, r.hoTen, r.sdt, r.ngayThue, r.hanTra, r.thoiGianConLai
+                });
+            }
+            JTable warnTable = makeStyledTable(warnModel);
+            // Cột "Còn lại" highlight vàng cam
+            warnTable.getColumnModel().getColumn(5).setCellRenderer(new DefaultTableCellRenderer() {
+                @Override public Component getTableCellRendererComponent(
+                        JTable t, Object v, boolean sel, boolean foc, int row, int col) {
+                    super.getTableCellRendererComponent(t, v, sel, foc, row, col);
+                    setBackground(row % 2 == 0 ? TBL_ROW_A : TBL_ROW_B);
+                    setForeground(COLOR_ROM);
+                    setFont(new Font("Segoe UI", Font.BOLD, 13));
+                    setBorder(new EmptyBorder(0, 12, 0, 12));
+                    if (sel) { setBackground(ACCENT); setForeground(Color.WHITE); }
+                    return this;
+                }
+            });
+            warnTable.setPreferredScrollableViewportSize(new Dimension(0, Math.min(dueSoonList.size() * 38 + 42, 180)));
+            warnCard.add(styledScrollPane(warnTable), BorderLayout.CENTER);
+        }
+
+        // ── Bảng quá hạn ─────────────────────────────────────────────────────
         String[] cols = {"Mã PT", "Khách hàng", "SĐT", "Ngày thuê", "Hạn trả", "Quá hạn (ngày)", "Tiền phạt"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
@@ -638,11 +684,9 @@ public class ReportPanel extends JPanel {
         for (ReportController.OverdueRow r : ctrl.getOverdueList()) {
             model.addRow(new Object[]{
                 r.maPT, r.hoTen, r.sdt, r.ngayThue, r.hanTra,
-                r.soNgayQuaHan,
-                ReportController.formatMoney(r.tienPhat)
+                r.soNgayQuaHan, ReportController.formatMoney(r.tienPhat)
             });
         }
-
         JTable table = makeStyledTable(model);
         table.getColumnModel().getColumn(5).setCellRenderer(new DefaultTableCellRenderer() {
             @Override public Component getTableCellRendererComponent(
@@ -658,8 +702,13 @@ public class ReportPanel extends JPanel {
             }
         });
 
-        root.add(kpiRow,                  BorderLayout.NORTH);
-        root.add(styledScrollPane(table), BorderLayout.CENTER);
+        JPanel body = new JPanel(new BorderLayout(0, 12));
+        body.setBackground(BG_DARK);
+        body.add(warnCard,            BorderLayout.NORTH);
+        body.add(styledScrollPane(table), BorderLayout.CENTER);
+
+        root.add(kpiRow, BorderLayout.NORTH);
+        root.add(body,   BorderLayout.CENTER);
         return root;
     }
 
