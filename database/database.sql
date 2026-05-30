@@ -25,7 +25,8 @@ CREATE TABLE NHANVIEN (
     SDT        VARCHAR(15),
     NgaySinh   DATE,
     CCCD       VARCHAR(20) UNIQUE,
-    NgayVaoLam DATE DEFAULT GETDATE()
+    NgayVaoLam DATE DEFAULT GETDATE(),
+    IsDeleted BIT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE USERS (
@@ -43,7 +44,8 @@ CREATE TABLE KHACHHANG (
     CCCD        VARCHAR(20),
     Email       VARCHAR(100),
     DiaChi      NVARCHAR(200),
-    DiemTichLuy INT DEFAULT 0
+    DiemTichLuy INT DEFAULT 0,
+    IsDeleted BIT NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX UQ_KHACHHANG_SDT
 ON KHACHHANG (SDT)
@@ -55,7 +57,8 @@ CREATE TABLE GAME (
     TheLoai NVARCHAR(50),
     NenTang NVARCHAR(50),
     GhiChu  NVARCHAR(500),
-    HinhAnh VARCHAR(255)
+    HinhAnh VARCHAR(255),
+    IsDeleted BIT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE GAME_CHITIET (
@@ -75,7 +78,8 @@ CREATE TABLE SANPHAM (
     MaSP        INT IDENTITY(1,1) PRIMARY KEY,
     MaGame      INT,
     GiaBan      DECIMAL(15,2),
-    GiaThueNgay DECIMAL(15,2)
+    GiaThueNgay DECIMAL(15,2),
+    IsDeleted BIT NOT NULL DEFAULT 0
 );
 
 -- TrangThai: SanSang | DangThue | DaBan | Hong
@@ -83,14 +87,16 @@ CREATE TABLE CD (
     MaCD      INT IDENTITY(1,1) PRIMARY KEY,
     MaSP      INT,
     TinhTrang NVARCHAR(50),
-    TrangThai NVARCHAR(20) DEFAULT N'SanSang'
+    TrangThai NVARCHAR(20) DEFAULT N'SanSang',
+    IsDeleted BIT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE ROM (
     MaSP       INT PRIMARY KEY,
     DungLuong  NVARCHAR(20),
     LinkLuuTru VARCHAR(500),
-    SoLuotBan  INT DEFAULT 0
+    SoLuotBan  INT DEFAULT 0,
+    IsDeleted BIT NOT NULL DEFAULT 0
 );
 
 -- TrangThai: ChuaThanhToan | DaThanhToan

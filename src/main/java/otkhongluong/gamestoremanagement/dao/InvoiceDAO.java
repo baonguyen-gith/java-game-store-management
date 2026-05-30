@@ -230,9 +230,10 @@ public class InvoiceDAO {
      ===================================================== */
     public Invoice getHoaDonById(int maHD) {
         String sql =
-            "SELECT hd.*, kh.HoTen, kh.SDT " +
+            "SELECT hd.*, kh.HoTen, kh.SDT, nv.HoTen AS TenNV " +
             "FROM HOADON hd " +
             "LEFT JOIN KHACHHANG kh ON hd.MaKH = kh.MaKH " +
+            "LEFT JOIN NHANVIEN  nv ON hd.MaNV  = nv.MaNV  " +
             "WHERE hd.MaHD=?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -505,9 +506,13 @@ public class InvoiceDAO {
         if (ts != null) hd.setNgayLap(ts.toLocalDateTime());
         hd.setTongTien(rs.getDouble("TongTien"));
         hd.setTrangThai(rs.getString("TrangThai"));
-        // THÊM:
         hd.setTenKhachHang(rs.getString("HoTen"));
         hd.setSoDienThoai(rs.getString("SDT"));
+        // Thông tin nhân viên
+        try { hd.setTenNhanVien(rs.getString("TenNV")); } catch (SQLException ignored) {}
+        // Điểm giảm — cột có thể NULL nếu HĐ cũ không lưu
+        try { hd.setDiemSuDung(rs.getInt("DiemSuDung")); } catch (SQLException ignored) {}
+        try { hd.setTienGiam(rs.getDouble("TienGiam"));  } catch (SQLException ignored) {}
         return hd;
     }
 

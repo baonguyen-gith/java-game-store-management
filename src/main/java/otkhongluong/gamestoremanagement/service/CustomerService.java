@@ -30,23 +30,21 @@ public class CustomerService {
 
     // ================= ADD =================
     public boolean addKhachHang(Customer kh) {
-    // 1. Kiểm tra dữ liệu trước khi thêm
-    validateKhachHang(kh);
-
-    // 2. Gọi DAO để chèn vào Database
-    // Sử dụng hàm insert(kh) đã có sẵn trong CustomerDAO của bạn
-    return khachHangDAO.insert(kh);
-}
+        validateKhachHang(kh, false);
+        return khachHangDAO.insert(kh);
+    }
 
     // ================= UPDATE =================
     public boolean updateKhachHang(Customer kh) {
-
-        if (kh == null || kh.getMaKH() <= 0) {
+        if (kh == null || kh.getMaKH() <= 0)
             throw new IllegalArgumentException("Khách hàng không hợp lệ");
-        }
 
-        validateKhachHang(kh);
+        // Lấy dữ liệu cũ để kiểm tra CCCD
+        Customer existing = khachHangDAO.findById(kh.getMaKH());
+        if (existing == null)
+            throw new IllegalArgumentException("Không tìm thấy khách hàng");
 
+        validateKhachHang(kh, existing.getCccd() != null && !existing.getCccd().isBlank());
         return khachHangDAO.update(kh);
     }
 
@@ -61,27 +59,29 @@ public class CustomerService {
     }
 
     // ================= VALIDATION =================
-    private void validateKhachHang(Customer kh) {
-
-        if (kh == null) {
+    private void validateKhachHang(Customer kh, boolean cccdRequired) {
+        if (kh == null)
             throw new IllegalArgumentException("Khách hàng không được null");
-        }
 
         ValidationService.validateNotEmpty(kh.getHoTen(), "Họ tên");
-
         ValidationService.validateNotEmpty(kh.getSdt(), "Số điện thoại");
         ValidationService.validatePhone(kh.getSdt());
 
-        ValidationService.validateNotEmpty(kh.getCccd(), "CCCD");
+        // CCCD: bắt buộc nếu trước đó đã có
+        if (cccdRequired) {
+            if (kh.getCccd() == null || kh.getCccd().isBlank())
+                throw new IllegalArgumentException("CCCD đã được đăng ký trước đó, không được để trống");
+        } else {
+            if (kh.getCccd() == null) kh.setCccd("");
+        }
 
-        if (kh.getEmail() != null && !kh.getEmail().isEmpty()) {
+        if (kh.getEmail() != null && !kh.getEmail().isBlank())
             ValidationService.validateEmail(kh.getEmail());
-        }
 
-        ValidationService.validateNotEmpty(kh.getDiaChi(), "Địa chỉ");
-
-        if (kh.getDiemTichLuy() < 0) {
+        if (kh.getDiemTichLuy() < 0)
             throw new IllegalArgumentException("Điểm tích lũy không hợp lệ");
-        }
+
+        if (kh.getDiaChi() == null) kh.setDiaChi("");
+        if (kh.getEmail()  == null) kh.setEmail("");
     }
 }

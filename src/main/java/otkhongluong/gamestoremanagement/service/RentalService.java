@@ -294,8 +294,7 @@ public class RentalService {
                     }
 
                     // Tính tiền gia hạn & phạt đã đóng (chỉ khi đã trả)
-                    if (data.daTra && data.tienPhatDB > 0
-                            && data.ngayThue != null && data.ngayTraDK != null) {
+                    if (data.tienPhatDB > 0 && data.ngayThue != null && data.ngayTraDK != null) {
                         long soNgayTong = ChronoUnit.DAYS.between(
                             data.ngayThue.toLocalDateTime().toLocalDate(),
                             data.ngayTraDK.toLocalDateTime().toLocalDate());
@@ -310,18 +309,11 @@ public class RentalService {
                         LocalDateTime homNay = LocalDate.now().atStartOfDay();
 
                         if (homNay.isAfter(ngayDK)) {
-                            // [C] Đang quá hạn mới: phạt mới + cộng phạt cũ từ DB
                             long ngayTre = ChronoUnit.DAYS.between(
                                 ngayDK.toLocalDate(), homNay.toLocalDate());
                             if (ngayTre <= 0) ngayTre = 1;
-                            data.phatTreTamTinh = ngayTre * data.giaThueNgayHT * 1.5
-                                                  + data.tienPhatDB;
-                        } else if (data.tienPhatDB > 0) {
-                            // [B] Còn hạn nhưng đã có phạt cũ từ lần gia hạn trước
-                            // Hiển thị lại tienPhatDB để không bị "mất" khỏi màn hình
-                            data.phatTreTamTinh = data.tienPhatDB;
+                            data.phatTreTamTinh = ngayTre * data.giaThueNgayHT * 1.5;
                         }
-                        // [A] Còn hạn, chưa từng quá hạn: phatTreTamTinh = 0 (mặc định)
                     }
                 }
             }
@@ -397,7 +389,9 @@ public class RentalService {
         if (rental == null) throw new RuntimeException("Không tìm thấy phiếu thuê #" + maPT);
 
         List<String[]> items = new ArrayList<>();
+        double tienThueBanDau = 0;
         for (CTPhieuThue ct : rental.getDanhSachChiTiet()) {
+            tienThueBanDau += ct.getDonGiaThue();
             items.add(new String[]{
                 "CD" + String.format("%04d", ct.getMaCD()),
                 ct.getTenGame(),
@@ -406,10 +400,34 @@ public class RentalService {
             });
         }
 
-        double tongTienThue = rental.getDanhSachChiTiet().stream()
-            .mapToDouble(CTPhieuThue::getDonGiaThue).sum();
+        // Điểm đã trừ khi tạo phiếu (từ DIEM_LICHSU)
+        int    diemSuDung   = loadDiemDaTru(maPT);
+        double tienGiamDiem = diemSuDung * (double) DIEM_TO_VND;
 
-        return new Object[]{rental, items, tongTienThue};
+        // Phân tách TienPhat = tienGiaHan + tienPhatTreHan + tienHuHong
+        // Quy ước lưu trong DB: TienPhat = phatTre + phiGiaHan (xem extendRental)
+        // Khi trả CD: tienPhatChot = pt.getTienPhat() + chiPhiHuHong (xem returnCDFull)
+        // → Không thể tách chính xác từng khoản nếu không có cột riêng.
+        //   Cách an toàn nhất: load lại loadRentDetail để lấy tienGiaHan + treHanDaDong đã tính.
+        RentDetailData detail = loadRentDetail(maPT);
+        double tienGiaHan      = 0;
+        double tienPhatTreHan  = 0;
+        double tienHuHong      = 0;
+        if (detail != null) {
+            tienGiaHan     = detail.tienGiaHan;
+            tienPhatTreHan = detail.treHanDaDong;
+            // tienHuHong = phần còn lại của TienPhat chưa được phân loại
+            double tongPhat = rental.getTienPhat();
+            tienHuHong = Math.max(0, tongPhat - tienGiaHan - tienPhatTreHan);
+        }
+
+        // Trả Object[]:
+        // [0] RentalOrder  [1] items  [2] tienThueBanDau
+        // [3] diemSuDung   [4] tienGiamDiem
+        // [5] tienGiaHan   [6] tienPhatTreHan  [7] tienHuHong
+        return new Object[]{rental, items, tienThueBanDau,
+                            (double) diemSuDung, tienGiamDiem,
+                            tienGiaHan, tienPhatTreHan, tienHuHong};
     }
 
     private String nvl(String s)              { return s == null ? "" : s; }

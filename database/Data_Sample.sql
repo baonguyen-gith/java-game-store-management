@@ -78,11 +78,11 @@ SET IDENTITY_INSERT NHANVIEN OFF;
 -- ============================================================
 SET IDENTITY_INSERT USERS ON;
 INSERT INTO USERS (MaUser, Username, Password, MaRole, MaNV) VALUES
-(1, 'admin',     '$2a$10$slYQmyNdgTY18LMoDIs11OHQEBsxGBsS3bT.T5ZZNGPDiPDy6JbTu', 1, 1),
-(2, 'quanly',    '$2a$10$slYQmyNdgTY18LMoDIs11OHQEBsxGBsS3bT.T5ZZNGPDiPDy6JbTu', 2, 2),
-(3, 'nhanvien1', '$2a$10$slYQmyNdgTY18LMoDIs11OHQEBsxGBsS3bT.T5ZZNGPDiPDy6JbTu', 3, 3),
-(4, 'nhanvien2', '$2a$10$slYQmyNdgTY18LMoDIs11OHQEBsxGBsS3bT.T5ZZNGPDiPDy6JbTu', 3, 4),
-(5, 'nhanvien3', '$2a$10$slYQmyNdgTY18LMoDIs11OHQEBsxGBsS3bT.T5ZZNGPDiPDy6JbTu', 3, 5);
+(1, 'admin',     'Password@123', 1, 1),
+(2, 'quanly',    'Password@123', 2, 2),
+(3, 'nhanvien1', 'Password@123', 3, 3),
+(4, 'nhanvien2', 'Password@123', 3, 4),
+(5, 'nhanvien3', 'Password@123', 3, 5);
 SET IDENTITY_INSERT USERS OFF;
 
 -- ============================================================

@@ -4,6 +4,7 @@ import otkhongluong.gamestoremanagement.util.DBConnection;
 import otkhongluong.gamestoremanagement.util.FormatUtil;
 
 import java.sql.*;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -489,121 +490,151 @@ public class ReportDAO {
         return years;
     }
     
-    public <T> T runInSerializable(SerializableTask<T> task) {
-        Connection conn = null;
-        try {
-            conn = DBConnection.getConnection();
-            // Nâng isolation level lên SERIALIZABLE chỉ cho connection này
-            conn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-            conn.setAutoCommit(false);
-            T result = task.run(conn);
-            conn.commit();
-            return result;
-        } catch (Exception e) {
-            if (conn != null) try { conn.rollback(); } catch (Exception ignored) {}
-            e.printStackTrace();
-            return null;
-        } finally {
-            if (conn != null) try {
-                // Trả về READ_COMMITTED (mặc định) trước khi đóng
-                conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
-                conn.setAutoCommit(true);
-                conn.close();
-            } catch (Exception ignored) {}
-        }
-    }
+    /**
+     * Truy vấn doanh thu tháng để xuất Excel.
+     *
+     * Nhận snapshotTime = thời điểm quản lý bấm "Xuất Excel".
+     * Tất cả filter đều dùng NgayLap < snapshotTime và NgayThue < snapshotTime
+     * → bất kỳ hóa đơn/phiếu thuê nào được tạo SAU thời điểm đó đều bị loại,
+     *   hoàn toàn không phụ thuộc vào isolation level hay DB config.
+     *
+     * Schema trả về: { String ngay "dd/MM/yyyy", int soHD, double doanhThuBan, double tienThue }
+     */
+    public List<Object[]> getMonthlyRowsForExport(int month, int year, Timestamp snapshotTime) {
+        String sql =
+            "WITH ban AS ( " +
+            "    SELECT DAY(NgayLap) AS D, COUNT(*) AS SoHD, " +
+            "           ISNULL(SUM(TongTien), 0) AS DT " +
+            "    FROM HOADON " +
+            "    WHERE MONTH(NgayLap)=? AND YEAR(NgayLap)=? " +
+            "      AND TrangThai='DaThanhToan' " +
+            "      AND NgayLap < ? " +
+            "    GROUP BY DAY(NgayLap) " +
+            "), thue AS ( " +
+            "    SELECT DAY(pt.NgayThue) AS D, " +
+            "           ISNULL(SUM(ct.DonGiaThue),0) + ISNULL(SUM(pt.TienPhat),0) AS TT " +
+            "    FROM PHIEUTHUE pt JOIN CTPHIEUTHUE ct ON pt.MaPT = ct.MaPT " +
+            "    WHERE MONTH(pt.NgayThue)=? AND YEAR(pt.NgayThue)=? " +
+            "      AND pt.TrangThai='DaTra' " +
+            "      AND pt.NgayThue < ? " +
+            "    GROUP BY DAY(pt.NgayThue) " +
+            ") " +
+            "SELECT COALESCE(b.D, t.D) AS D, " +
+            "       ISNULL(b.SoHD, 0)  AS SoHD, " +
+            "       ISNULL(b.DT, 0)    AS DT, " +
+            "       ISNULL(t.TT, 0)    AS TT " +
+            "FROM ban b FULL OUTER JOIN thue t ON b.D = t.D " +
+            "WHERE ISNULL(b.DT,0) + ISNULL(t.TT,0) > 0 " +
+            "ORDER BY D";
 
-    // Functional interface cho task
-    @FunctionalInterface
-    public interface SerializableTask<T> {
-        T run(Connection conn) throws SQLException;
-    }
-    
-    public List<Object[]> getMonthlyRowsWithConn(Connection conn, int month, int year)
-            throws SQLException {
-         List<Object[]> list = new ArrayList<>();
-         String sql =
-             "SELECT g.TenGame, COUNT(DISTINCT hd.MaHD) AS SoHD, " +
-             "       ISNULL(SUM(ct.SoLuong * ct.DonGia), 0) AS DoanhThuBan, " +
-             "       ISNULL(rent_agg.TongThue, 0)            AS TienThue " +
-             "FROM GAME g " +
-             "LEFT JOIN SANPHAM sp ON sp.MaGame = g.MaGame " +
-             "LEFT JOIN CTHOADON ct ON ct.MaSP = sp.MaSP " +
-             "LEFT JOIN HOADON hd ON hd.MaHD = ct.MaHD " +
-             "    AND MONTH(hd.NgayLap) = ? AND YEAR(hd.NgayLap) = ? " +
-             "    AND hd.TrangThai = N'DaThanhToan' " +
-             "LEFT JOIN ( " +
-             "    SELECT cd2.MaSP, SUM(ptc2.DonGiaThue) AS TongThue " +
-             "    FROM CTPHIEUTHUE ptc2 " +
-             "    JOIN CD cd2 ON cd2.MaCD = ptc2.MaCD " +
-             "    JOIN PHIEUTHUE pt2 ON pt2.MaPT = ptc2.MaPT " +
-             "        AND MONTH(pt2.NgayThue) = ? AND YEAR(pt2.NgayThue) = ? " +
-             "        AND pt2.TrangThai = N'DaTra' " +
-             "    GROUP BY cd2.MaSP " +
-             ") rent_agg ON rent_agg.MaSP = sp.MaSP " +
-             "GROUP BY g.MaGame, g.TenGame, rent_agg.TongThue " +
-             "ORDER BY DoanhThuBan DESC";
-
-         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-             ps.setInt(1, month); ps.setInt(2, year);   // cho HOADON
-             ps.setInt(3, month); ps.setInt(4, year);   // cho subquery thuê
-             try (ResultSet rs = ps.executeQuery()) {
-                 while (rs.next())
-                     list.add(new Object[]{
-                         rs.getString(1), rs.getInt(2),
-                         rs.getDouble(3), rs.getDouble(4)});
-             }
-         }
-         return list;
-     }
-    
-    public List<Object[]> getYearlyRowsWithConn(Connection conn, int year)
-            throws SQLException {
-        double[] banArr  = new double[12];
-        double[] thueArr = new double[12];
-        int[]    hdArr   = new int[12];
-        int[]    ptArr   = new int[12];
-
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT MONTH(NgayLap) as M, COUNT(*) as SoHD, " +
-                "ISNULL(SUM(TongTien),0) as DT " +
-                "FROM HOADON WHERE YEAR(NgayLap)=? AND TrangThai='DaThanhToan' " +
-                "GROUP BY MONTH(NgayLap)")) {
-            ps.setInt(1, year);
+        List<Object[]> rows = new ArrayList<>();
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, month); ps.setInt(2, year); ps.setTimestamp(3, snapshotTime); // ban
+            ps.setInt(4, month); ps.setInt(5, year); ps.setTimestamp(6, snapshotTime); // thue
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    int m = rs.getInt("M") - 1;
-                    banArr[m] = rs.getDouble("DT");
-                    hdArr[m]  = rs.getInt("SoHD");
+                    int d = rs.getInt("D");
+                    rows.add(new Object[]{
+                        String.format("%02d/%02d/%04d", d, month, year),
+                        rs.getInt("SoHD"), rs.getDouble("DT"), rs.getDouble("TT")
+                    });
                 }
             }
-        }
+        } catch (Exception ex) { ex.printStackTrace(); }
+        return rows;
+    }
 
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT MONTH(pt.NgayThue) as M, COUNT(DISTINCT pt.MaPT) as SoPT, " +
-                "ISNULL(SUM(ct.DonGiaThue),0) + ISNULL(SUM(pt.TienPhat),0) as TT " +
-                "FROM PHIEUTHUE pt JOIN CTPHIEUTHUE ct ON pt.MaPT=ct.MaPT " +
-                "WHERE YEAR(pt.NgayThue)=? AND pt.TrangThai='DaTra' " +
-                "GROUP BY MONTH(pt.NgayThue)")) {
-            ps.setInt(1, year);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    int m = rs.getInt("M") - 1;
-                    thueArr[m] = rs.getDouble("TT");
-                    ptArr[m]   = rs.getInt("SoPT");
-                }
-            }
-        }
+    /**
+     * Truy vấn doanh thu năm để xuất Excel.
+     *
+     * Cùng cơ chế snapshot timestamp với getMonthlyRowsForExport.
+     *
+     * Schema trả về: { String tenThang, int soHD, double doanhThuBan, int soPT, double tienThue }
+     */
+    public List<Object[]> getYearlyRowsForExport(int year, Timestamp snapshotTime) {
+        String sql =
+            "WITH ban AS ( " +
+            "    SELECT MONTH(NgayLap) AS M, COUNT(*) AS SoHD, " +
+            "           ISNULL(SUM(TongTien), 0) AS DT " +
+            "    FROM HOADON " +
+            "    WHERE YEAR(NgayLap)=? AND TrangThai='DaThanhToan' " +
+            "      AND NgayLap < ? " +
+            "    GROUP BY MONTH(NgayLap) " +
+            "), thue AS ( " +
+            "    SELECT MONTH(pt.NgayThue) AS M, COUNT(DISTINCT pt.MaPT) AS SoPT, " +
+            "           ISNULL(SUM(ct.DonGiaThue),0) + ISNULL(SUM(pt.TienPhat),0) AS TT " +
+            "    FROM PHIEUTHUE pt JOIN CTPHIEUTHUE ct ON pt.MaPT = ct.MaPT " +
+            "    WHERE YEAR(pt.NgayThue)=? AND pt.TrangThai='DaTra' " +
+            "      AND pt.NgayThue < ? " +
+            "    GROUP BY MONTH(pt.NgayThue) " +
+            ") " +
+            "SELECT COALESCE(b.M, t.M) AS M, " +
+            "       ISNULL(b.SoHD, 0)  AS SoHD, " +
+            "       ISNULL(b.DT,   0)  AS DT, " +
+            "       ISNULL(t.SoPT, 0)  AS SoPT, " +
+            "       ISNULL(t.TT,   0)  AS TT " +
+            "FROM ban b FULL OUTER JOIN thue t ON b.M = t.M " +
+            "WHERE ISNULL(b.DT,0) + ISNULL(t.TT,0) > 0 " +
+            "ORDER BY M";
 
-        String[] ten = {
+        String[] tenThang = {
             "Tháng 1","Tháng 2","Tháng 3","Tháng 4","Tháng 5","Tháng 6",
             "Tháng 7","Tháng 8","Tháng 9","Tháng 10","Tháng 11","Tháng 12"
         };
+
         List<Object[]> rows = new ArrayList<>();
-        for (int i = 0; i < 12; i++) {
-            if (banArr[i] == 0 && thueArr[i] == 0) continue;
-            rows.add(new Object[]{ten[i], hdArr[i], banArr[i], ptArr[i], thueArr[i]});
-        }
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, year); ps.setTimestamp(2, snapshotTime); // ban
+            ps.setInt(3, year); ps.setTimestamp(4, snapshotTime); // thue
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int m = rs.getInt("M");
+                    rows.add(new Object[]{
+                        tenThang[m - 1],
+                        rs.getInt("SoHD"), rs.getDouble("DT"),
+                        rs.getInt("SoPT"), rs.getDouble("TT")
+                    });
+                }
+            }
+        } catch (Exception ex) { ex.printStackTrace(); }
+        return rows;
+    }
+    
+    public List<Object[]> getVIPCustomers(int year) {
+        List<Object[]> rows = new ArrayList<>();
+        String sql =
+            "SELECT kh.HoTen, kh.SDT, kh.Email, kh.DiemTichLuy, " +
+            "ISNULL(b.TongMua,0) as TongMua, ISNULL(r.TongThue,0) as TongThue " +
+            "FROM KHACHHANG kh " +
+            "LEFT JOIN (" +
+            "    SELECT MaKH, SUM(TongTien) as TongMua FROM HOADON " +
+            "    WHERE TrangThai='DaThanhToan' AND YEAR(NgayLap)=? GROUP BY MaKH" +
+            ") b ON kh.MaKH = b.MaKH " +
+            "LEFT JOIN (" +
+            "    SELECT pt.MaKH, " +
+            "    ISNULL(SUM(ct.DonGiaThue),0) + ISNULL(SUM(pt.TienPhat),0) as TongThue " +
+            "    FROM PHIEUTHUE pt JOIN CTPHIEUTHUE ct ON pt.MaPT = ct.MaPT " +
+            "    WHERE pt.TrangThai='DaTra' AND YEAR(pt.NgayThue)=? GROUP BY pt.MaKH" +
+            ") r ON kh.MaKH = r.MaKH " +
+            "WHERE kh.HoTen IS NOT NULL " +
+            "AND (ISNULL(b.TongMua,0) + ISNULL(r.TongThue,0)) > 0 " +
+            "ORDER BY (ISNULL(b.TongMua,0) + ISNULL(r.TongThue,0)) DESC";
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, year);
+            ps.setInt(2, year);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    rows.add(new Object[]{
+                        rs.getString("HoTen"), rs.getString("SDT"), rs.getString("Email"),
+                        rs.getInt("DiemTichLuy"), rs.getDouble("TongMua"), rs.getDouble("TongThue")
+                    });
+                }
+            }
+        } catch (Exception ex) { ex.printStackTrace(); }
         return rows;
     }
 }

@@ -3,7 +3,8 @@ package otkhongluong.gamestoremanagement.view.panel;
 import otkhongluong.gamestoremanagement.util.UIStyle;
 import otkhongluong.gamestoremanagement.controller.ReportController;
 import otkhongluong.gamestoremanagement.util.IconUtils;
-
+import java.io.IOException;
+import java.util.Collections;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
@@ -280,32 +281,6 @@ public class ReportPanel extends JPanel {
         filterBar.add(makeFilterLabel("Năm:"));   filterBar.add(cboYear);
         filterBar.add(Box.createHorizontalStrut(16)); // ← thêm khoảng cách
 
-        // ── THÊM NÚT XUẤT EXCEL ──────────────────────────────────────
-        JButton btnExport = makeExportButton("Xuất Excel");
-        btnExport.addActionListener(e -> {
-            int m = (Integer) cboMonth.getSelectedItem();
-            int y = cboYear.getSelectedItem() != null
-                ? (Integer) cboYear.getSelectedItem()
-                : LocalDate.now().getYear();
-
-            String path = otkhongluong.gamestoremanagement.util.ExportUtil
-                .chooseFilePath(this, "xlsx", "Excel Files");
-            if (path == null) return;
-
-            try {
-                ctrl.exportMonthlyExcel(m, y, path);
-                JOptionPane.showMessageDialog(this,
-                    "Xuất Excel thành công!\n" + path,
-                    "OK", JOptionPane.INFORMATION_MESSAGE);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                JOptionPane.showMessageDialog(this,
-                    "Lỗi: " + ex.getMessage(),
-                    "Lỗi", JOptionPane.ERROR_MESSAGE);
-            }
-        });
-        filterBar.add(btnExport);
-        
         JLabel chartTitle = new JLabel();
         chartTitle.setFont(new Font("Segoe UI", Font.BOLD, 14));
         chartTitle.setForeground(TEXT_WHITE);
@@ -326,6 +301,9 @@ public class ReportPanel extends JPanel {
         JTable table = makeStyledTable(model);
         JScrollPane sp = styledScrollPane(table);
 
+        // Cache dữ liệu đang hiển thị — xuất Excel sẽ dùng list này, không query lại DB
+        List<ReportController.MonthlyRow>[] monthlyCache = new List[]{java.util.Collections.emptyList()};
+
         // ── Load dữ liệu bảng qua Controller ──
         Runnable load = () -> {
             int m = (Integer) cboMonth.getSelectedItem();
@@ -334,7 +312,9 @@ public class ReportPanel extends JPanel {
             chartPanel.setMonthYear(m, y);
             chartPanel.repaint();
             model.setRowCount(0);
-            for (ReportController.MonthlyRow r : ctrl.getMonthlyDetail(m, y)) {
+            List<ReportController.MonthlyRow> rows = ctrl.getMonthlyDetail(m, y);
+            monthlyCache[0] = rows; // chốt dữ liệu tại thời điểm load
+            for (ReportController.MonthlyRow r : rows) {
                 model.addRow(new Object[]{
                     r.ngay,
                     r.soHD,
@@ -349,6 +329,32 @@ public class ReportPanel extends JPanel {
         cboYear.addActionListener(e -> load.run());
         chartTitle.setText("Doanh thu từng ngày — Tháng " + nowMonth + "/" + nowYear);
         load.run();
+
+        // ── XUẤT EXCEL — dùng cache, không query lại DB ──────────────
+        JButton btnExport = makeExportButton("Xuất Excel");
+        btnExport.addActionListener(e -> {
+            int m = (Integer) cboMonth.getSelectedItem();
+            int y = cboYear.getSelectedItem() != null
+                ? (Integer) cboYear.getSelectedItem()
+                : LocalDate.now().getYear();
+
+            String path = otkhongluong.gamestoremanagement.util.ExportUtil
+                .chooseFilePath(this, "xlsx", "Excel Files");
+            if (path == null) return;
+
+            try {
+                ctrl.exportMonthlyExcelFromCache(m, y, monthlyCache[0], path);
+                JOptionPane.showMessageDialog(this,
+                    "Xuất Excel thành công!\n" + path,
+                    "OK", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this,
+                    "Lỗi: " + ex.getMessage(),
+                    "Lỗi", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+        filterBar.add(btnExport);
 
         JPanel body = new JPanel(new BorderLayout(0, 16));
         body.setBackground(BG_DARK);
@@ -367,7 +373,7 @@ public class ReportPanel extends JPanel {
         JPanel root = new JPanel(new BorderLayout(0, 16));
         root.setBackground(BG_DARK);
 
-        // ── Lấy danh sách năm qua Controller (đã gom bán + thuê, đã sort) ──
+        // ── Lấy danh sách năm qua Controller ──
         List<Integer> years = ctrl.getAvailableYears();
 
         JPanel filterBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 4));
@@ -381,16 +387,92 @@ public class ReportPanel extends JPanel {
         JLabel lblBan  = makeSummaryBadge("Tổng bán: —",  COLOR_REVENUE);
         JLabel lblThue = makeSummaryBadge("Tổng thuê: —", COLOR_RENT);
         JLabel lblAll  = makeSummaryBadge("Tổng cộng: —", ACCENT_LIGHT);
-        
+
         filterBar.add(makeFilterLabel("Năm:"));
         filterBar.add(cboYear);
         filterBar.add(Box.createHorizontalStrut(16));
         filterBar.add(lblBan);
         filterBar.add(lblThue);
         filterBar.add(lblAll);
-        filterBar.add(Box.createHorizontalStrut(16)); // ← thêm khoảng cách
+        filterBar.add(Box.createHorizontalStrut(16));
 
-        // ── THÊM NÚT XUẤT EXCEL ──────────────────────────────────────
+        // ── Khai báo biến cục bộ (đây là phần bị thiếu) ──────────
+        int initYear = years.isEmpty() ? LocalDate.now().getYear() : years.get(0);
+
+        // Chart title label
+        JLabel chartTitle = new JLabel("Doanh thu 12 tháng — Năm " + initYear);
+        chartTitle.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        chartTitle.setForeground(TEXT_WHITE);
+
+        // Chart panel
+        YearlyBarChart chartPanel = new YearlyBarChart(initYear);
+        chartPanel.setPreferredSize(new Dimension(0, 260));
+
+        // Table model + table
+        String[] cols = {"Tháng", "Số HĐ", "DT Bán (VNĐ)", "Số PT", "DT Thuê (VNĐ)", "Tổng tháng"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+        JTable table = makeStyledTable(model);
+        JScrollPane sp = styledScrollPane(table);
+
+        // Chart card
+        JPanel chartCard = makeCard();
+        chartCard.setLayout(new BorderLayout(0, 8));
+        chartCard.setBorder(new EmptyBorder(16, 20, 16, 20));
+        chartCard.add(chartTitle, BorderLayout.NORTH);
+        chartCard.add(chartPanel, BorderLayout.CENTER);
+
+        // ── Cache dữ liệu ──
+        List<ReportController.YearlyRow>[] yearlyCache =
+            new List[]{java.util.Collections.emptyList()};
+
+        // ── Load data ──
+        Runnable load = () -> {
+            int y = cboYear.getSelectedItem() != null
+                ? (Integer) cboYear.getSelectedItem()
+                : LocalDate.now().getYear();
+
+            chartTitle.setText("Doanh thu 12 tháng — Năm " + y);
+
+            double[][] chartData = ctrl.getYearlyChartData(y);
+            chartPanel.setYear(y);
+            chartPanel.setData(chartData[0], chartData[1]);
+            chartPanel.repaint();
+
+            model.setRowCount(0);
+            List<ReportController.YearlyRow> rows = ctrl.getYearlyDetail(y);
+            yearlyCache[0] = rows;
+
+            for (ReportController.YearlyRow r : rows) {
+                model.addRow(new Object[]{
+                    r.tenThang,
+                    r.soHD,
+                    ReportController.formatMoney(r.doanhThuBan),
+                    r.soPT,
+                    ReportController.formatMoney(r.tienThue),
+                    ReportController.formatMoney(r.tongThang())
+                });
+            }
+
+            ReportController.YearlySummary s = ctrl.getYearlySummary(y);
+            model.addRow(new Object[]{
+                "TỔNG NĂM " + y, "",
+                ReportController.formatMoney(s.tongBan),
+                "",
+                ReportController.formatMoney(s.tongThue),
+                ReportController.formatMoney(s.tongCong())
+            });
+
+            lblBan.setText("  Bán: "   + ReportController.formatMoney(s.tongBan)    + "  ");
+            lblThue.setText("  Thuê: " + ReportController.formatMoney(s.tongThue)   + "  ");
+            lblAll.setText("  Tổng: "  + ReportController.formatMoney(s.tongCong()) + "  ");
+        };
+
+        cboYear.addActionListener(e -> load.run());
+        load.run(); // load lần đầu
+
+        // ── Nút xuất Excel ──
         JButton btnExport = makeExportButton("Xuất Excel");
         btnExport.addActionListener(e -> {
             int y = cboYear.getSelectedItem() != null
@@ -402,100 +484,19 @@ public class ReportPanel extends JPanel {
             if (path == null) return;
 
             try {
-                ctrl.exportYearlyExcel(y, path);
+                ctrl.exportYearlyExcelFromCache(y, yearlyCache[0], path);
                 JOptionPane.showMessageDialog(this,
                     "Xuất Excel thành công!\n" + path,
                     "OK", JOptionPane.INFORMATION_MESSAGE);
-            } catch (java.io.IOException ex) {
+            } catch (IOException ex) {          // ← sửa: bỏ java.io. vì đã import
                 JOptionPane.showMessageDialog(this,
                     "Lỗi: " + ex.getMessage(),
                     "Lỗi", JOptionPane.ERROR_MESSAGE);
             }
         });
         filterBar.add(btnExport);
-        
-        YearlyBarChart chartPanel = new YearlyBarChart(
-            years.isEmpty() ? LocalDate.now().getYear() : years.get(0));
-        chartPanel.setPreferredSize(new Dimension(0, 260));
 
-        JPanel chartCard = makeCard();
-        chartCard.setLayout(new BorderLayout(0, 10));
-        chartCard.setBorder(new EmptyBorder(16, 20, 16, 20));
-        JLabel chartTitle = new JLabel();
-        chartTitle.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        chartTitle.setForeground(TEXT_WHITE);
-        chartCard.add(chartTitle, BorderLayout.NORTH);
-        chartCard.add(chartPanel, BorderLayout.CENTER);
-
-        String[] cols = {"Tháng", "Số HĐ bán", "Doanh thu bán", "Số PT thuê", "Thu thuê (hoàn thành)", "Tổng tháng"};
-        DefaultTableModel model = new DefaultTableModel(cols, 0) {
-            public boolean isCellEditable(int r, int c) { return false; }
-        };
-        JTable table = new JTable(model) {
-            @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
-                Component c = super.prepareRenderer(r, row, col);
-                if (!isRowSelected(row)) {
-                    c.setBackground(row % 2 == 0 ? TBL_ROW_A : TBL_ROW_B);
-                    c.setForeground(TEXT_WHITE);
-                    c.setFont(FONT_CELL);
-                    String first = model.getValueAt(row, 0).toString();
-                    if (first.startsWith("TỔNG")) {
-                        c.setFont(new Font("Segoe UI", Font.BOLD, 13));
-                        c.setForeground(ACCENT_LIGHT);
-                    }
-                    if (col == 5 && !first.startsWith("TỔNG")) {
-                        c.setFont(new Font("Segoe UI", Font.BOLD, 13));
-                        c.setForeground(ACCENT_LIGHT);
-                    }
-                } else {
-                    c.setBackground(ACCENT);
-                    c.setForeground(Color.WHITE);
-                }
-                return c;
-            }
-        };
-        styleTable(table);
-        JScrollPane sp = styledScrollPane(table);
-
-        // ── Load dữ liệu qua Controller ──
-        Runnable load = () -> {
-            int y = cboYear.getSelectedItem() != null
-                ? (Integer) cboYear.getSelectedItem()
-                : LocalDate.now().getYear();
-            chartTitle.setText("Doanh thu 12 tháng — Năm " + y);
-
-            double[][] chartData = ctrl.getYearlyChartData(y);
-            chartPanel.setYear(y);
-            chartPanel.setData(chartData[0], chartData[1]);
-            chartPanel.repaint();
-
-            model.setRowCount(0);
-            for (ReportController.YearlyRow r : ctrl.getYearlyDetail(y)) {
-                model.addRow(new Object[]{
-                    r.tenThang,
-                    r.soHD,
-                    ReportController.formatMoney(r.doanhThuBan),
-                    r.soPT,
-                    ReportController.formatMoney(r.tienThue),
-                    ReportController.formatMoney(r.tongThang())
-                });
-            }
-            ReportController.YearlySummary s = ctrl.getYearlySummary(y);
-            model.addRow(new Object[]{
-                "TỔNG NĂM " + y, "",
-                ReportController.formatMoney(s.tongBan),
-                "",
-                ReportController.formatMoney(s.tongThue),
-                ReportController.formatMoney(s.tongCong())
-            });
-            lblBan.setText("  Bán: "   + ReportController.formatMoney(s.tongBan)    + "  ");
-            lblThue.setText("  Thuê: " + ReportController.formatMoney(s.tongThue)   + "  ");
-            lblAll.setText("  Tổng: "  + ReportController.formatMoney(s.tongCong()) + "  ");
-        };
-
-        cboYear.addActionListener(e -> load.run());
-        if (!years.isEmpty()) load.run();
-
+        // ── Layout ──
         JPanel body = new JPanel(new BorderLayout(0, 14));
         body.setBackground(BG_DARK);
         body.add(chartCard, BorderLayout.NORTH);
@@ -666,22 +667,28 @@ public class ReportPanel extends JPanel {
     // TAB 7 — KHÁCH VIP
     // ═════════════════════════════════════════════════════════════════════════
     private JPanel buildVIP() {
+        JPanel root = new JPanel(new BorderLayout(0, 16));
+        root.setBackground(BG_DARK);
+
+        // ── Filter bar ──
+        JPanel filterBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 4));
+        filterBar.setBackground(BG_DARK);
+
+        List<Integer> years = ctrl.getAvailableYears();
+        if (years.isEmpty()) years.add(LocalDate.now().getYear());
+
+        JComboBox<Integer> cboYear = makeCombo(years.toArray(new Integer[0]));
+        cboYear.setSelectedItem(years.get(0));
+
+        filterBar.add(makeFilterLabel("Năm:"));
+        filterBar.add(cboYear);
+
+        // ── Table ──
         String[] cols = {"#", "Khách hàng", "SĐT", "Email", "Điểm tích lũy",
                          "Tổng mua", "Tổng thuê (hoàn thành)", "Tổng cộng"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
-        // ── Lấy dữ liệu qua Controller ──
-        int[] idx = {1};
-        for (ReportController.VIPRow r : ctrl.getVIPCustomers()) {
-            int i = idx[0]++;
-            model.addRow(new Object[]{
-                "#" + i, r.hoTen, r.sdt, r.email, r.diemTichLuy,
-                ReportController.formatMoney(r.tongMua),
-                ReportController.formatMoney(r.tongThue),
-                ReportController.formatMoney(r.tongCong())
-            });
-        }
 
         JTable table = new JTable(model) {
             @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
@@ -710,15 +717,42 @@ public class ReportPanel extends JPanel {
         };
         styleTable(table);
 
+        // ── Load data ──
+        Runnable load = () -> {
+            int y = cboYear.getSelectedItem() != null
+                ? (Integer) cboYear.getSelectedItem()
+                : LocalDate.now().getYear();
+            model.setRowCount(0);
+            int[] idx = {1};
+            for (ReportController.VIPRow row : ctrl.getVIPCustomers(y)) {
+                int i = idx[0]++;
+                model.addRow(new Object[]{
+                    "#" + i, row.hoTen, row.sdt, row.email, row.diemTichLuy,
+                    ReportController.formatMoney(row.tongMua),
+                    ReportController.formatMoney(row.tongThue),
+                    ReportController.formatMoney(row.tongCong())
+                });
+            }
+        };
+
+        cboYear.addActionListener(e -> load.run());
+        load.run();
+
+        // ── Card ──
         JPanel card = makeCard();
         card.setLayout(new BorderLayout(0, 10));
         card.setBorder(new EmptyBorder(16, 16, 16, 16));
+
         JLabel title = new JLabel("[VIP]  Bảng xếp hạng khách hàng — Tổng chi tiêu");
         title.setFont(new Font("Segoe UI", Font.BOLD, 14));
         title.setForeground(new Color(255, 215, 0));
-        card.add(title, BorderLayout.NORTH);
+
+        card.add(title,               BorderLayout.NORTH);
         card.add(styledScrollPane(table), BorderLayout.CENTER);
-        return card;
+
+        root.add(filterBar, BorderLayout.NORTH);
+        root.add(card,      BorderLayout.CENTER);
+        return root;
     }
 
     // ═════════════════════════════════════════════════════════════════════════

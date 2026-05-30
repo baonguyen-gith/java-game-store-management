@@ -6,6 +6,8 @@ public class Product {
     private double giaBan;
     private double giaThueNgay;
     private int soLuongCD; // số lượng đĩa CD tồn kho
+    private boolean hasRom;
+    private boolean hasCd;
 
     public Product() {}
 
@@ -40,6 +42,12 @@ public class Product {
 
     public int getSoLuongCD() { return soLuongCD; }
     public void setSoLuongCD(int soLuongCD) { this.soLuongCD = soLuongCD; }
+    
+    public boolean isHasRom() { return hasRom; }
+    public void setHasRom(boolean hasRom) { this.hasRom = hasRom; }
+
+    public boolean isHasCd() { return hasCd; }
+    public void setHasCd(boolean hasCd) { this.hasCd = hasCd; }
 
     @Override
     public String toString() {

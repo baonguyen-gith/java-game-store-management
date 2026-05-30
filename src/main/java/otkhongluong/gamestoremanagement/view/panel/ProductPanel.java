@@ -197,24 +197,38 @@ public class ProductPanel extends JPanel {
     //  TABLE
     // ======================================================
     private JScrollPane buildTable() {
-        String[] cols = {"Mã SP", "Mã Game", "Giá Bán", "Giá Thuê Ngày"};
+        String[] cols = {"Mã SP", "Mã Game", "Giá Bán", "Giá Thuê Ngày", "Loại"};
         tableModel = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override public Class<?> getColumnClass(int c) { return String.class; } // tất cả String
         };
 
         table = new JTable(tableModel) {
             @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
                 if (c instanceof JLabel) {
-                    ((JLabel) c).setHorizontalAlignment(SwingConstants.LEFT);
-                    ((JLabel) c).setBorder(new EmptyBorder(0, 12, 0, 12));
+                    JLabel lbl = (JLabel) c;
+                    lbl.setBorder(new EmptyBorder(0, 12, 0, 12));
+                    lbl.setHorizontalAlignment(col >= 4 ? SwingConstants.CENTER : SwingConstants.LEFT);
+                    if (col == 4 && !isRowSelected(row)) {
+                        String val = (String) tableModel.getValueAt(
+                            table.convertRowIndexToModel(row), col);
+                        lbl.setForeground(
+                            "ROM".equals(val) ? new Color(255, 193, 80)  :   // vàng cam
+                            "CD".equals(val)  ? new Color(80, 200, 120)  :   // xanh lá
+                            "ROM + CD".equals(val) ? new Color(130, 90, 230) : // tím accent
+                                                new Color(160, 160, 160));      // xám --- 
+                        lbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
+                    } else if (col < 4) {
+                        lbl.setFont(FONT_CELL);
+                    }
                 }
-                if (isRowSelected(row)) {
+                if (!isRowSelected(row)) {
+                    c.setBackground(row % 2 == 0 ? PURPLE_ROW : PURPLE_ALT);
+                    if (col < 4) c.setForeground(new Color(40, 40, 40));
+                } else {
                     c.setBackground(ACCENT);
                     c.setForeground(Color.WHITE);
-                } else {
-                    c.setBackground(row % 2 == 0 ? PURPLE_ROW : PURPLE_ALT);
-                    c.setForeground(new Color(40, 40, 40));
                 }
                 return c;
             }
@@ -227,7 +241,6 @@ public class ProductPanel extends JPanel {
         table.setSelectionBackground(ACCENT);
         table.setSelectionForeground(Color.WHITE);
         table.setBackground(PURPLE_ALT);
-        table.setForeground(TEXT_WHITE);
 
         JTableHeader header = table.getTableHeader();
         header.setDefaultRenderer(new DefaultTableCellRenderer() {
@@ -237,7 +250,7 @@ public class ProductPanel extends JPanel {
                 lbl.setFont(FONT_HEADER);
                 lbl.setForeground(Color.WHITE);
                 lbl.setBackground(PURPLE_HEADER);
-                lbl.setHorizontalAlignment(SwingConstants.LEFT);
+                lbl.setHorizontalAlignment(c >= 4 ? SwingConstants.CENTER : SwingConstants.LEFT);
                 lbl.setOpaque(true);
                 lbl.setBorder(new EmptyBorder(10, 12, 10, 12));
                 return lbl;
@@ -247,7 +260,7 @@ public class ProductPanel extends JPanel {
         header.setPreferredSize(new Dimension(0, 42));
         header.setBorder(BorderFactory.createEmptyBorder());
 
-        int[] widths = {100, 100, 150, 150};
+        int[] widths = {80, 80, 150, 150, 80};
         for (int i = 0; i < widths.length; i++)
             table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
 
@@ -257,18 +270,15 @@ public class ProductPanel extends JPanel {
         table.getTableHeader().addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
                 if (!isFilterMode) return;
-                int viewCol  = table.columnAtPoint(e.getPoint());
+                int viewCol = table.columnAtPoint(e.getPoint());
                 if (viewCol < 0) return;
                 int modelCol = table.convertColumnIndexToModel(viewCol);
                 String colName = table.getColumnName(viewCol);
-
                 String input = JOptionPane.showInputDialog(null, "Lọc theo " + colName + ":");
-                if (input != null && !input.trim().isEmpty()) {
-                    rowSorter.setRowFilter(
-                            RowFilter.regexFilter("(?i)" + input.trim(), modelCol));
-                } else if (input != null) {
+                if (input != null && !input.trim().isEmpty())
+                    rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + input.trim(), modelCol));
+                else if (input != null)
                     rowSorter.setRowFilter(null);
-                }
             }
         });
 
@@ -410,13 +420,12 @@ public class ProductPanel extends JPanel {
     //  DATA
     // ======================================================
     private void loadData() {
-        allData = controller.loadAll();
-        renderPage();
-    }
+            allData = controller.loadAll();
+            renderPage();
+        }
 
     private void renderPage() {
         tableModel.setRowCount(0);
-
         String keyword = txtSearch == null ? "" : txtSearch.getText().trim().toLowerCase();
         ProductController.PageResult result =
             controller.getPage(allData, keyword, currentPage, PAGE_SIZE);
@@ -425,14 +434,20 @@ public class ProductPanel extends JPanel {
         currentPageData = result.data;
 
         for (Product sp : currentPageData) {
+            String loai;
+            if (sp.isHasRom() && sp.isHasCd())  loai = "ROM + CD";
+            else if (sp.isHasRom())             loai = "ROM";
+            else if (sp.isHasCd())              loai = "CD";
+            else                                loai = "---";
+
             tableModel.addRow(new Object[]{
                 "SP" + String.format("%03d", sp.getMaSP()),
                 "G"  + String.format("%03d", sp.getMaGame()),
                 String.format("%,.0f đ", sp.getGiaBan()),
-                String.format("%,.0f đ", sp.getGiaThueNgay())
+                String.format("%,.0f đ", sp.getGiaThueNgay()),
+                loai
             });
         }
-
         rebuildPagination(result.totalPages);
     }
 
@@ -440,21 +455,47 @@ public class ProductPanel extends JPanel {
     //  DIALOG: THÊM / SỬA SẢN PHẨM
     // ======================================================
     private void showAddProductDialog() {
+        // Bước 1: chọn loại
+        String[] loaiOptions = {"ROM (Bản kỹ thuật số)", "CD (Đĩa vật lý)"};
+        int loaiChoice = JOptionPane.showOptionDialog(
+            this,
+            "Chọn loại sản phẩm muốn thêm:",
+            "Thêm Sản Phẩm Mới",
+            JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,
+            null, loaiOptions, loaiOptions[0]
+        );
+        if (loaiChoice < 0) return; // bấm X
+        boolean isRom = (loaiChoice == 0);
+
+        // Bước 2: form nhập liệu
         JPanel panel = new JPanel(new GridLayout(0, 1, 5, 5));
         JTextField txtMaGame  = new JTextField();
         JTextField txtGiaBan  = new JTextField("0");
         JTextField txtGiaThue = new JTextField("0");
 
-        panel.add(new JLabel("Mã Game liên kết (*):"));  panel.add(txtMaGame);
-        panel.add(new JLabel("Giá Bán (ROM) - VNĐ:"));   panel.add(txtGiaBan);
-        panel.add(new JLabel("Giá Thuê (CD) - VNĐ:"));   panel.add(txtGiaThue);
+        panel.add(new JLabel("Mã Game liên kết (*):"));
+        panel.add(txtMaGame);
+
+        if (isRom) {
+            panel.add(new JLabel("Giá Bán ROM - VNĐ (*):"));
+            panel.add(txtGiaBan);
+        } else {
+            panel.add(new JLabel("Giá Bán CD - VNĐ (để trống nếu không bán):"));
+            panel.add(txtGiaBan);
+            panel.add(new JLabel("Giá Thuê CD/ngày - VNĐ (để trống nếu không cho thuê):"));
+            panel.add(txtGiaThue);
+        }
 
         int result = JOptionPane.showConfirmDialog(this, panel,
-                "Thêm Sản Phẩm Mới", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+            "Thêm " + (isRom ? "ROM" : "CD"), JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 
         if (result == JOptionPane.OK_OPTION) {
-            ProductController.ActionResult actionResult =
-                    controller.handleAdd(txtMaGame.getText(), txtGiaBan.getText(), txtGiaThue.getText());
+            ProductController.ActionResult actionResult = controller.handleAdd(
+                isRom ? "ROM" : "CD",
+                txtMaGame.getText(),
+                txtGiaBan.getText(),
+                isRom ? "0" : txtGiaThue.getText()
+            );
             showResult(actionResult);
             if (actionResult.success) loadData();
         }

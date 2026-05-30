@@ -56,26 +56,21 @@ public class ProductDAO {
 
     // ================= DELETE =================
     public boolean delete(int maSP) {
-
-        String sql = "DELETE FROM SANPHAM WHERE MaSP = ?";
-
+        String sql = "UPDATE SANPHAM SET IsDeleted = 1 WHERE MaSP = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-
             ps.setInt(1, maSP);
             return ps.executeUpdate() > 0;
-
-        } catch (SQLException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
-
         return false;
     }
 
     // ================= FIND BY ID =================
     public Product findById(int maSP) {
 
-        String sql = "SELECT * FROM SANPHAM WHERE MaSP = ?";
+        String sql = "SELECT * FROM SANPHAM WHERE MaSP = ? AND IsDeleted = 0";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -95,22 +90,35 @@ public class ProductDAO {
 
     // ================= FIND ALL =================
     public List<Product> findAll() {
-
         List<Product> list = new ArrayList<>();
-        String sql = "SELECT * FROM SANPHAM ORDER BY MaSP DESC";
+        String sql =
+            "SELECT sp.MaSP, sp.MaGame, sp.GiaBan, sp.GiaThueNgay, " +
+            "  CASE WHEN r.MaSP IS NOT NULL THEN 1 ELSE 0 END AS HasRom, " +
+            "  CASE WHEN COUNT(cd.MaCD) > 0  THEN 1 ELSE 0 END AS HasCd " +
+            "FROM SANPHAM sp " +
+            "LEFT JOIN ROM r  ON r.MaSP  = sp.MaSP AND r.IsDeleted = 0 " +
+            "LEFT JOIN CD  cd ON cd.MaSP = sp.MaSP AND cd.IsDeleted = 0 " +
+            "WHERE sp.IsDeleted = 0 " +
+            "GROUP BY sp.MaSP, sp.MaGame, sp.GiaBan, sp.GiaThueNgay, r.MaSP " +
+            "ORDER BY sp.MaSP DESC";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
 
             while (rs.next()) {
-                list.add(map(rs));
+                Product sp = new Product();
+                sp.setMaSP(rs.getInt("MaSP"));
+                sp.setMaGame(rs.getInt("MaGame"));
+                sp.setGiaBan(rs.getDouble("GiaBan"));
+                sp.setGiaThueNgay(rs.getDouble("GiaThueNgay"));
+                sp.setHasRom(rs.getInt("HasRom") == 1);
+                sp.setHasCd(rs.getInt("HasCd")  == 1);
+                list.add(sp);
             }
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
-
         return list;
     }
 
@@ -118,7 +126,7 @@ public class ProductDAO {
     public List<Product> findByMaGame(int maGame) {
 
         List<Product> list = new ArrayList<>();
-        String sql = "SELECT * FROM SANPHAM WHERE MaGame = ?";
+        String sql = "SELECT * FROM SANPHAM WHERE MaGame = ? AND IsDeleted = 0";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {

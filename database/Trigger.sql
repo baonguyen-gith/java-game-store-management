@@ -118,5 +118,24 @@ BEGIN
 END;
 GO
 
-PRINT N'Tao bang va trigger thanh cong.';
 GO
+
+-- TRIGGER 6: Vô hiệu hóa USERS khi NhanVien bị soft-delete
+CREATE OR ALTER TRIGGER TRG_DISABLE_USER_KHI_XOA_NV
+ON NHANVIEN AFTER UPDATE
+AS
+BEGIN
+    IF UPDATE(IsDeleted)
+    BEGIN
+        SET NOCOUNT ON;
+        -- Xóa hẳn tài khoản của nhân viên bị đánh dấu IsDeleted = 1
+        -- (hoặc đổi thành UPDATE nếu muốn giữ lại lịch sử)
+        DELETE FROM USERS
+        WHERE MaNV IN (
+            SELECT MaNV FROM inserted WHERE IsDeleted = 1
+        );
+    END
+END;
+GO
+
+PRINT N'Tao bang va trigger thanh cong.';

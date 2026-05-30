@@ -45,7 +45,9 @@ public class ReportController {
     public List<OverdueRow> getOverdueList()  { return reportService.getOverdueList(); }
 
     // ── Tab 7 ────────────────────────────────────────────────
-    public List<VIPRow> getVIPCustomers() { return reportService.getVIPCustomers(); }
+    public List<VIPRow> getVIPCustomers(int year) {
+        return reportService.getVIPCustomers(year);
+    }
 
     // ── Shared util ───────────────────────────────────────────
     public static String formatMoney(double v) { return String.format("%,.0f đ", v); }
@@ -121,7 +123,6 @@ public class ReportController {
         List<Object[]> rows  = (List<Object[]>) data[0];
         double totalBan      = (double) data[1];
         double totalThue     = (double) data[2];
-
         ExportUtil.exportMonthlyExcel(filePath, month, year, rows, totalBan, totalThue);
     }
 
@@ -130,6 +131,36 @@ public class ReportController {
         List<Object[]> rows  = (List<Object[]>) data[0];
         double totalBan      = (double) data[1];
         double totalThue     = (double) data[2];
+        ExportUtil.exportYearlyExcel(filePath, year, rows, totalBan, totalThue);
+    }
+    
+    // ── Export từ cache (không query lại DB) ─────────────────────
+    public void exportMonthlyExcelFromCache(int month, int year,
+            List<MonthlyRow> cache, String filePath) throws IOException {
+
+        List<Object[]> rows = new java.util.ArrayList<>();
+        double totalBan = 0, totalThue = 0;
+
+        for (MonthlyRow r : cache) {
+            rows.add(new Object[]{r.ngay, r.soHD, r.doanhThuBan, r.tienThue});
+            totalBan  += r.doanhThuBan;
+            totalThue += r.tienThue;
+        }
+
+        ExportUtil.exportMonthlyExcel(filePath, month, year, rows, totalBan, totalThue);
+    }
+
+    public void exportYearlyExcelFromCache(int year,
+            List<YearlyRow> cache, String filePath) throws IOException {
+
+        List<Object[]> rows = new java.util.ArrayList<>();
+        double totalBan = 0, totalThue = 0;
+
+        for (YearlyRow r : cache) {
+            rows.add(new Object[]{r.tenThang, r.soHD, r.doanhThuBan, r.soPT, r.tienThue});
+            totalBan  += r.doanhThuBan;
+            totalThue += r.tienThue;
+        }
 
         ExportUtil.exportYearlyExcel(filePath, year, rows, totalBan, totalThue);
     }

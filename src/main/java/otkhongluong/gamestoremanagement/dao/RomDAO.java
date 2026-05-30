@@ -9,7 +9,7 @@ public class RomDAO {
 
     // ================= FIND BY MASP =================
     public ROM findByMaSP(int maSP) {
-        String sql = "SELECT * FROM ROM WHERE MaSP = ?";
+        String sql = "SELECT * FROM ROM WHERE MaSP = ? AND IsDeleted = 0";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, maSP);
@@ -56,12 +56,12 @@ public class RomDAO {
 
     // ================= DELETE =================
     public boolean delete(int maSP) {
-        String sql = "DELETE FROM ROM WHERE MaSP = ?";
+        String sql = "UPDATE ROM SET IsDeleted = 1 WHERE MaSP = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, maSP);
             return ps.executeUpdate() > 0;
-        } catch (SQLException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return false;
@@ -69,7 +69,7 @@ public class RomDAO {
 
     // ================= EXISTS =================
     public boolean existsByMaSP(int maSP) {
-        String sql = "SELECT 1 FROM ROM WHERE MaSP = ?";
+        String sql = "SELECT 1 FROM ROM WHERE MaSP = ? AND IsDeleted = 0";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, maSP);

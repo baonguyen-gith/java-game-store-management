@@ -90,7 +90,9 @@ public class InvoiceService {
             "SELECT sp.MaSP, cd.MaCD, sp.GiaBan, cd.TinhTrang " +
             "FROM SANPHAM sp JOIN CD cd ON sp.MaSP=cd.MaSP " +
             "WHERE sp.MaGame=? AND cd.TrangThai=N'SanSang' " +
+            "  AND cd.TinhTrang != N'Hỏng' " +  // ← THÊM
             "  AND sp.GiaBan IS NOT NULL AND sp.GiaBan>0";
+        
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sqlCD)) {
             ps.setInt(1, maGame);
@@ -158,7 +160,9 @@ public class InvoiceService {
             "SELECT sp.MaSP, cd.MaCD, sp.GiaBan, cd.TinhTrang " +
             "FROM SANPHAM sp JOIN CD cd ON sp.MaSP=cd.MaSP " +
             "WHERE sp.MaGame=? AND cd.TrangThai=N'SanSang' " +
+            "  AND cd.TinhTrang != N'Hỏng' " +  // ← THÊM
             "  AND sp.GiaBan IS NOT NULL AND sp.GiaBan>0";
+        
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sqlCD)) {
             ps.setInt(1, maGame);
@@ -410,8 +414,10 @@ public class InvoiceService {
         if (invoice == null) throw new RuntimeException("Không tìm thấy hóa đơn #" + maHD);
 
         List<String[]> items = new ArrayList<>();
+        double tongGoc = 0;
         for (ChiTietHoaDon ct : invoice.getDanhSachChiTiet()) {
             double thanhTien = ct.getSoLuong() * ct.getDonGia();
+            tongGoc += thanhTien;
             items.add(new String[]{
                 ct.getTenGame(),
                 ct.getLoaiSanPham(),
@@ -421,8 +427,21 @@ public class InvoiceService {
             });
         }
 
+        // Điểm & tiền giảm (lấy từ DB qua Invoice; nếu model chưa có getter thì fallback về 0)
+        int    diemSuDung  = invoice.getDiemSuDung();          // getter mới trong Invoice
+        double tienGiam    = invoice.getTienGiam();            // getter mới trong Invoice
+        double tongPhaiTra = invoice.getTongTien();            // TongTien đã là sau-giảm
+
+        // Nếu model chưa lưu TongGoc riêng, tính lại từ items
+        // (tongGoc = sum donGia*soLuong, chưa trừ điểm)
+        if (tienGiam <= 0 && diemSuDung > 0) {
+            tienGiam = diemSuDung * (double) DIEM_TO_VND;
+        }
+
         // Trả Object[] để tránh tạo thêm class mới
-        return new Object[]{invoice, items};
+        // [0] Invoice  [1] items  [2] tongGoc  [3] diemSuDung  [4] tienGiam  [5] tongPhaiTra
+        return new Object[]{invoice, items,
+                            tongGoc, (double) diemSuDung, tienGiam, tongPhaiTra};
     }
 
     // ================================================================

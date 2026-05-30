@@ -136,6 +136,16 @@ public class RentReturnDialog extends JDialog {
         RentalOrder pt = ctrl.getById(id);
         if (pt == null) return;
 
+        // Chặn nếu phiếu không còn đang thuê
+        if (!"DangThue".equalsIgnoreCase(pt.getTrangThai())) {
+            JOptionPane.showMessageDialog(this,
+                "Phiếu PT" + String.format("%04d", id) + " đã ở trạng thái \"" 
+                + pt.getTrangThai() + "\".\nChỉ có thể trả CD với phiếu đang thuê.",
+                "Không thể thực hiện", JOptionPane.WARNING_MESSAGE);
+            dispose();
+            return;
+        }
+
         selectedPhieu = pt;
         loadStep2Data();
         showStep(2);

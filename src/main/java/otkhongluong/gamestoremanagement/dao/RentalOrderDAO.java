@@ -107,14 +107,16 @@ public class RentalOrderDAO {
 
     public RentalOrder findById(int id) {
         String sql =
-            "SELECT pt.*, kh.HoTen AS TenKH, MIN(nv.HoTen) AS TenNV " +
+            "SELECT pt.*, kh.HoTen AS TenKH, kh.SDT AS SDT, " +
+            "       MIN(ct.MaNV) AS MaNVFirst, MIN(nv.HoTen) AS TenNV " +
             "FROM PHIEUTHUE pt " +
-            "LEFT JOIN KHACHHANG kh ON pt.MaKH = kh.MaKH " +
-            "LEFT JOIN CTPHIEUTHUE ct ON pt.MaPT = ct.MaPT " +
-            "LEFT JOIN NHANVIEN nv ON ct.MaNV = nv.MaNV " +
+            "LEFT JOIN KHACHHANG   kh ON pt.MaKH  = kh.MaKH " +
+            "LEFT JOIN CTPHIEUTHUE ct ON pt.MaPT   = ct.MaPT " +
+            "LEFT JOIN NHANVIEN    nv ON ct.MaNV   = nv.MaNV " +
             "WHERE pt.MaPT = ? " +
             "GROUP BY pt.MaPT, pt.MaKH, pt.NgayThue, pt.NgayTraDuKien, " +
-            "         pt.NgayTraThucTe, pt.TienCoc, pt.TienPhat, pt.TrangThai, kh.HoTen";
+            "         pt.NgayTraThucTe, pt.TienCoc, pt.TienPhat, pt.TrangThai, " +
+            "         kh.HoTen, kh.SDT";
 
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -382,7 +384,10 @@ public class RentalOrderDAO {
         pt.setMaPT(rs.getInt("MaPT"));
         pt.setMaKH(rs.getInt("MaKH"));
         pt.setTenKhachHang(rs.getString("TenKH"));
+        pt.setSoDienThoai(rs.getString("SDT"));          // FIX: trước thiếu dòng này
         pt.setTenNhanVien(rs.getString("TenNV"));
+        // MaNV lấy từ aggregate MIN(ct.MaNV) alias MaNVFirst
+        try { pt.setMaNV(rs.getInt("MaNVFirst")); } catch (SQLException ignored) {}
 
         Timestamp t1 = rs.getTimestamp("NgayThue");
         if (t1 != null) pt.setNgayThue(t1.toLocalDateTime());

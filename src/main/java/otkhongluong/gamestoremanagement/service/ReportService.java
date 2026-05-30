@@ -121,40 +121,37 @@ public class ReportService {
         return rows;
     }
     
-    // Dùng thẳng ReportDAO.getMonthlyRows() và getYearlyRows() đã có
+    // Chốt thời điểm ngay khi quản lý bấm xuất, truyền vào query làm upper bound.
+    // Mọi hóa đơn/phiếu thuê tạo sau thời điểm này đều bị loại khỏi báo cáo.
     public Object[] getMonthlyExportData(int month, int year) {
-        return dao.runInSerializable(conn -> {
-            // Tất cả query chạy trong cùng 1 SERIALIZABLE transaction
-            List<Object[]> rows = dao.getMonthlyRowsWithConn(conn, month, year);
-            double totalBan  = 0, totalThue = 0;
-            for (Object[] row : rows) {
-                totalBan  += ((Number) row[2]).doubleValue();
-                totalThue += ((Number) row[3]).doubleValue();
-            }
-            return new Object[]{rows, totalBan, totalThue};
-        });
+        java.sql.Timestamp snapshot = new java.sql.Timestamp(System.currentTimeMillis());
+        List<Object[]> rows = dao.getMonthlyRowsForExport(month, year, snapshot);
+        double totalBan = 0, totalThue = 0;
+        for (Object[] row : rows) {
+            totalBan  += ((Number) row[2]).doubleValue();
+            totalThue += ((Number) row[3]).doubleValue();
+        }
+        return new Object[]{rows, totalBan, totalThue};
     }
 
-
     public Object[] getYearlyExportData(int year) {
-        return dao.runInSerializable(conn -> {
-            List<Object[]> rows = dao.getYearlyRowsWithConn(conn, year);
-            double totalBan  = 0, totalThue = 0;
-            for (Object[] row : rows) {
-                totalBan  += ((Number) row[2]).doubleValue();
-                totalThue += ((Number) row[4]).doubleValue();
-            }
-            return new Object[]{rows, totalBan, totalThue};
-        });
+        java.sql.Timestamp snapshot = new java.sql.Timestamp(System.currentTimeMillis());
+        List<Object[]> rows = dao.getYearlyRowsForExport(year, snapshot);
+        double totalBan = 0, totalThue = 0;
+        for (Object[] row : rows) {
+            totalBan  += ((Number) row[2]).doubleValue();
+            totalThue += ((Number) row[4]).doubleValue();
+        }
+        return new Object[]{rows, totalBan, totalThue};
     }
 
 
     // ── Tab 7 ────────────────────────────────────────────────
 
-    public List<VIPRow> getVIPCustomers() {
+    public List<VIPRow> getVIPCustomers(int year) {
         List<VIPRow> rows = new ArrayList<>();
         int rank = 1;
-        for (Object[] r : dao.getVIPCustomers()) {
+        for (Object[] r : dao.getVIPCustomers(year)) {
             String medal = rank == 1 ? "🥇" : rank == 2 ? "🥈" : rank == 3 ? "🥉" : String.valueOf(rank);
             rows.add(new VIPRow(medal, (String)r[0], (String)r[1], (String)r[2],
                     (int)r[3], (double)r[4], (double)r[5]));

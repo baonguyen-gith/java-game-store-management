@@ -60,20 +60,14 @@ public class GameDAO {
 
     // ================= DELETE =================
     public boolean delete(int maGame) {
-
-        String sql = "DELETE FROM GAME WHERE MaGame = ?";
-
+        String sql = "UPDATE GAME SET IsDeleted = 1 WHERE MaGame = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-
             ps.setInt(1, maGame);
             return ps.executeUpdate() > 0;
-
-        } catch (SQLException e) {
-            System.err.println("Không thể xóa Game (đang có SANPHAM/CD/ROM liên kết)");
+        } catch (Exception e) {
             e.printStackTrace();
         }
-
         return false;
     }
     
@@ -88,11 +82,13 @@ public class GameDAO {
             "  gc.MoTa, gc.Rating, gc.Genre, gc.DeliveryMethod, gc.ReleaseDate, " +
             "  gc.Region, gc.Features, gc.Language, gc.Currency, " +
 
-            "  CASE WHEN COUNT(CASE WHEN cd.TrangThai = N'SanSang' THEN 1 END) > 0 " +
+            "  CASE WHEN COUNT(CASE WHEN cd.TrangThai = N'SanSang' " +
+            "                       AND cd.TinhTrang != N'Hỏng' THEN 1 END) > 0 " +  // ← THÊM
             "       THEN MAX(CASE WHEN cd.MaSP IS NOT NULL THEN spCD.GiaBan ELSE NULL END) " +
             "       ELSE NULL END AS GiaCD, " +
             "  MAX(CASE WHEN r.MaSP IS NOT NULL THEN spROM.GiaBan ELSE NULL END) AS GiaROM, " +
-            "  CASE WHEN COUNT(CASE WHEN cd.TrangThai = N'SanSang' THEN 1 END) > 0 " +
+            "  CASE WHEN COUNT(CASE WHEN cd.TrangThai = N'SanSang' " +
+            "                       AND cd.TinhTrang != N'Hỏng' THEN 1 END) > 0 " +  // ← THÊM
             "       THEN MAX(CASE WHEN cd.MaSP IS NOT NULL THEN spCD.GiaThueNgay ELSE NULL END) " +
             "       ELSE NULL END AS GiaThueNgay " +
 
@@ -102,7 +98,7 @@ public class GameDAO {
             "LEFT JOIN CD cd        ON cd.MaSP     = spCD.MaSP " +
             "LEFT JOIN SANPHAM spROM ON spROM.MaGame = g.MaGame " +
             "LEFT JOIN ROM r         ON r.MaSP        = spROM.MaSP " +
-
+            "WHERE g.IsDeleted = 0 " +
             "GROUP BY g.MaGame, g.TenGame, g.TheLoai, g.NenTang, g.GhiChu, g.HinhAnh, " +
             "  gc.MoTa, gc.Rating, gc.Genre, gc.DeliveryMethod, gc.ReleaseDate, " + // ← THÊM VÀO GROUP BY
             "  gc.Region, gc.Features, gc.Language, gc.Currency " +
@@ -154,7 +150,7 @@ public class GameDAO {
     // ================= FIND BY ID =================
     public Game findById(int maGame) {
 
-        String sql = "SELECT * FROM GAME WHERE MaGame = ?";
+        String sql = "SELECT * FROM GAME WHERE MaGame = ? AND IsDeleted = 0";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -179,10 +175,7 @@ public class GameDAO {
 
         List<Game> list = new ArrayList<>();
 
-        String sql = "SELECT * FROM GAME " +
-                     "WHERE LOWER(TenGame) LIKE ? " +
-                     "OR LOWER(TheLoai) LIKE ? " +
-                     "OR LOWER(NenTang) LIKE ?";
+        String sql = "SELECT * FROM GAME WHERE IsDeleted = 0 AND (LOWER(TenGame) LIKE ? OR LOWER(TheLoai) LIKE ? OR LOWER(NenTang) LIKE ?)";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {

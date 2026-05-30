@@ -66,21 +66,29 @@ public class ProductController {
     }
 
     // ==================== ADD ====================
-
-    // ✅ Trả ActionResult thay vì gọi JOptionPane
-    public ActionResult handleAdd(String maGameStr, String giaBanStr, String giaThueStr) {
+    public ActionResult handleAdd(String loai, String maGameStr,
+                                   String giaBanStr, String giaThueStr) {
         if (maGameStr == null || maGameStr.trim().isEmpty())
             return ActionResult.fail("Vui lòng nhập Mã Game!");
         try {
             Product sp = new Product();
             sp.setMaGame(Integer.parseInt(maGameStr.trim()));
-            sp.setGiaBan(Double.parseDouble(giaBanStr.trim()));
-            sp.setGiaThueNgay(Double.parseDouble(giaThueStr.trim()));
+
+            if ("ROM".equals(loai)) {
+                sp.setGiaBan(Double.parseDouble(giaBanStr.trim()));
+                sp.setGiaThueNgay(0);
+            } else { // CD
+                double giaBan  = giaBanStr  == null || giaBanStr.trim().isEmpty()  ? 0 : Double.parseDouble(giaBanStr.trim());
+                double giaThue = giaThueStr == null || giaThueStr.trim().isEmpty() ? 0 : Double.parseDouble(giaThueStr.trim());
+                if (giaBan == 0 && giaThue == 0)
+                    return ActionResult.fail("Vui lòng nhập ít nhất Giá Bán hoặc Giá Thuê cho CD!");
+                sp.setGiaBan(giaBan);
+                sp.setGiaThueNgay(giaThue);
+            }
 
             boolean ok = service.addSanPham(sp);
-            return ok
-                ? ActionResult.ok("Thêm sản phẩm thành công!")
-                : ActionResult.fail("Lỗi: Không tìm thấy Mã Game này hoặc lỗi kết nối!");
+            return ok ? ActionResult.ok("Thêm sản phẩm thành công!")
+                      : ActionResult.fail("Lỗi: Không tìm thấy Mã Game hoặc lỗi kết nối!");
         } catch (NumberFormatException ex) {
             return ActionResult.fail("Mã Game và Giá tiền phải là con số!");
         } catch (Exception ex) {

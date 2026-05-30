@@ -62,27 +62,21 @@ public class CustomerDAO {
 
     // ================= DELETE =================
     public boolean delete(int maKH) {
-
-        String sql = "DELETE FROM KHACHHANG WHERE MaKH = ?";
-
+        String sql = "UPDATE KHACHHANG SET IsDeleted = 1 WHERE MaKH = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-
             ps.setInt(1, maKH);
             return ps.executeUpdate() > 0;
-
-        } catch (SQLException e) {
-            System.err.println("Không thể xóa khách hàng (liên quan HOADON / PHIEUTHUE)");
+        } catch (Exception e) {
             e.printStackTrace();
         }
-
         return false;
     }
 
     // ================= FIND BY ID =================
     public Customer findById(int maKH) {
 
-        String sql = "SELECT * FROM KHACHHANG WHERE MaKH = ?";
+        String sql = "SELECT * FROM KHACHHANG WHERE MaKH = ? AND IsDeleted = 0";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -106,7 +100,7 @@ public class CustomerDAO {
     public List<Customer> findAll() {
 
         List<Customer> list = new ArrayList<>();
-        String sql = "SELECT * FROM KHACHHANG ORDER BY MaKH DESC";
+        String sql = "SELECT * FROM KHACHHANG WHERE IsDeleted = 0 ORDER BY MaKH DESC";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
@@ -127,7 +121,7 @@ public class CustomerDAO {
 
         List<String> list = new ArrayList<>();
 
-        String sql = "SELECT HoTen FROM KHACHHANG";
+        String sql = "SELECT HoTen FROM KHACHHANG WHERE IsDeleted = 0";
 
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql);
@@ -147,7 +141,7 @@ public class CustomerDAO {
        // ================= FIND BY SDT =================
     public Customer findBySDT(String sdt) {
 
-        String sql = "SELECT * FROM KHACHHANG WHERE SDT = ?";
+        String sql = "SELECT * FROM KHACHHANG WHERE SDT = ? AND IsDeleted = 0";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -201,10 +195,7 @@ public class CustomerDAO {
 
         List<Customer> list = new ArrayList<>();
 
-        String sql = "SELECT * FROM KHACHHANG " +
-                     "WHERE LOWER(HoTen) LIKE ? " +
-                     "OR SDT LIKE ? " +
-                     "OR LOWER(Email) LIKE ?";
+        String sql = "WHERE IsDeleted = 0 AND (LOWER(HoTen) LIKE ? OR SDT LIKE ? OR LOWER(Email) LIKE ?)";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {

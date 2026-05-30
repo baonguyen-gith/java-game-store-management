@@ -48,6 +48,8 @@ public class DiscDAO {
             "JOIN SANPHAM sp ON cd.MaSP = sp.MaSP " +
             "JOIN GAME g ON sp.MaGame = g.MaGame " +
             "WHERE cd.TrangThai = N'SanSang' " +
+            "  AND cd.TinhTrang != N'Hỏng' " +  // ← THÊM
+            "  AND cd.IsDeleted = 0 " +
             "  AND sp.GiaThueNgay IS NOT NULL " +
             "  AND sp.GiaThueNgay > 0 " +
             "ORDER BY g.TenGame";
@@ -71,7 +73,7 @@ public class DiscDAO {
     // ================= [MỚI] FIND ALL BY MASP =================
     public List<Disc> findByMaSP(int maSP) {
         List<Disc> list = new ArrayList<>();
-        String sql = "SELECT * FROM CD WHERE MaSP = ? ORDER BY MaCD";
+        String sql = "SELECT * FROM CD WHERE MaSP = ? AND IsDeleted = 0 ORDER BY MaCD";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, maSP);
@@ -114,13 +116,13 @@ public class DiscDAO {
 
     // ================= [MỚI] DELETE (chỉ xóa khi SanSang) =================
     public boolean deleteByMaCD(int maCD) {
-        // Chỉ cho phép xóa đĩa đang ở trạng thái SanSang (chưa thuê)
-        String sql = "DELETE FROM CD WHERE MaCD = ? AND TrangThai = N'SanSang'";
+        // Chỉ soft delete đĩa đang SanSang
+        String sql = "UPDATE CD SET IsDeleted = 1 WHERE MaCD = ? AND TrangThai = N'SanSang'";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, maCD);
             return ps.executeUpdate() > 0;
-        } catch (SQLException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return false;
@@ -128,7 +130,7 @@ public class DiscDAO {
 
     // ================= [MỚI] COUNT TỔNG =================
     public int countByMaSP(int maSP) {
-        String sql = "SELECT COUNT(*) FROM CD WHERE MaSP = ?";
+        String sql = "SELECT COUNT(*) FROM CD WHERE MaSP = ? AND IsDeleted = 0";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, maSP);
@@ -142,7 +144,7 @@ public class DiscDAO {
 
     // ================= [MỚI] COUNT SẴN SÀNG =================
     public int countSanSangByMaSP(int maSP) {
-        String sql = "SELECT COUNT(*) FROM CD WHERE MaSP = ? AND TrangThai = N'SanSang'";
+        String sql = "SELECT COUNT(*) FROM CD WHERE MaSP = ? AND TrangThai = N'SanSang' AND IsDeleted = 0";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, maSP);

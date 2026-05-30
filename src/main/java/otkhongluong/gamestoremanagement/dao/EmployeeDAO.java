@@ -83,7 +83,7 @@ public class EmployeeDAO {
     // ================= CRUD OPERATIONS =================
     public List<Employee> findAll() {
         List<Employee> list = new ArrayList<>();
-        String sql = "SELECT * FROM NHANVIEN ORDER BY MaNV DESC";
+        String sql = "SELECT * FROM NHANVIEN WHERE IsDeleted = 0 ORDER BY MaNV DESC";
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
@@ -97,7 +97,7 @@ public class EmployeeDAO {
     }
 
     public Employee findById(int maNV) {
-        String sql = "SELECT * FROM NHANVIEN WHERE MaNV = ?";
+        String sql = "SELECT * FROM NHANVIEN WHERE MaNV = ? AND IsDeleted = 0";
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, maNV);
@@ -144,15 +144,33 @@ public class EmployeeDAO {
     }
 
     public boolean delete(int maNV) {
-        String sql = "DELETE FROM NHANVIEN WHERE MaNV = ?";
-        try (Connection con = DBConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, maNV);
-            return ps.executeUpdate() > 0;
+        String sqlDeleteUser = "DELETE FROM USERS WHERE MaNV = ?";
+        String sqlDeleteNV   = "UPDATE NHANVIEN SET IsDeleted = 1 WHERE MaNV = ?";
+
+        try (Connection con = DBConnection.getConnection()) {
+            con.setAutoCommit(false); // transaction
+
+            try (PreparedStatement ps1 = con.prepareStatement(sqlDeleteUser)) {
+                ps1.setInt(1, maNV);
+                ps1.executeUpdate(); // không cần check > 0, có thể chưa có TK
+            }
+
+            try (PreparedStatement ps2 = con.prepareStatement(sqlDeleteNV)) {
+                ps2.setInt(1, maNV);
+                int rows = ps2.executeUpdate();
+                if (rows > 0) {
+                    con.commit();
+                    return true;
+                } else {
+                    con.rollback();
+                    return false;
+                }
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
+            return false;
         }
-        return false;
     }
 
     private Employee mapResultSetToNhanVien(ResultSet rs) throws SQLException {

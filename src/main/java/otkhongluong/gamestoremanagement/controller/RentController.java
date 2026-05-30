@@ -215,19 +215,25 @@ public class RentController {
      * @return ActionResult; nếu success thì message chứa thông tin phiếu
      */
     public ActionResult createPhieuThue(RentalOrder pt, int diemThucDung) {
+        // ★ Gán maNV từ Session cho từng CTPhieuThue nếu chưa có
+        int maNVSession = otkhongluong.gamestoremanagement.util.Session.getMaNV();
+        if (pt.getDanhSachChiTiet() != null) {
+            for (CTPhieuThue ct : pt.getDanhSachChiTiet()) {
+                if (ct.getMaNV() <= 0) ct.setMaNV(maNVSession);
+            }
+        }
+
         boolean ok = service.createPhieuThue(pt);
         if (!ok) return ActionResult.fail(
-            "CD" + pt.getDanhSachChiTiet().get(0).getMaCD() + 
+            "CD" + pt.getDanhSachChiTiet().get(0).getMaCD() +
             " không còn sẵn sàng!\n" +
             "Có thể đã được bán hoặc thuê bởi giao dịch khác.\n" +
             "Vui lòng nhấn \"Làm mới\" ở Bước 1 để cập nhật danh sách.");
 
-        // Trừ điểm + ghi log — uỷ quyền cho Service
         if (pt.getMaKH() > 0 && diemThucDung > 0) {
             String result = service.deductPointForRental(
                 pt.getMaKH(), diemThucDung, pt.getMaPT());
             if (result != null) {
-                // Không fail toàn bộ giao dịch, nhưng trả về cảnh báo
                 return ActionResult.ok("Tạo phiếu thuê thành công nhưng trừ điểm thất bại:\n" + result);
             }
         }
@@ -414,25 +420,39 @@ public class RentController {
     }
     
     public void exportRentalPDF(int maPT, String filePath) throws IOException {
-        Object[] data       = service.getRentalExportData(maPT);
-        RentalOrder rental  = (RentalOrder) data[0];
-        List<String[]> items = (List<String[]>) data[1];
-        double tongTienThue = (double) data[2];
+        Object[] data         = service.getRentalExportData(maPT);
+        RentalOrder rental    = (RentalOrder)   data[0];
+        List<String[]> items  = (List<String[]>) data[1];
+        double tienThueBanDau = (double)         data[2];
+        double diemSuDung     = (double)         data[3];
+        double tienGiamDiem   = (double)         data[4];
+        double tienGiaHan     = (double)         data[5];
+        double tienPhatTreHan = (double)         data[6];
+        double tienHuHong     = (double)         data[7];
+
+        // maNV từ RentalOrder (đã được map từ MIN(ct.MaNV) trong findById)
+        int    maNV        = rental.getMaNV();
+        String tenNhanVien = rental.getTenNhanVien();   // đã JOIN NHANVIEN trong findById
 
         ExportUtil.exportRentalPDF(
             filePath,
             rental.getMaPT(),
             rental.getTenKhachHang(),
-            rental.getSoDienThoai(),
-            rental.getTenNhanVien(),
+            rental.getSoDienThoai(),       // FIX: trước bị null vì DAO thiếu kh.SDT
+            maNV,                          // THÊM MỚI
+            tenNhanVien,                   // FIX: trước bị null
             rental.getNgayThue(),
             rental.getNgayTraDuKien(),
             rental.getNgayTraThucTe(),
             rental.getTienCoc(),
-            rental.getTienPhat(),
+            tienThueBanDau,
+            diemSuDung,
+            tienGiamDiem,
+            tienGiaHan,
+            tienPhatTreHan,
+            tienHuHong,
             rental.getTrangThai(),
-            items,
-            tongTienThue
+            items
         );
     }
 

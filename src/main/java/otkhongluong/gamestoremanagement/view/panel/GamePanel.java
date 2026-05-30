@@ -108,6 +108,9 @@ public class GamePanel extends JPanel {
         title.setFont(F_HEADER);
         title.setForeground(TEXT_WHITE);
         inner.add(title, BorderLayout.WEST);
+        
+        JButton btnRefresh = makeRefreshButton();
+        inner.add(btnRefresh, BorderLayout.EAST);
 
         JPanel sep = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
@@ -124,6 +127,37 @@ public class GamePanel extends JPanel {
         wrap.add(inner, BorderLayout.CENTER);
         wrap.add(sep,   BorderLayout.SOUTH);
         return wrap;
+    }
+    
+    private JButton makeRefreshButton() {
+        JButton btn = new JButton("Làm mới") { // ↻
+            private boolean hov = false;
+            {
+                setFocusPainted(false);
+                setContentAreaFilled(false);
+                setBorderPainted(false);
+                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                setFont(new Font("Segoe UI", Font.BOLD, 13));
+                setForeground(new Color(180, 160, 255));
+                addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) { hov = true;  repaint(); }
+                    public void mouseExited (MouseEvent e) { hov = false; repaint(); }
+                });
+            }
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                if (hov) {
+                    g2.setColor(new Color(80, 55, 160));
+                    g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 8, 8));
+                }
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        btn.setBorder(new EmptyBorder(6, 14, 6, 14));
+        btn.addActionListener(e -> loadGames());
+        return btn;
     }
 
     private void loadGames() {
@@ -342,16 +376,25 @@ public class GamePanel extends JPanel {
     // ── IMAGE LOADER ─────────────────────────────────────────────
     private ImageIcon loadImage(String path, int w, int h) {
         try {
-            if (path == null || path.isBlank()) throw new Exception();
-            java.net.URL url = getClass().getResource(path);
-            if (url == null) throw new Exception();
-            return new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(w, h, Image.SCALE_SMOOTH));
+            if (path == null || path.isBlank()) return null;
+
+            Image img = null;
+
+            java.io.File file = new java.io.File(path);
+            if (file.exists() && file.isFile()) {
+                img = new ImageIcon(file.getAbsolutePath()).getImage();
+            }
+
+            if (img == null) {
+                java.net.URL url = getClass().getResource(path);
+                if (url != null) img = new ImageIcon(url).getImage();
+            }
+
+            if (img == null) return null;
+
+            return new ImageIcon(img.getScaledInstance(w, h, Image.SCALE_SMOOTH));
+
         } catch (Exception e) {
-            try {
-                java.net.URL def = getClass().getResource("/icons/no-image.png");
-                if (def != null)
-                    return new ImageIcon(new ImageIcon(def).getImage().getScaledInstance(w, h, Image.SCALE_SMOOTH));
-            } catch (Exception ignored) {}
             return null;
         }
     }

@@ -321,19 +321,32 @@ public class InvoiceController {
     }
     
     public void exportInvoicePDF(int maHD, String filePath) throws IOException {
-        Object[] data    = service.getInvoiceExportData(maHD);
-        Invoice invoice  = (Invoice) data[0];
+        Object[] data        = service.getInvoiceExportData(maHD);
+        Invoice invoice      = (Invoice)       data[0];
         List<String[]> items = (List<String[]>) data[1];
+        double tongGoc       = (double)         data[2];
+        double diemSuDung    = (double)         data[3];
+        double tienGiam      = (double)         data[4];
+        double tongPhaiTra   = (double)         data[5];
+
+        // Lấy tên nhân viên — Invoice.getTenNhanVien() được map từ DAO (JOIN NHANVIEN)
+        int    maNV       = invoice.getMaNV();
+        String tenNhanVien = invoice.getTenNhanVien();   // getter mới trong Invoice
 
         ExportUtil.exportInvoicePDF(
             filePath,
             invoice.getMaHD(),
             invoice.getTenKhachHang(),
             invoice.getSoDienThoai(),
+            maNV,
+            tenNhanVien,
             invoice.getNgayLap(),
             invoice.getTrangThai(),
             items,
-            invoice.getTongTien()
+            tongGoc,
+            diemSuDung,
+            tienGiam,
+            tongPhaiTra
         );
     }
 
