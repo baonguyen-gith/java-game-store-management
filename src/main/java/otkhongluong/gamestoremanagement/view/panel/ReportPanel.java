@@ -849,7 +849,8 @@ public class ReportPanel extends JPanel {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             drawGrouped(g2, ban, thue, days, buildDayLabels(days),
                 new Color[]{COLOR_REVENUE, COLOR_RENT},
-                new String[]{"Bán", "Thuê (hoàn thành)"});
+                new String[]{"Bán", "Thuê (hoàn thành)"},
+                getWidth(), getHeight());   // ← thêm 2 tham số này
             g2.dispose();
         }
 
@@ -879,62 +880,76 @@ public class ReportPanel extends JPanel {
             String[] lbl = {"T1","T2","T3","T4","T5","T6","T7","T8","T9","T10","T11","T12"};
             drawGrouped(g2, banData, thueData, 12, lbl,
                 new Color[]{COLOR_REVENUE, COLOR_RENT},
-                new String[]{"Bán", "Thuê (hoàn thành)"});
+                new String[]{"Bán", "Thuê (hoàn thành)"},
+                getWidth(), getHeight());   // ← thêm 2 tham số này
             g2.dispose();
         }
     }
 
     // ── Shared grouped bar renderer ───────────────────────────────────────────
     private void drawGrouped(Graphics2D g2, double[] a, double[] b, int n,
-                              String[] labels, Color[] colors, String[] seriesNames) {
-        int w = getWidth(), h = getHeight();
-        int padL = 64, padR = 14, padT = 20, padB = 46;
-        int cW = w - padL - padR, cH = h - padT - padB;
-        if (cW <= 0 || cH <= 0) return;
-        double max = 1;
-        for (int i = 0; i < n; i++) max = Math.max(max, Math.max(a[i], b[i]));
+                                String[] labels, Color[] colors, String[] seriesNames,
+                                int w, int h) {   // ← nhận w, h từ caller
+          int padL = 64, padR = 14, padT = 20, padB = 46;
+          int cW = w - padL - padR, cH = h - padT - padB;
+          if (cW <= 0 || cH <= 0) return;
 
-        int groupW = cW / n;
-        int barW   = Math.max(3, groupW / 3);
+          double max = 1;
+          for (int i = 0; i < n; i++) max = Math.max(max, Math.max(a[i], b[i]));
 
-        for (int i = 0; i <= 4; i++) {
-            int y = padT + cH - (int)(cH * i / 4.0);
-            g2.setColor(new Color(255, 255, 255, 18));
-            g2.drawLine(padL, y, w - padR, y);
-            g2.setColor(TEXT_MUTED);
-            g2.setFont(new Font("Segoe UI", Font.PLAIN, 9));
-            g2.drawString(MiniBarChart.moneyShort(max * i / 4), 2, y + 4);
-        }
+          // ── Key fix: barW cố định, group tính từ barW ──
+          int barW   = Math.max(6, Math.min(18, cW / (n * 3)));
+          int gap    = Math.max(2, barW / 3);          // khoảng giữa 2 cột cùng nhóm
+          int groupW = barW * 2 + gap;                  // tổng chiều rộng 1 nhóm
+          int groupGap = Math.max(2, (cW - groupW * n) / Math.max(1, n)); // khoảng giữa các nhóm
 
-        for (int i = 0; i < n; i++) {
-            double[] vals = {a[i], b[i]};
-            int gx = padL + i * groupW;
-            for (int s = 0; s < 2; s++) {
-                int bx = gx + s * (barW + 2) + (groupW - 2 * barW - 2) / 2;
-                int bh = (int)(cH * vals[s] / max);
-                if (bh < 2 && vals[s] > 0) bh = 2;
-                int by = padT + cH - bh;
-                g2.setPaint(new GradientPaint(bx, by, colors[s].brighter(), bx, padT + cH, colors[s].darker()));
-                g2.fill(new RoundRectangle2D.Float(bx, by, barW, bh, 4, 4));
-            }
-            if (labels != null && i < labels.length) {
-                g2.setColor(TEXT_MUTED);
-                g2.setFont(new Font("Segoe UI", Font.PLAIN, 9));
-                FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(labels[i], gx + (groupW - fm.stringWidth(labels[i])) / 2, h - padB + 14);
-            }
-        }
+          // Grid lines
+          for (int i = 0; i <= 4; i++) {
+              int y = padT + cH - (int)(cH * i / 4.0);
+              g2.setColor(new Color(255, 255, 255, 18));
+              g2.drawLine(padL, y, w - padR, y);
+              g2.setColor(TEXT_MUTED);
+              g2.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+              g2.drawString(MiniBarChart.moneyShort(max * i / 4), 2, y + 4);
+          }
 
-        int lx = padL;
-        for (int s = 0; s < seriesNames.length; s++) {
-            g2.setColor(colors[s]);
-            g2.fillRoundRect(lx, h - padB + 24, 10, 10, 3, 3);
-            g2.setColor(TEXT_MUTED);
-            g2.setFont(new Font("Segoe UI", Font.PLAIN, 10));
-            g2.drawString(seriesNames[s], lx + 14, h - padB + 33);
-            lx += 100;
-        }
-    }
+          for (int i = 0; i < n; i++) {
+              double[] vals = {a[i], b[i]};
+              // Căn giữa nhóm trong slot của nó
+              int slotStart = padL + i * (cW / n);
+              int slotW     = cW / n;
+              int gx        = slotStart + (slotW - groupW) / 2;
+
+              for (int s = 0; s < 2; s++) {
+                  int bx = gx + s * (barW + gap);
+                  int bh = (int)(cH * vals[s] / max);
+                  if (bh < 2 && vals[s] > 0) bh = 2;
+                  int by = padT + cH - bh;
+                  g2.setPaint(new GradientPaint(bx, by, colors[s].brighter(), bx, padT + cH, colors[s].darker()));
+                  g2.fill(new RoundRectangle2D.Float(bx, by, barW, bh, 4, 4));
+              }
+
+              // Nhãn trục X
+              if (labels != null && i < labels.length) {
+                  g2.setColor(TEXT_MUTED);
+                  g2.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+                  FontMetrics fm = g2.getFontMetrics();
+                  int lx = slotStart + (slotW - fm.stringWidth(labels[i])) / 2;
+                  g2.drawString(labels[i], lx, h - padB + 14);
+              }
+          }
+
+          // Legend
+          int lx = padL;
+          for (int s = 0; s < seriesNames.length; s++) {
+              g2.setColor(colors[s]);
+              g2.fillRoundRect(lx, h - padB + 24, 10, 10, 3, 3);
+              g2.setColor(TEXT_MUTED);
+              g2.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+              g2.drawString(seriesNames[s], lx + 14, h - padB + 33);
+              lx += 100;
+          }
+      }
 
     // ═════════════════════════════════════════════════════════════════════════
     // HELPERS — UI (không có DB code)
