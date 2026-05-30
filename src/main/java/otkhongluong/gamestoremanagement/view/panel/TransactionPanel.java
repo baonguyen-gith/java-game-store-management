@@ -95,6 +95,16 @@ public class TransactionPanel extends JPanel {
 
         // Tải dữ liệu lần đầu
         render(controller.loadAll());
+
+        // Tự động tải lại dữ liệu khi hiển thị trên giao diện (chuyển tab)
+        addHierarchyListener(new HierarchyListener() {
+            @Override
+            public void hierarchyChanged(HierarchyEvent e) {
+                if ((e.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing()) {
+                    render(controller.loadAll());
+                }
+            }
+        });
     }
 
     // ══════════════════════════════════════════════════════════
