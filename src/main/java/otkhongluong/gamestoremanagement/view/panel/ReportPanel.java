@@ -71,6 +71,16 @@ public class ReportPanel extends JPanel {
         setBorder(new EmptyBorder(22, 22, 22, 22));
         add(buildHeader(),  BorderLayout.NORTH);
         add(buildContent(), BorderLayout.CENTER);
+
+        // Tự động tải lại dữ liệu khi hiển thị trên giao diện (chuyển tab)
+        addHierarchyListener(new java.awt.event.HierarchyListener() {
+            @Override
+            public void hierarchyChanged(java.awt.event.HierarchyEvent e) {
+                if ((e.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing()) {
+                    doRefresh();
+                }
+            }
+        });
     }
 
     // ═════════════════════════════════════════════════════════════════════════
