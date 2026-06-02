@@ -136,18 +136,7 @@ public class LoginView extends JFrame {
         chkRemember.setSelected(true); // mặc định checked như ảnh
         chkRemember.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-        // Label "forgot password"
-        JLabel forgot = new JLabel("forgot password");
-        forgot.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        forgot.setForeground(TEXT_FORGOT);
-        forgot.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        forgot.addMouseListener(new MouseAdapter() {
-            public void mouseEntered(MouseEvent e) { forgot.setForeground(Color.WHITE); }
-            public void mouseExited(MouseEvent e)  { forgot.setForeground(TEXT_FORGOT); }
-        });
-
         options.add(chkRemember, BorderLayout.WEST);
-        options.add(forgot, BorderLayout.EAST);
 
         // ── Sign in button (đen) ───────────────────────────
         DarkButton signIn = new DarkButton("Sign in");
