@@ -65,6 +65,16 @@ public class CustomerPanel extends JPanel {
         add(buildBottomBar(), BorderLayout.SOUTH);
 
         loadData();
+
+        // Tự động tải lại dữ liệu khi hiển thị trên giao diện (chuyển tab)
+        addHierarchyListener(new HierarchyListener() {
+            @Override
+            public void hierarchyChanged(HierarchyEvent e) {
+                if ((e.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing()) {
+                    loadData();
+                }
+            }
+        });
     }
 
     /* ======================================================

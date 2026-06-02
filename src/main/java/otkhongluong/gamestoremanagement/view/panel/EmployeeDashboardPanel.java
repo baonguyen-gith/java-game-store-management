@@ -31,6 +31,8 @@ public class EmployeeDashboardPanel extends JPanel {
     private final JLabel lblSoHoaDon;
     private final JLabel lblSoPhieuThue;
 
+    private EmployeeDashboardController controller;
+
     // ─── Constructor ──────────────────────────────────────────────────────
 
     /**
@@ -113,14 +115,26 @@ public class EmployeeDashboardPanel extends JPanel {
 
         // ✅ Tạo Controller và load data ngay sau khi UI sẵn sàng
         if (currentUser.hasEmployee()) {
-            EmployeeDashboardController controller =
+            this.controller =
                 new EmployeeDashboardController(this, currentUser.getMaNV());
-            controller.loadData();
+            this.controller.loadData();
         } else {
             // User chưa được gắn nhân viên (VD: tài khoản system thuần)
             lblName.setText(currentUser.getUsername());
             lblMaNV.setText("Chưa gắn NV");
         }
+
+        // Tự động tải lại dữ liệu khi hiển thị trên giao diện (chuyển tab)
+        addHierarchyListener(new java.awt.event.HierarchyListener() {
+            @Override
+            public void hierarchyChanged(java.awt.event.HierarchyEvent e) {
+                if ((e.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing()) {
+                    if (controller != null) {
+                        controller.loadData();
+                    }
+                }
+            }
+        });
     }
 
     // ─── Public setters — CHỈ được gọi từ EmployeeDashboardController ────
